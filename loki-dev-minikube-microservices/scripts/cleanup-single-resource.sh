@@ -1,0 +1,78 @@
+#!/bin/bash
+# Individual resource cleanup commands for selective deletion
+
+echo "🧹 Individual Resource Cleanup Commands"
+echo "Copy and paste any command below to delete specific resources:"
+echo ""
+
+echo "# Stop port forwards"
+echo "pkill -f \"kubectl port-forward\""
+echo ""
+
+echo "# Delete Fluent Bit"
+echo "kubectl delete daemonset fluent-bit -n loki"
+echo ""
+
+echo "# Delete individual deployments"
+echo "kubectl delete deployment loki-distributor -n loki"
+echo "kubectl delete deployment loki-querier -n loki"
+echo "kubectl delete deployment loki-query-frontend -n loki"
+echo "kubectl delete deployment loki-query-scheduler -n loki"
+echo "kubectl delete deployment loki-compactor -n loki"
+echo "kubectl delete deployment loki-ruler -n loki"
+echo "kubectl delete deployment loki-index-gateway -n loki"
+echo ""
+
+echo "# Delete StatefulSet"
+echo "kubectl delete statefulset loki-ingester -n loki"
+echo ""
+
+echo "# Delete MinIO"
+echo "kubectl delete deployment minio -n loki"
+echo ""
+
+echo "# Delete individual services"
+echo "kubectl delete service distributor -n loki"
+echo "kubectl delete service ingester -n loki"
+echo "kubectl delete service querier -n loki"
+echo "kubectl delete service query-frontend -n loki"
+echo "kubectl delete service query-scheduler -n loki"
+echo "kubectl delete service compactor -n loki"
+echo "kubectl delete service ruler -n loki"
+echo "kubectl delete service index-gateway -n loki"
+echo "kubectl delete service minio -n loki"
+echo ""
+
+echo "# Delete individual ConfigMaps"
+echo "kubectl delete configmap distributor-config -n loki"
+echo "kubectl delete configmap ingester-config -n loki"
+echo "kubectl delete configmap querier-config -n loki"
+echo "kubectl delete configmap query-frontend-config -n loki"
+echo "kubectl delete configmap query-scheduler-config -n loki"
+echo "kubectl delete configmap compactor-config -n loki"
+echo "kubectl delete configmap ruler-config -n loki"
+echo "kubectl delete configmap index-gateway-config -n loki"
+echo "kubectl delete configmap fluent-bit-config -n loki"
+echo ""
+
+echo "# Delete secrets"
+echo "kubectl delete secret minio-creds -n loki"
+echo ""
+
+echo "# Delete RBAC resources"
+echo "kubectl delete serviceaccount fluent-bit -n loki"
+echo "kubectl delete clusterrole fluent-bit"
+echo "kubectl delete clusterrolebinding fluent-bit"
+echo ""
+
+echo "# Delete individual PVCs"
+echo "kubectl delete pvc ingester-data-loki-ingester-0 -n loki"
+echo "kubectl delete pvc ingester-wal-loki-ingester-0 -n loki"
+echo "kubectl delete pvc compactor-data -n loki"
+echo "kubectl delete pvc querier-cache -n loki"
+echo "kubectl delete pvc index-cache -n loki"
+echo "kubectl delete pvc minio-pvc -n loki"
+echo ""
+
+echo "# Delete namespace (this will delete everything)"
+echo "kubectl delete namespace loki"

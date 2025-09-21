@@ -1,0 +1,46 @@
+target: query-frontend
+auth_enabled: false
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+  log_level: info
+common:
+  instance_addr: "${HOSTNAME}"
+  path_prefix: "/loki"
+  storage:
+    s3:
+      endpoint: "minio.loki.svc.cluster.local:9000"
+      bucketnames: "loki-chunks"
+      access_key_id: "${MINIO_ACCESS_KEY}"
+      secret_access_key: "${MINIO_SECRET_KEY}"
+      insecure: true
+      s3forcepathstyle: true
+  replication_factor: 1
+  compactor_address: "compactor.loki.svc.cluster.local:3100"
+  ring:
+    kvstore:
+      store: inmemory
+storage_config:
+  aws:
+    endpoint: "minio.loki.svc.cluster.local:9000"
+    bucketnames: "loki-chunks"
+    access_key_id: "${MINIO_ACCESS_KEY}"
+    secret_access_key: "${MINIO_SECRET_KEY}"
+    s3forcepathstyle: true
+    insecure: true
+frontend:
+  max_outstanding_per_tenant: 100
+  # scheduler_address: "query-scheduler.loki.svc.cluster.local:9095"
+frontend_worker:
+  frontend_address: "query-frontend.loki.svc.cluster.local:9095"
+analytics:
+  reporting_enabled: false
+schema_config:
+  configs:
+    - from: 2024-04-01
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h

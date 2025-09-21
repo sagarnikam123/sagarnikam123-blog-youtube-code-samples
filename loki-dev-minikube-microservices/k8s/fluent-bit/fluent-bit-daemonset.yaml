@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: loki
+  labels:
+    app: fluent-bit
+spec:
+  selector:
+    matchLabels:
+      app: fluent-bit
+  template:
+    metadata:
+      labels:
+        app: fluent-bit
+    spec:
+      serviceAccountName: fluent-bit
+      tolerations:
+      - operator: Exists
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+      containers:
+      - name: fluent-bit
+        image: fluent/fluent-bit:3.1.9
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 2020
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: varlogpods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: varlogcontainers
+          mountPath: /var/log/containers
+          readOnly: true
+        - name: dockerlogs
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: fluent-bit-config
+          mountPath: /fluent-bit/etc/
+        - name: fluent-bit-state
+          mountPath: /fluent-bit/state
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+      - name: varlogpods
+        hostPath:
+          path: /var/log/pods
+          type: DirectoryOrCreate
+      - name: varlogcontainers
+        hostPath:
+          path: /var/log/containers
+          type: DirectoryOrCreate
+      - name: dockerlogs
+        hostPath:
+          path: /var/lib/docker/containers
+          type: DirectoryOrCreate
+      - name: fluent-bit-config
+        configMap:
+          name: fluent-bit-config
+          items:
+          - key: fluent-bit.conf
+            path: fluent-bit.conf
+          - key: parsers.conf
+            path: parsers.conf
+      - name: fluent-bit-state
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit
+  namespace: loki
+  labels:
+    app: fluent-bit
+spec:
+  type: ClusterIP
+  selector:
+    app: fluent-bit
+  ports:
+    - port: 2020
+      targetPort: 2020
+      protocol: TCP
+      name: metrics

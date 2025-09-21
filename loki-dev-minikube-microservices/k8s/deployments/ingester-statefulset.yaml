@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki-ingester
+  namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: ingester
+spec:
+  serviceName: ingester
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: loki-ingester
+  template:
+    metadata:
+      labels:
+        app: loki-ingester
+        app.kubernetes.io/name: loki
+        app.kubernetes.io/component: ingester
+    spec:
+      securityContext:
+        fsGroup: 10001
+      terminationGracePeriodSeconds: 4800
+      initContainers:
+      - name: init-permissions
+        image: busybox:1.35
+        command: ['sh', '-c', 'chown -R 10001:10001 /loki']
+        volumeMounts:
+        - name: ingester-data
+          mountPath: /loki/data
+        - name: ingester-wal
+          mountPath: /loki/wal
+        - name: tsdb-cache
+          mountPath: /loki/tsdb
+      containers:
+      - name: loki-ingester
+        image: grafana/loki:3.5.5
+        args:
+        - -config.file=/etc/loki/ingester.yaml
+        - -target=ingester
+        - -config.expand-env=true
+        ports:
+        - containerPort: 3100
+          name: http
+        - containerPort: 9095
+          name: grpc
+        - containerPort: 7946
+          name: memberlist
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2000m"
+            memory: "4Gi"
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/loki
+          readOnly: true
+        - name: ingester-data
+          mountPath: /loki/data
+        - name: ingester-wal
+          mountPath: /loki/wal
+        - name: tmp
+          mountPath: /tmp
+        - name: tsdb-cache
+          mountPath: /loki
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: accesskey
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: secretkey
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ingester-config
+      - name: tmp
+        emptyDir: {}
+      - name: tsdb-cache
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: ingester-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 2Gi
+  - metadata:
+      name: ingester-wal
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 1Gi

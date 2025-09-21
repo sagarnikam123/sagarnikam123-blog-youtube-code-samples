@@ -1,0 +1,37 @@
+target: distributor
+auth_enabled: false
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+  log_level: info
+common:
+  instance_addr: "${POD_IP}"
+  path_prefix: "/loki"
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: memberlist
+    instance_port: 9095
+memberlist:
+  bind_addr: ["0.0.0.0"]
+  bind_port: 7946
+  advertise_addr: "${POD_IP}"
+  advertise_port: 7946
+  join_members:
+    - "ingester.loki.svc.cluster.local:7946"
+  abort_if_cluster_join_fails: false
+distributor:
+  ring:
+    kvstore:
+      store: memberlist
+analytics:
+  reporting_enabled: false
+schema_config:
+  configs:
+    - from: 2024-04-01
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
