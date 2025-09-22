@@ -1,13 +1,10 @@
 # Production Deployment Guide
 
+> See README.md for current versions and deployment instructions
+
 ## Production Readiness Checklist
 
-### ✅ Current Status (Development Ready)
-- [x] All components deployed and functional
-- [x] MinIO object storage working
-- [x] Memberlist coordination established
-- [x] API endpoints accessible
-- [x] Log ingestion and querying working
+> Development deployment is functional. See README.md for setup details.
 
 ### ⚠️ Production Requirements (Missing)
 
@@ -19,11 +16,14 @@
 - [ ] RBAC hardening
 
 #### Monitoring & Observability
-- [ ] Prometheus metrics collection
-- [ ] Grafana dashboards
+- [x] Prometheus metrics collection
+- [x] Grafana dashboards
 - [ ] Alerting rules configured
-- [ ] Log aggregation for Loki itself
-- [ ] Health check endpoints
+- [x] Log aggregation for Loki itself (Fluent Bit)
+- [x] Health check endpoints
+- [x] Automated validation scripts
+- [x] API functionality testing
+- [x] Component log analysis tools
 
 #### High Availability
 - [ ] Multiple replicas for stateless components
@@ -46,24 +46,73 @@
 
 ## Scaling Guidelines
 
-### Component Scaling Recommendations
+### When to Scale Components
 
-**Distributors:**
+**Scale Distributors when:**
+- CPU usage > 80% consistently
+- Ingestion rate > 10MB/s per distributor
+- HTTP 5xx errors > 1% of requests
+- Memory usage > 1GB per distributor
 ```bash
-# Scale based on ingestion rate
 kubectl scale deployment loki-distributor --replicas=3 -n loki
 ```
 
-**Ingesters:**
+**Scale Ingesters when:**
+- Memory usage > 2GB per ingester
+- WAL disk usage > 80%
+- Chunk flush latency > 30s
+- Ring unhealthy instances detected
 ```bash
-# Scale based on storage requirements
 kubectl scale statefulset loki-ingester --replicas=3 -n loki
 ```
 
-**Queriers:**
+**Scale Queriers when:**
+- Query response time > 10s (p95)
+- CPU usage > 70% consistently
+- Query queue depth > 100
+- Concurrent queries > 50 per querier
 ```bash
-# Scale based on query load
 kubectl scale deployment loki-querier --replicas=3 -n loki
+```
+
+**Scale Query-Frontend when:**
+- Query queue length > 200
+- Frontend response time > 15s
+- High number of query retries
+```bash
+kubectl scale deployment loki-query-frontend --replicas=2 -n loki
+```
+
+### Scaling Triggers & Metrics
+
+**Monitor these key metrics:**
+- `loki_distributor_ingester_append_failures_total` - Ingestion failures
+- `loki_ingester_memory_chunks` - Memory usage per ingester
+- `loki_request_duration_seconds` - Query latency
+- `loki_ingester_wal_disk_full_failures_total` - WAL disk issues
+- `prometheus_tsdb_head_series` - Series cardinality
+
+**Automated scaling conditions:**
+```yaml
+# HPA example for distributors
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: loki-distributor-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: loki-distributor
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
 ```
 
 ### Resource Sizing
@@ -83,35 +132,7 @@ kubectl scale deployment loki-querier --replicas=3 -n loki
 - Ingesters: 12 replicas, 4 CPU, 8Gi RAM
 - Queriers: 8 replicas, 4 CPU, 8Gi RAM
 
-## Performance Tuning
-
-### Ingester Optimization
-```yaml
-ingester:
-  chunk_target_size: 1572864  # 1.5MB
-  max_chunk_age: 2h
-  chunk_idle_period: 30m
-  max_transfer_retries: 0
-```
-
-### Query Optimization
-```yaml
-querier:
-  max_concurrent: 16
-  query_timeout: 300s
-  tail_max_duration: 12h
-```
-
-### Storage Optimization
-```yaml
-storage_config:
-  aws:
-    s3forcepathstyle: true
-    insecure: false  # Enable in production
-    http_config:
-      idle_conn_timeout: 90s
-      response_header_timeout: 0s
-```
+> See CONFIGURATION.md for performance tuning parameters
 
 ## Monitoring Setup
 
@@ -133,6 +154,8 @@ storage_config:
   expr: histogram_quantile(0.99, rate(loki_request_duration_seconds_bucket[5m])) > 10
 ```
 
+> See LABELS.md for labeling standards and operational commands
+
 ## Upgrade Procedures
 
 ### Rolling Update Strategy
@@ -147,16 +170,14 @@ storage_config:
 3. Monitor metrics during upgrades
 4. Have emergency contact procedures
 
-## Troubleshooting
+> See README.md for operational scripts and LABELS.md for label-based operations
 
-### Common Production Issues
-1. **High memory usage**: Scale ingesters, tune chunk settings
-2. **Query timeouts**: Scale queriers, optimize queries
-3. **Storage full**: Implement retention policies, monitor growth
-4. **Network issues**: Check memberlist coordination, DNS resolution
+## Production Troubleshooting
 
-### Emergency Procedures
-1. **Service degradation**: Scale up affected components
-2. **Data loss**: Restore from MinIO backups
-3. **Complete outage**: Follow disaster recovery procedures
-4. **Security incident**: Rotate credentials, review access logs
+> See README.md for diagnostic tools and basic troubleshooting
+
+### Production-Specific Issues
+1. **High load**: Use scaling guidelines above
+2. **Storage full**: Implement retention policies, monitor growth
+3. **Security incidents**: Rotate credentials, review access logs
+4. **Multi-zone failures**: Follow disaster recovery procedures

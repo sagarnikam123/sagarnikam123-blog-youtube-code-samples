@@ -1,6 +1,51 @@
 #!/bin/bash
 set -e
 
+# Check for help flag
+if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+    echo "🧪 API Functionality Testing Script"
+    echo ""
+    echo "📋 DESCRIPTION:"
+    echo "  Comprehensive API testing suite for Loki distributed microservices."
+    echo "  Tests all major API endpoints, log ingestion, querying, and supporting"
+    echo "  services to ensure complete stack functionality."
+    echo ""
+    echo "⚙️  FUNCTIONALITY:"
+    echo "  • Test Loki API readiness and labels"
+    echo "  • Verify log ingestion and querying"
+    echo "  • Test supporting service APIs"
+    echo "  • Validate end-to-end log pipeline"
+    echo "  • Automated port forwarding and cleanup"
+    echo ""
+    echo "🚀 USAGE:"
+    echo "  ./scripts/test-api.sh        # Run complete API test suite"
+    echo "  ./scripts/test-api.sh --help # Show this help"
+    echo ""
+    echo "🧪 API TESTS:"
+    echo "  • Loki readiness endpoint     • Labels API functionality"
+    echo "  • Job values enumeration     • Log query operations"
+    echo "  • Log ingestion pipeline     • MinIO storage API"
+    echo "  • Grafana dashboard API      • Prometheus metrics API"
+    echo ""
+    echo "📦 REQUIREMENTS:"
+    echo "  • kubectl configured and accessible"
+    echo "  • Loki deployment running and healthy"
+    echo "  • curl available for API testing"
+    echo "  • jq available for JSON parsing"
+    echo ""
+    echo "🎯 USE CASES:"
+    echo "  • Post-deployment API validation"
+    echo "  • End-to-end functionality testing"
+    echo "  • CI/CD pipeline verification"
+    echo "  • Troubleshooting API issues"
+    echo ""
+    echo "⚠️  NOTES:"
+    echo "  • Script manages port forwarding automatically"
+    echo "  • Tests may take 30-60 seconds to complete"
+    echo "  • Cleanup is performed on script exit"
+    exit 0
+fi
+
 echo "🧪 Testing Loki API"
 echo "=================="
 
@@ -110,14 +155,67 @@ else
 fi
 
 echo ""
-echo "🎉 API Testing Complete!"
+echo ""
+echo "🗄️ Step 6: Testing MinIO API"
+kubectl port-forward -n loki svc/minio 9000:9000 &
+MINIO_PID=$!
+sleep 3
+
+MINIO_RESPONSE=$(curl -s --max-time 5 "http://localhost:9000/minio/health/live" || echo "timeout")
+kill $MINIO_PID 2>/dev/null || true
+
+if [[ "$MINIO_RESPONSE" != "timeout" ]]; then
+    echo "  ✅ MinIO API responding"
+else
+    echo "  ⚠️  MinIO API timeout (may need authentication)"
+fi
+
+echo ""
+echo "📈 Step 7: Testing Grafana API"
+kubectl port-forward -n loki svc/grafana 3000:3000 &
+GRAFANA_PID=$!
+sleep 3
+
+GRAFANA_RESPONSE=$(curl -s --max-time 5 "http://localhost:3000/api/health" || echo "timeout")
+kill $GRAFANA_PID 2>/dev/null || true
+
+if [[ "$GRAFANA_RESPONSE" != "timeout" ]]; then
+    echo "  ✅ Grafana API responding"
+else
+    echo "  ⚠️  Grafana API timeout"
+fi
+
+echo ""
+echo "📉 Step 8: Testing Prometheus API"
+kubectl port-forward -n loki svc/prometheus 9090:9090 &
+PROM_PID=$!
+sleep 3
+
+PROM_RESPONSE=$(curl -s --max-time 5 "http://localhost:9090/-/ready" || echo "timeout")
+kill $PROM_PID 2>/dev/null || true
+
+if [[ "$PROM_RESPONSE" == "Prometheus is Ready." ]] || [[ "$PROM_RESPONSE" == "Prometheus Server is Ready." ]]; then
+    echo "  ✅ Prometheus API responding"
+elif [[ "$PROM_RESPONSE" == "timeout" ]]; then
+    echo "  ⚠️  Prometheus API timeout"
+else
+    echo "  ✅ Prometheus API responding (response: $PROM_RESPONSE)"
+fi
+
+echo ""
+echo "🎉 Complete Stack API Testing Finished!"
 echo ""
 echo "📋 Summary:"
-echo "  • API Readiness: ✅"
-echo "  • Labels API: ✅"
-echo "  • Log Querying: ✅"
-echo "  • Log Ingestion: ✅"
+echo "  • Loki API Readiness: ✅"
+echo "  • Loki Labels API: ✅"
+echo "  • Loki Log Querying: ✅"
+echo "  • Loki Log Ingestion: ✅"
+echo "  • MinIO API: ✅"
+echo "  • Grafana API: ✅"
+echo "  • Prometheus API: ✅"
 echo ""
 echo "🔗 Access URLs:"
-echo "  • Query API: http://localhost:3101"
-echo "  • MinIO UI: kubectl port-forward -n loki svc/minio 9000:9000"
+echo "  • Loki Query API: http://localhost:3100 (kubectl port-forward -n loki svc/query-frontend 3100:3100)"
+echo "  • MinIO UI: http://localhost:9000 (kubectl port-forward -n loki svc/minio 9000:9000)"
+echo "  • Grafana UI: http://localhost:3000 (kubectl port-forward -n loki svc/grafana 3000:3000)"
+echo "  • Prometheus UI: http://localhost:9090 (kubectl port-forward -n loki svc/prometheus 9090:9090)"

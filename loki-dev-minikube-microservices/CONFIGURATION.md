@@ -1,13 +1,23 @@
-# Loki 3.5.x Configuration Guide
+# Loki Configuration Guide
 
 > ⚠️ **Development Configuration** - These configs use insecure settings for ease of setup. See [SECURITY.md](SECURITY.md) for production hardening.
 
+## 🏷️ **Kubernetes Standard Labels**
+
+**All components use consistent Kubernetes standard labels for operations and automation.**
+
+See [LABELS.md](LABELS.md) for complete labeling standards, component mappings, and operational examples.
+
+## 🔄 **Version Management**
+
+**All component versions are centrally managed.** See [README.md](README.md) for version management details and procedures.
+
 ## Configuration Files Overview
 
-All configuration files are located in the `config/` directory:
+All configuration files are located in the `k8s/loki/configs/` directory:
 
 ```
-config/
+k8s/loki/configs/
 ├── distributor.yaml      # Log ingestion and distribution
 ├── ingester.yaml         # Log storage with WAL and MinIO
 ├── querier.yaml          # Query execution with direct frontend connection
@@ -175,7 +185,7 @@ env:
 **Individual Component Validation:**
 ```bash
 # Validate specific component (replace [component] and [target])
-docker run --rm -v "$(pwd)/config:/config" grafana/loki:3.5.5 \
+docker run --rm -v "$(pwd)/config:/config" grafana/loki:${LOKI_VERSION} \
   -config.file=/config/[component].yaml -verify-config -target=[component]
 
 # Examples:
@@ -186,16 +196,108 @@ docker run --rm -v "$(pwd)/config:/config" grafana/loki:3.5.5 \
 **Automated Validation:**
 ```bash
 # Use the validation script
-./scripts/validate-configs.sh
+./scripts/validate-loki-configs.sh
+```
+
+## 📊 **Cluster Sizing & Storage Optimization**
+
+### **Development vs Production Sizing**
+
+**Current Development Setup:**
+- **Target**: < 1GB logs/day, 7-day retention
+- **Ingesters**: 1 replica (development only)
+- **Storage**: 10Gi total (78% reduction from production baseline)
+- **Suitable for**: Testing, demos, learning
+
+**Production Scaling Guidelines:**
+
+| Log Volume/Day | Ingesters | Queriers | Distributors | Storage (Total) |
+|----------------|-----------|----------|--------------|----------------|
+| < 1GB | 1 | 1 | 1 | 10-20Gi |
+| 1-10GB | 2-3 | 2 | 2 | 50-100Gi |
+| 10-100GB | 3-5 | 3-5 | 2-3 | 500Gi-1Ti |
+| > 100GB | 5+ | 5+ | 3+ | 1Ti+ |
+
+**Key Scaling Factors:**
+- **Ingester replicas**: Based on write throughput and availability needs
+- **Querier replicas**: Based on query load and response time requirements  
+- **Storage per ingester**: ~10-50GB per 1GB/day log volume
+- **Retention period**: Multiply storage by retention days
+
+## 💻 **Development Storage Optimization**
+
+**Optimized storage allocation for development:**
+```yaml
+# Total: 10Gi (78% reduction from original 45Gi)
+PersistentVolumeClaims:
+  ingester-data: 2Gi          # Reduced from 10Gi
+  ingester-wal: 1Gi           # Reduced from 5Gi
+  compactor-data: 2Gi         # Reduced from 10Gi
+  querier-cache: 1Gi          # Reduced from 5Gi
+  index-cache: 1Gi            # Reduced from 5Gi
+  minio-pvc: 3Gi              # Reduced from 10Gi
+```
+
+**Benefits:**
+- **MacBook friendly**: Reasonable for development environments
+- **Faster deployment**: Less storage provisioning time
+- **Cost-effective**: Reduced cloud storage costs
+- **Still functional**: Adequate for testing and demos
+
+### **Performance Considerations**
+
+**Single Replica Limitations (Current Setup):**
+- **No High Availability**: Single point of failure
+- **Limited Throughput**: ~100MB/s ingestion rate (1 ingester)
+- **Query Performance**: Single querier bottleneck (~1000 queries/min)
+- **Memory Usage**: ~2-4GB per component
+- **Suitable for**: Development, testing, demos only
+
+**Production Throughput Guidelines:**
+- **Ingester**: ~100MB/s per replica (sustained, from Grafana docs)
+- **Distributor**: ~500MB/s per replica (burst)
+- **Querier**: ~1000-5000 queries/min per replica
+- **Storage**: 3:1 compression ratio typical
+
+**Resource Requirements per Component:**
+
+| Component | CPU (cores) | Memory (GB) | Storage | Replicas |
+|-----------|-------------|-------------|---------|----------|
+| **Distributor** | 0.5-2 | 1-4 | - | 2-3 |
+| **Ingester** | 1-4 | 4-16 | 50-500Gi | 3-10 |
+| **Querier** | 1-2 | 2-8 | 10-50Gi | 2-5 |
+| **Query-Frontend** | 0.5-1 | 1-2 | - | 2 |
+| **Compactor** | 1-2 | 2-8 | 20-100Gi | 1 |
+
+**Scaling Triggers:**
+- **Ingestion lag**: Scale distributors and ingesters
+- **Query timeouts**: Scale queriers and query-frontends
+- **Storage pressure**: Increase PVC sizes or add retention policies
+- **Memory pressure**: Increase resource limits or scale horizontally
+- **CPU throttling**: Increase CPU limits or add replicas
+
+**Storage Monitoring:**
+```bash
+# Check storage usage
+kubectl get pvc -n loki -o custom-columns="NAME:.metadata.name,SIZE:.spec.resources.requests.storage,STATUS:.status.phase"
+
+# Monitor actual usage
+kubectl exec -n loki loki-ingester-0 -- df -h /loki
 ```
 
 ## Configuration Management
 
 **Update Component Configuration:**
 ```bash
-# Update ConfigMap and restart component
-kubectl create configmap [component]-config --from-file=config/[component].yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl delete pod -n loki -l app=loki-[component]
+# Update ConfigMap and restart component (using standard labels)
+kubectl create configmap [component]-config --from-file=k8s/loki/configs/[component].yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+
+# Restart using standard labels
+kubectl delete pod -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=[component]
+
+# Examples:
+kubectl delete pod -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor
+kubectl delete pod -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=ingester
 ```
 
 **Bulk Configuration Updates:**
@@ -214,11 +316,28 @@ kubectl delete pod -n loki -l app=loki-[component]
 
 **Environment Variable Issues:**
 ```bash
-# Validate config expansion
-kubectl logs -n loki [pod-name] | grep "POD_IP\|HOSTNAME"
+# Validate config expansion (using standard labels)
+kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor | grep "POD_IP\|HOSTNAME"
 
-# Check environment variables
-kubectl exec -n loki [pod-name] -- env | grep -E "POD_IP|HOSTNAME"
+# Check environment variables for specific components
+kubectl exec -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=ingester -- env | grep -E "POD_IP|HOSTNAME"
+
+# Check all logging stack components
+kubectl get pods -n loki -l app.kubernetes.io/part-of=logging-stack -o wide
+```
+
+**Label-Based Troubleshooting:**
+```bash
+# Check component health by labels
+kubectl describe pods -n loki -l app.kubernetes.io/component=storage  # MinIO
+kubectl describe pods -n loki -l app.kubernetes.io/component=log-collector  # Fluent Bit
+
+# Check logs by component type
+kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=querier --tail=20
+kubectl logs -n loki -l app.kubernetes.io/component=monitoring --tail=20  # Prometheus
+
+# Scale components using labels
+kubectl scale deployment -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor --replicas=2
 ```
 
 **Common Problems:**
@@ -240,11 +359,14 @@ kubectl exec -n loki [pod-name] -- env | grep -E "POD_IP|HOSTNAME"
 
 ## Key Success Factors
 
-1. **POD_IP Usage**: Critical for memberlist in Kubernetes
-2. **Config Expansion**: Required for environment variable substitution (`-config.expand-env=true`)
-3. **Service DNS**: Proper naming for service discovery
-4. **Ring Coordination**: Memberlist configuration across all components
-5. **Storage Integration**: MinIO DNS resolution and connectivity
-6. **Direct Query Path**: Frontend-Querier connection bypassing scheduler
-7. **Health Monitoring**: Regular checks for ring and storage health
-8. **Log Collection**: Fluent Bit DaemonSet for comprehensive log gathering
+1. **Kubernetes Standard Labels**: Consistent labeling across all components for operations
+2. **POD_IP Usage**: Critical for memberlist in Kubernetes
+3. **Config Expansion**: Required for environment variable substitution (`-config.expand-env=true`)
+4. **Service DNS**: Proper naming for service discovery
+5. **Ring Coordination**: Memberlist configuration across all components
+6. **Storage Integration**: MinIO DNS resolution and connectivity
+7. **Storage Optimization**: MacBook Pro friendly 10Gi total allocation
+8. **Direct Query Path**: Frontend-Querier connection bypassing scheduler
+9. **Health Monitoring**: Regular checks for ring and storage health
+10. **Log Collection**: Fluent Bit DaemonSet for comprehensive log gathering
+11. **Label-Based Operations**: Use standard labels for troubleshooting and scaling

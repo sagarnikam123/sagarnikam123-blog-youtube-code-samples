@@ -1,7 +1,65 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting Loki 3.5.x Distributed Microservices Deployment"
+# Check for help flag
+if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+    echo "🚀 Loki Distributed Microservices Deployment Script"
+    echo ""
+    echo "📋 DESCRIPTION:"
+    echo "  Complete automated deployment of Loki distributed microservices stack"
+    echo "  on Minikube. Deploys all components with proper sequencing, health checks,"
+    echo "  and configuration management."
+    echo ""
+    echo "⚙️  FUNCTIONALITY:"
+    echo "  • Validate Minikube environment"
+    echo "  • Deploy infrastructure (namespace, storage, MinIO)"
+    echo "  • Deploy Loki microservices with configurations"
+    echo "  • Deploy supporting services (Fluent Bit, Prometheus, Grafana)"
+    echo "  • Perform health checks and provide access information"
+    echo ""
+    echo "🚀 USAGE:"
+    echo "  ./run-on-minikube.sh        # Deploy complete stack"
+    echo "  ./run-on-minikube.sh --help # Show this help"
+    echo ""
+    echo "📋 DEPLOYED COMPONENTS:"
+    echo "  • Loki: 8 microservices (distributor, ingester, querier, etc.)"
+    echo "  • MinIO: S3-compatible object storage"
+    echo "  • Fluent Bit: Log collection agent"
+    echo "  • Prometheus: Metrics collection"
+    echo "  • Grafana: Visualization dashboards"
+    echo ""
+    echo "🏷️ CURRENT VERSIONS:"
+    echo "  • Loki: 3.5.5              • Grafana: 12.1.0"
+    echo "  • Prometheus: v3.5.0       • MinIO: 2025-09-07"
+    echo "  • Fluent Bit: 4.0.10"
+    echo ""
+    echo "📦 REQUIREMENTS:"
+    echo "  • Minikube installed and configured"
+    echo "  • kubectl configured for Minikube"
+    echo "  • 6 CPUs, 12GB RAM recommended"
+    echo "  • Docker for configuration validation"
+    echo ""
+    echo "🎯 USE CASES:"
+    echo "  • Development environment setup"
+    echo "  • Learning Loki architecture"
+    echo "  • Testing log aggregation"
+    echo "  • Blog/tutorial demonstrations"
+    echo ""
+    echo "📋 POST-DEPLOYMENT:"
+    echo "  • Run ./scripts/check-deployment-health.sh for validation"
+    echo "  • Use ./scripts/test-api.sh for API testing"
+    echo "  • Access UIs via kubectl port-forward commands"
+    exit 0
+fi
+
+# 🏷️ Centralized Version Management
+export LOKI_VERSION="3.5.5"        # Latest stable from grafana/loki
+export GRAFANA_VERSION="12.1.0"     # Latest from grafana/grafana
+export PROMETHEUS_VERSION="v3.5.0" # Latest from prometheus/prometheus
+export MINIO_VERSION="RELEASE.2025-09-07T16-13-09Z" # Latest from minio/minio  
+export FLUENT_BIT_VERSION="4.0.10"   # Latest from fluent/fluent-bit
+
+echo "🚀 Starting Loki ${LOKI_VERSION} Distributed Microservices Deployment"
 
 # Check if Minikube is running
 echo "📦 Checking Minikube status..."
@@ -18,18 +76,18 @@ kubectl create namespace loki --dry-run=client -o yaml | kubectl apply -f -
 
 # Create Secrets
 echo "🔐 Creating MinIO secrets..."
-kubectl create secret generic minio-creds \
-  --from-literal=accesskey=minioadmin \
-  --from-literal=secretkey=minioadmin \
-  -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f k8s/minio/secret.yaml
 
 # Apply Storage
 echo "💾 Creating persistent volumes..."
-kubectl apply -f k8s/storage/
+kubectl apply -f k8s/loki/storage.yaml
+kubectl apply -f k8s/minio/storage.yaml
 
-# Deploy Infrastructure (MinIO)
+# Deploy MinIO
 echo "🗄️  Deploying MinIO..."
-kubectl apply -f k8s/infrastructure/minio-deployment.yaml
+for file in k8s/minio/*.yaml; do
+    envsubst < "$file" | kubectl apply -f -
+done
 
 # Wait for MinIO to be ready
 echo "⏳ Waiting for MinIO to be ready..."
@@ -37,56 +95,55 @@ kubectl wait --for=condition=ready pod -l app=minio -n loki --timeout=300s
 
 # Create Services
 echo "🌐 Creating services..."
-kubectl apply -f k8s/services.yaml
+envsubst < k8s/loki/services.yaml | kubectl apply -f -
 
 # Create ConfigMaps with all configurations
-echo "⚙️  Creating ConfigMaps..."
-kubectl create configmap distributor-config --from-file=config/distributor.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap ingester-config --from-file=config/ingester.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap querier-config --from-file=config/querier.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap query-frontend-config --from-file=config/query-frontend.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap query-scheduler-config --from-file=config/query-scheduler.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap compactor-config --from-file=config/compactor.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap ruler-config --from-file=config/ruler.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap index-gateway-config --from-file=config/index-gateway.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+echo "⚙️  Creating Loki ConfigMaps..."
+kubectl create configmap distributor-config --from-file=k8s/loki/configs/distributor.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap ingester-config --from-file=k8s/loki/configs/ingester.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap querier-config --from-file=k8s/loki/configs/querier.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap query-frontend-config --from-file=k8s/loki/configs/query-frontend.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap query-scheduler-config --from-file=k8s/loki/configs/query-scheduler.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap compactor-config --from-file=k8s/loki/configs/compactor.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap ruler-config --from-file=k8s/loki/configs/ruler.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap index-gateway-config --from-file=k8s/loki/configs/index-gateway.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
 
 # Deploy components in proper order
 echo "🔧 Deploying Loki components..."
 
-# Deploy ingester first (StatefulSet)
-echo "  📊 Deploying ingester..."
-kubectl apply -f k8s/deployments/ingester-statefulset.yaml
-
-# Deploy other components
-echo "  📡 Deploying distributor..."
-kubectl apply -f k8s/deployments/distributor-deployment.yaml
-
-echo "  🔍 Deploying querier..."
-kubectl apply -f k8s/deployments/querier-deployment.yaml
-
-echo "  🎯 Deploying query frontend..."
-kubectl apply -f k8s/deployments/query-frontend-deployment.yaml
-
-echo "  📅 Deploying query scheduler..."
-kubectl apply -f k8s/deployments/query-scheduler-deployment.yaml
-
-echo "  🗜️  Deploying compactor..."
-kubectl apply -f k8s/deployments/compactor-deployment.yaml
-
-echo "  📏 Deploying ruler..."
-kubectl apply -f k8s/deployments/ruler-deployment.yaml
-
-echo "  🏛️  Deploying index gateway..."
-kubectl apply -f k8s/deployments/index-gateway-deployment.yaml
+# Deploy Loki components with version substitution
+echo "  🔍 Deploying Loki components..."
+export LOKI_VERSION GRAFANA_VERSION PROMETHEUS_VERSION MINIO_VERSION FLUENT_BIT_VERSION
+for file in k8s/loki/deployments/*.yaml; do
+    echo "    Deploying $(basename "$file")..."
+    envsubst < "$file" | kubectl apply -f -
+done
 
 # Deploy Fluent Bit for log collection
 echo "  📝 Deploying Fluent Bit..."
-kubectl apply -f k8s/fluent-bit/
+for file in k8s/fluent-bit/*.yaml; do
+    echo "    Deploying $(basename "$file")..."
+    envsubst < "$file" | kubectl apply -f -
+done
+
+# Deploy Prometheus for metrics collection
+echo "  📈 Deploying Prometheus..."
+for file in k8s/prometheus/*.yaml; do
+    echo "    Deploying $(basename "$file")..."
+    envsubst < "$file" | kubectl apply -f -
+done
+
+# Deploy Grafana for log visualization
+echo "  📊 Deploying Grafana..."
+for file in k8s/grafana/*.yaml; do
+    echo "    Deploying $(basename "$file")..."
+    envsubst < "$file" | kubectl apply -f -
+done
 
 # Wait for critical components
 echo "⏳ Waiting for critical components to be ready..."
-kubectl wait --for=condition=ready pod -l app=loki-ingester -n loki --timeout=120s
-kubectl wait --for=condition=ready pod -l app=loki-distributor -n loki --timeout=60s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=loki,app.kubernetes.io/component=ingester -n loki --timeout=120s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor -n loki --timeout=60s
 
 # Show deployment status
 echo "✅ Deployment complete! Checking status..."
@@ -107,7 +164,7 @@ echo "🔧 ConfigMap Status:"
 kubectl get configmaps -n loki
 
 echo ""
-echo "🎉 Loki 3.5.x Distributed Microservices Stack is Ready!"
+echo "🎉 Loki ${LOKI_VERSION} Distributed Microservices Stack is Ready!"
 echo ""
 echo "📋 Access Information:"
 echo "  🗄️  MinIO UI:"
@@ -122,12 +179,21 @@ echo "  📡 Loki Ingestion (via Distributor):"
 echo "    kubectl port-forward -n loki svc/distributor 3101:3100"
 echo "    Endpoint: http://localhost:3101"
 echo ""
+echo "  📊 Grafana Dashboard:"
+echo "    kubectl port-forward -n loki svc/grafana 3000:3000"
+echo "    Open: http://localhost:3000 (admin/admin)"
+echo ""
+echo "  📈 Prometheus Metrics:"
+echo "    kubectl port-forward -n loki svc/prometheus 9090:9090"
+echo "    Open: http://localhost:9090"
+echo ""
 echo "🔍 Health Check Commands:"
 echo "  kubectl get pods -n loki"
-echo "  kubectl logs -n loki -l app=loki-distributor"
+echo "  kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor"
 echo "  kubectl logs -n loki loki-ingester-0"
 echo ""
 echo "🧪 Next Steps:"
-echo "  ./scripts/validate-deployment.sh    # Validate all components"
-echo "  ./scripts/test-api.sh             # Test API functionality"
-echo "  ./scripts/check-all-logs.sh       # Check component logs"
+echo "  ./scripts/check-deployment-health.sh # 1. Check deployment health"
+echo "  ./scripts/check-all-logs.sh         # 2. Check component logs"
+echo "  ./scripts/test-api.sh               # 3. Test API functionality"
+echo "  ./scripts/check-versions.sh         # 4. Check current versions"
