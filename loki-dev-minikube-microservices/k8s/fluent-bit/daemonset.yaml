@@ -4,7 +4,12 @@ metadata:
   name: fluent-bit
   namespace: loki
   labels:
-    app: fluent-bit
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: log-collector
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
 spec:
   selector:
     matchLabels:
@@ -22,7 +27,7 @@ spec:
         fsGroup: 0
       containers:
       - name: fluent-bit
-        image: fluent/fluent-bit:3.1.9
+        image: fluent/fluent-bit:${FLUENT_BIT_VERSION}
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 2020
@@ -80,7 +85,13 @@ metadata:
   name: fluent-bit
   namespace: loki
   labels:
-    app: fluent-bit
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: log-collector
+    app.kubernetes.io/version: "${FLUENT_BIT_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
 spec:
   type: ClusterIP
   selector:
