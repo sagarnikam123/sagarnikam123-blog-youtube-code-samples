@@ -6,6 +6,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: distributor
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   ports:
   - name: http
@@ -29,6 +33,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: ingester
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   clusterIP: None  # Headless for StatefulSet
   ports:
@@ -52,6 +60,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: query-frontend
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   ports:
   - name: http
@@ -72,6 +84,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: query-scheduler
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   ports:
   - name: http
@@ -92,6 +108,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: querier
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   ports:
   - name: http
@@ -112,6 +132,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: index-gateway
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   ports:
   - name: http
@@ -132,6 +156,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: compactor
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   ports:
   - name: http
@@ -152,6 +180,10 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: ruler
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    environment: development
 spec:
   ports:
   - name: http
