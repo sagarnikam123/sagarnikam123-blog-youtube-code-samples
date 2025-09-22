@@ -1,7 +1,49 @@
 #!/bin/bash
 set -e
 
-echo "🔍 Validating Loki 3.5.5 Distributed Microservices Deployment"
+# Check for help flag
+if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+    echo "🔍 Deployment Health Check Script"
+    echo ""
+    echo "📋 DESCRIPTION:"
+    echo "  Comprehensive health validation for Loki distributed microservices"
+    echo "  deployment. Checks pods, services, storage, DNS resolution, and"
+    echo "  component-specific health indicators."
+    echo ""
+    echo "⚙️  FUNCTIONALITY:"
+    echo "  • Validate namespace and basic resources"
+    echo "  • Check pod status and readiness"
+    echo "  • Verify service connectivity and DNS"
+    echo "  • Test memberlist coordination"
+    echo "  • Identify common deployment issues"
+    echo ""
+    echo "🚀 USAGE:"
+    echo "  ./scripts/check-deployment-health.sh        # Run health checks"
+    echo "  ./scripts/check-deployment-health.sh --help # Show this help"
+    echo ""
+    echo "🔍 HEALTH CHECKS:"
+    echo "  • Namespace existence        • Pod readiness status"
+    echo "  • Service availability       • Storage binding"
+    echo "  • DNS resolution            • Memberlist coordination"
+    echo "  • Component-specific logs    • Common error patterns"
+    echo ""
+    echo "📦 REQUIREMENTS:"
+    echo "  • kubectl configured and accessible"
+    echo "  • Loki namespace deployed"
+    echo "  • Standard Kubernetes labels applied"
+    echo ""
+    echo "🎯 USE CASES:"
+    echo "  • Post-deployment validation"
+    echo "  • Troubleshooting deployment issues"
+    echo "  • Monitoring deployment health"
+    echo "  • CI/CD pipeline verification"
+    exit 0
+fi
+
+# Extract Loki version from deployment script
+LOKI_VERSION=$(grep "^export LOKI_VERSION=" ./run-on-minikube.sh | cut -d'"' -f2)
+
+echo "🔍 Validating Loki ${LOKI_VERSION} Distributed Microservices Deployment"
 
 # Check if namespace exists
 echo "📋 Checking namespace..."
@@ -29,38 +71,52 @@ echo ""
 echo "🔧 Checking critical components..."
 
 # MinIO
-if kubectl get pod -n loki -l app=minio --field-selector=status.phase=Running &>/dev/null; then
+if kubectl get pod -n loki -l app.kubernetes.io/name=minio --field-selector=status.phase=Running &>/dev/null; then
     echo "  ✅ MinIO is running"
 else
     echo "  ❌ MinIO is not running"
 fi
 
 # Distributor
-if kubectl get pod -n loki -l app=loki-distributor --field-selector=status.phase=Running &>/dev/null; then
+if kubectl get pod -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor --field-selector=status.phase=Running &>/dev/null; then
     echo "  ✅ Distributor is running"
 else
     echo "  ❌ Distributor is not running"
 fi
 
 # Ingester
-if kubectl get pod -n loki -l app=loki-ingester --field-selector=status.phase=Running &>/dev/null; then
+if kubectl get pod -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=ingester --field-selector=status.phase=Running &>/dev/null; then
     echo "  ✅ Ingester is running"
 else
     echo "  ❌ Ingester is not running"
 fi
 
 # Querier
-if kubectl get pod -n loki -l app=loki-querier --field-selector=status.phase=Running &>/dev/null; then
+if kubectl get pod -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=querier --field-selector=status.phase=Running &>/dev/null; then
     echo "  ✅ Querier is running"
 else
     echo "  ❌ Querier is not running"
 fi
 
 # Query Frontend
-if kubectl get pod -n loki -l app=loki-query-frontend --field-selector=status.phase=Running &>/dev/null; then
+if kubectl get pod -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=query-frontend --field-selector=status.phase=Running &>/dev/null; then
     echo "  ✅ Query Frontend is running"
 else
     echo "  ❌ Query Frontend is not running"
+fi
+
+# Grafana
+if kubectl get pod -n loki -l app.kubernetes.io/name=grafana --field-selector=status.phase=Running &>/dev/null; then
+    echo "  ✅ Grafana is running"
+else
+    echo "  ❌ Grafana is not running"
+fi
+
+# Prometheus
+if kubectl get pod -n loki -l app.kubernetes.io/name=prometheus --field-selector=status.phase=Running &>/dev/null; then
+    echo "  ✅ Prometheus is running"
+else
+    echo "  ❌ Prometheus is not running"
 fi
 
 # Check services
@@ -76,13 +132,13 @@ kubectl get pvc -n loki
 # Check memberlist coordination
 echo ""
 echo "🔗 Checking memberlist coordination..."
-DISTRIBUTOR_POD=$(kubectl get pods -n loki -l app=loki-distributor -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+DISTRIBUTOR_POD=$(kubectl get pods -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 if [[ -n "$DISTRIBUTOR_POD" ]]; then
     echo "  📡 Checking distributor memberlist..."
     kubectl logs -n loki "$DISTRIBUTOR_POD" --tail=5 | grep -i memberlist || echo "    ⚠️  No recent memberlist activity"
 fi
 
-INGESTER_POD=$(kubectl get pods -n loki -l app=loki-ingester -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+INGESTER_POD=$(kubectl get pods -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=ingester -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 if [[ -n "$INGESTER_POD" ]]; then
     echo "  📊 Checking ingester memberlist..."
     kubectl logs -n loki "$INGESTER_POD" --tail=5 | grep -i memberlist || echo "    ⚠️  No recent memberlist activity"
@@ -100,7 +156,7 @@ echo ""
 echo "⚠️  Checking for common issues..."
 
 # Check for timestamp errors
-TIMESTAMP_ERRORS=$(kubectl logs -n loki -l app=loki-distributor --tail=100 2>/dev/null | grep -c "timestamp too new" 2>/dev/null || echo "0")
+TIMESTAMP_ERRORS=$(kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor --tail=100 2>/dev/null | grep -c "timestamp too new" 2>/dev/null || echo "0")
 TIMESTAMP_ERRORS=$(echo "$TIMESTAMP_ERRORS" | tr -d ' \n')
 if [[ $TIMESTAMP_ERRORS -gt 0 ]]; then
     echo "  ⚠️  Found $TIMESTAMP_ERRORS timestamp errors in distributor logs"
@@ -109,7 +165,7 @@ else
 fi
 
 # Check for ring errors
-RING_ERRORS=$(kubectl logs -n loki -l app=loki-querier --tail=100 2>/dev/null | grep -c "empty ring" 2>/dev/null || echo "0")
+RING_ERRORS=$(kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=querier --tail=100 2>/dev/null | grep -c "empty ring" 2>/dev/null || echo "0")
 RING_ERRORS=$(echo "$RING_ERRORS" | tr -d ' \n')
 if [[ $RING_ERRORS -gt 0 ]]; then
     echo "  ⚠️  Found $RING_ERRORS ring errors in querier logs"
@@ -137,7 +193,7 @@ if [[ $RUNNING_PODS -eq $TOTAL_PODS ]] && [[ $TIMESTAMP_ERRORS -eq 0 ]] && [[ $S
     echo "  2. Test API:"
     echo "     curl http://localhost:3100/ready"
     echo "  3. View logs:"
-    echo "     kubectl logs -n loki -l app=loki-distributor"
+    echo "     kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor"
 else
     echo "  ⚠️  Deployment has issues that need attention"
     echo ""
