@@ -1,17 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: loki-index-gateway
+  name: loki-compactor
   namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: compactor
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: loki-index-gateway
+      app: loki-compactor
   template:
     metadata:
       labels:
-        app: loki-index-gateway
+        app: loki-compactor
     spec:
       securityContext:
         fsGroup: 10001
@@ -20,14 +28,15 @@ spec:
         image: busybox:1.35
         command: ['sh', '-c', 'chown -R 10001:10001 /loki']
         volumeMounts:
-        - name: index-cache
+        - name: compactor-data
           mountPath: /loki
       containers:
-      - name: loki-index-gateway
-        image: grafana/loki:3.5.5
+      - name: loki-compactor
+        image: grafana/loki:${LOKI_VERSION}
         args:
-        - -config.file=/etc/loki/index-gateway.yaml
-        - -target=index-gateway
+        - -config.file=/etc/loki/compactor.yaml
+        - -target=compactor
+        - -config.expand-env=true
         ports:
         - containerPort: 3100
         - containerPort: 9095
@@ -38,17 +47,6 @@ spec:
           limits:
             cpu: "200m"
             memory: "512Mi"
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/loki
-          readOnly: true
-        - name: index-cache
-          mountPath: /loki
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 10001
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
         env:
         - name: HOSTNAME
           valueFrom:
@@ -64,10 +62,40 @@ spec:
             secretKeyRef:
               name: minio-creds
               key: secretkey
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/loki
+          readOnly: true
+        - name: compactor-data
+          mountPath: /loki
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: accesskey
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: secretkey
       volumes:
       - name: config-volume
         configMap:
-          name: index-gateway-config
-      - name: index-cache
+          name: compactor-config
+      - name: compactor-data
         persistentVolumeClaim:
-          claimName: index-cache
+          claimName: compactor-data

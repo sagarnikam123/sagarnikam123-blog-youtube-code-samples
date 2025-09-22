@@ -3,6 +3,14 @@ kind: Deployment
 metadata:
   name: loki-query-frontend
   namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: query-frontend
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
 spec:
   replicas: 1
   selector:
@@ -17,7 +25,7 @@ spec:
         fsGroup: 10001
       containers:
       - name: loki-query-frontend
-        image: grafana/loki:3.5.5
+        image: grafana/loki:${LOKI_VERSION}
         args:
         - -config.file=/etc/loki/query-frontend.yaml
         - -target=query-frontend

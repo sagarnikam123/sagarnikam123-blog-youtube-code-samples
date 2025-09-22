@@ -1,14 +1,27 @@
+# Optimized for MacBook Pro Development
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ingester-data
+  name: ingester-data-loki-ingester-0
   namespace: loki
 spec:
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
+      storage: 2Gi  # Reduced from 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ingester-wal-loki-ingester-0
+  namespace: loki
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # Reduced from 5Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -20,7 +33,7 @@ spec:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 3Gi
+      storage: 2Gi  # Reduced from 10Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -32,7 +45,7 @@ spec:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 2Gi
+      storage: 1Gi  # Reduced from 5Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -44,5 +57,4 @@ spec:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 2Gi
-
+      storage: 1Gi  # Reduced from 5Gi

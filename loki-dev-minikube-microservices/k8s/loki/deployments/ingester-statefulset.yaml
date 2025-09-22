@@ -6,6 +6,11 @@ metadata:
   labels:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: ingester
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
 spec:
   serviceName: ingester
   replicas: 1
@@ -36,7 +41,7 @@ spec:
           mountPath: /loki/tsdb
       containers:
       - name: loki-ingester
-        image: grafana/loki:3.5.5
+        image: grafana/loki:${LOKI_VERSION}
         args:
         - -config.file=/etc/loki/ingester.yaml
         - -target=ingester

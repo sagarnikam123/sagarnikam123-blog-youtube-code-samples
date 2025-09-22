@@ -1,17 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: loki-querier
+  name: loki-index-gateway
   namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: index-gateway
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: loki-querier
+      app: loki-index-gateway
   template:
     metadata:
       labels:
-        app: loki-querier
+        app: loki-index-gateway
     spec:
       securityContext:
         fsGroup: 10001
@@ -20,15 +28,14 @@ spec:
         image: busybox:1.35
         command: ['sh', '-c', 'chown -R 10001:10001 /loki']
         volumeMounts:
-        - name: querier-cache
+        - name: index-cache
           mountPath: /loki
       containers:
-      - name: loki-querier
-        image: grafana/loki:3.5.5
+      - name: loki-index-gateway
+        image: grafana/loki:${LOKI_VERSION}
         args:
-        - -config.file=/etc/loki/querier.yaml
-        - -target=querier
-        - -config.expand-env=true
+        - -config.file=/etc/loki/index-gateway.yaml
+        - -target=index-gateway
         ports:
         - containerPort: 3100
         - containerPort: 9095
@@ -43,7 +50,7 @@ spec:
         - name: config-volume
           mountPath: /etc/loki
           readOnly: true
-        - name: querier-cache
+        - name: index-cache
           mountPath: /loki
         securityContext:
           runAsNonRoot: true
@@ -55,10 +62,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         - name: MINIO_ACCESS_KEY
           valueFrom:
             secretKeyRef:
@@ -72,7 +75,7 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: querier-config
-      - name: querier-cache
+          name: index-gateway-config
+      - name: index-cache
         persistentVolumeClaim:
-          claimName: querier-cache
+          claimName: index-cache

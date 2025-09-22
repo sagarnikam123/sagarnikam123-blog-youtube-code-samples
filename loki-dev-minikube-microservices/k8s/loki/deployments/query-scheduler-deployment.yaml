@@ -3,6 +3,14 @@ kind: Deployment
 metadata:
   name: loki-query-scheduler
   namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: query-scheduler
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
 spec:
   replicas: 1
   selector:
@@ -15,7 +23,7 @@ spec:
     spec:
       containers:
       - name: loki-query-scheduler
-        image: grafana/loki:3.5.5
+        image: grafana/loki:${LOKI_VERSION}
         args:
         - -config.file=/etc/loki/query-scheduler.yaml
         - -target=query-scheduler
