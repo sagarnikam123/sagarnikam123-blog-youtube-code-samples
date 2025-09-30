@@ -10,4 +10,3 @@ spec:
   resources:
     requests:
       storage: 3Gi  # Reduced from 10Gi
-
