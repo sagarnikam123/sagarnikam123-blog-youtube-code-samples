@@ -136,11 +136,11 @@ kill $DIST_PID 2>/dev/null || true
 
 if [[ "$PUSH_RESPONSE" != "timeout" ]]; then
     echo "  ✅ Log ingestion test successful"
-    
+
     # Wait and check if test log appears
     echo "  ⏳ Waiting 10 seconds for log to be indexed..."
     sleep 10
-    
+
     TEST_QUERY=$(curl -s --max-time 10 "http://localhost:3101/loki/api/v1/query_range?query=%7Bjob%3D%22test%22%7D&start=$START_TIME&end=$END_TIME&limit=1" || echo "timeout")
     if [[ "$TEST_QUERY" != "timeout" ]]; then
         TEST_COUNT=$(echo "$TEST_QUERY" | jq -r '.data.result | length' 2>/dev/null || echo "0")

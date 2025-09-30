@@ -63,7 +63,7 @@ TOTAL_COUNT=${#COMPONENTS[@]}
 
 for component in "${COMPONENTS[@]}"; do
     echo "Validating $component..."
-    
+
     if docker run --rm -v "$(pwd)/k8s/loki/configs:/config" grafana/loki:${LOKI_VERSION} \
         -config.file="/config/${component}.yaml" -verify-config -target="$component" 2>/dev/null; then
         echo "   ✅ $component config is valid"
