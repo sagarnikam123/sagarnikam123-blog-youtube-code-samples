@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: loki
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://query-frontend.loki.svc.cluster.local:3100
+      isDefault: true
+      editable: true
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus.loki.svc.cluster.local:9090
+      isDefault: false
+      editable: true

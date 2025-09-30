@@ -29,6 +29,7 @@ spec:
         args:
         - -config.file=/etc/loki/query-frontend.yaml
         - -target=query-frontend
+        - -config.expand-env=true
         ports:
         - containerPort: 3100
         - containerPort: 9095
@@ -44,6 +45,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         - name: MINIO_ACCESS_KEY
           valueFrom:
             secretKeyRef:

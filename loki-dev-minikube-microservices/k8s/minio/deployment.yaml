@@ -54,16 +54,3 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: minio-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: minio
-  namespace: loki
-spec:
-  ports:
-  - port: 9000
-    targetPort: 9000
-  selector:
-    app: minio
-  type: ClusterIP

@@ -52,6 +52,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         - name: MINIO_ACCESS_KEY
           valueFrom:
             secretKeyRef:
@@ -73,25 +77,6 @@ spec:
           runAsUser: 10001
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
-        env:
-        - name: HOSTNAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: MINIO_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-creds
-              key: accesskey
-        - name: MINIO_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-creds
-              key: secretkey
       volumes:
       - name: config-volume
         configMap:

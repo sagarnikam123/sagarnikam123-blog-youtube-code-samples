@@ -61,6 +61,7 @@ kubectl delete -f k8s/loki/deployments/ --ignore-not-found=true
 
 echo "📝 Deleting Fluent Bit..."
 kubectl delete -f k8s/fluent-bit/ --ignore-not-found=true
+kubectl delete -f k8s/fluent-bit/rbac/ --ignore-not-found=true
 
 echo "📊 Deleting Grafana..."
 kubectl delete -f k8s/grafana/ --ignore-not-found=true
@@ -71,8 +72,9 @@ kubectl delete -f k8s/prometheus/ --ignore-not-found=true
 echo "🗄️  Deleting MinIO..."
 kubectl delete -f k8s/minio/ --ignore-not-found=true
 
-# Delete Services (already handled by component deletion above)
-echo "🌐 Services deleted with components..."
+# Delete Services
+echo "🌐 Deleting Loki services..."
+kubectl delete -f k8s/loki/services/ --ignore-not-found=true
 
 # Delete ConfigMaps (Loki configs are created dynamically, others deleted with components)
 echo "⚙️  Deleting Loki ConfigMaps..."
@@ -86,8 +88,9 @@ kubectl delete secret minio-creds -n loki --ignore-not-found=true
 echo "🔨 Force deleting any stuck pods..."
 kubectl delete pods --all -n loki --force --grace-period=0 2>/dev/null || true
 
-# Delete PVCs (already handled by component deletion above)
-echo "💾 Storage deleted with components..."
+# Delete Storage
+echo "💾 Deleting Loki storage..."
+kubectl delete -f k8s/loki/storage/ --ignore-not-found=true
 
 # Delete namespace
 echo "🗑️  Deleting namespace..."

@@ -22,7 +22,7 @@ if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
     echo "  ./run-on-minikube.sh --help # Show this help"
     echo ""
     echo "📋 DEPLOYED COMPONENTS:"
-    echo "  • Loki: 8 microservices (distributor, ingester, querier, etc.)"
+    echo "  • Loki: 8 microservices + Web UI (distributor, ingester, querier, etc.)"
     echo "  • MinIO: S3-compatible object storage"
     echo "  • Fluent Bit: Log collection agent"
     echo "  • Prometheus: Metrics collection"
@@ -31,7 +31,7 @@ if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
     echo "🏷️ CURRENT VERSIONS:"
     echo "  • Loki: 3.5.5              • Grafana: 12.1.0"
     echo "  • Prometheus: v3.5.0       • MinIO: 2025-09-07"
-    echo "  • Fluent Bit: 4.0.10"
+    echo "  • Fluent Bit: 4.1.0"
     echo ""
     echo "📦 REQUIREMENTS:"
     echo "  • Minikube installed and configured"
@@ -56,8 +56,8 @@ fi
 export LOKI_VERSION="3.5.5"        # Latest stable from grafana/loki
 export GRAFANA_VERSION="12.1.0"     # Latest from grafana/grafana
 export PROMETHEUS_VERSION="v3.5.0" # Latest from prometheus/prometheus
-export MINIO_VERSION="RELEASE.2025-09-07T16-13-09Z" # Latest from minio/minio  
-export FLUENT_BIT_VERSION="4.0.10"   # Latest from fluent/fluent-bit
+export MINIO_VERSION="RELEASE.2025-09-07T16-13-09Z" # Latest from minio/minio
+export FLUENT_BIT_VERSION="4.1.0"   # Latest from fluent/fluent-bit
 
 echo "🚀 Starting Loki ${LOKI_VERSION} Distributed Microservices Deployment"
 
@@ -80,7 +80,7 @@ kubectl apply -f k8s/minio/secret.yaml
 
 # Apply Storage
 echo "💾 Creating persistent volumes..."
-kubectl apply -f k8s/loki/storage.yaml
+kubectl apply -f k8s/loki/storage/
 kubectl apply -f k8s/minio/storage.yaml
 
 # Deploy MinIO
@@ -95,7 +95,10 @@ kubectl wait --for=condition=ready pod -l app=minio -n loki --timeout=300s
 
 # Create Services
 echo "🌐 Creating services..."
-envsubst < k8s/loki/services.yaml | kubectl apply -f -
+for file in k8s/loki/services/*.yaml; do
+    envsubst < "$file" | kubectl apply -f -
+done
+
 
 # Create ConfigMaps with all configurations
 echo "⚙️  Creating Loki ConfigMaps..."
@@ -121,6 +124,7 @@ done
 
 # Deploy Fluent Bit for log collection
 echo "  📝 Deploying Fluent Bit..."
+kubectl apply -f k8s/fluent-bit/rbac/
 for file in k8s/fluent-bit/*.yaml; do
     echo "    Deploying $(basename "$file")..."
     envsubst < "$file" | kubectl apply -f -
@@ -171,13 +175,14 @@ echo "  🗄️  MinIO UI:"
 echo "    kubectl port-forward -n loki svc/minio 9000:9000"
 echo "    Open: http://localhost:9000 (minioadmin/minioadmin)"
 echo ""
-echo "  📊 Loki API (via Query Frontend):"
+echo "  🔍 Loki Web UI & API (via Query Frontend):"
 echo "    kubectl port-forward -n loki svc/query-frontend 3100:3100"
-echo "    Endpoint: http://localhost:3100"
+echo "    Web UI: http://localhost:3100"
+echo "    API: http://localhost:3100/loki/api/v1/"
 echo ""
 echo "  📡 Loki Ingestion (via Distributor):"
-echo "    kubectl port-forward -n loki svc/distributor 3101:3100"
-echo "    Endpoint: http://localhost:3101"
+echo "    kubectl port-forward -n loki svc/distributor 3102:3100"
+echo "    Endpoint: http://localhost:3102"
 echo ""
 echo "  📊 Grafana Dashboard:"
 echo "    kubectl port-forward -n loki svc/grafana 3000:3000"

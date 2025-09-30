@@ -178,6 +178,36 @@ env:
 - **Query-frontend**: Uses `${HOSTNAME}` for `instance_addr`
 - **Distributor**: No MinIO storage config (routes to ingesters)
 
+## Fluent Bit Configuration
+
+**Optimized for performance with clean labels:**
+
+**Key Configuration (k8s/fluent-bit/configmap.yaml):**
+```yaml
+[OUTPUT]
+    Name                    loki
+    Match                   *
+    host                    distributor.loki.svc.cluster.local
+    port                    3100
+    labels                  job=fluentbit
+    remove_keys             logtag,kubernetes
+    auto_kubernetes_labels  off
+    workers                 1
+    Retry_Limit             False
+```
+
+**Performance Optimizations:**
+- **Clean labels**: Simple `job=fluentbit` only (no JSON objects)
+- **auto_kubernetes_labels=off**: Prevents massive label bloat
+- **Efficient processing**: No complex label parsing or variable expansion
+- **Reliable ingestion**: Eliminates "entry too far behind" errors
+
+**Benefits:**
+- **Reduced label size**: From ~2KB JSON objects to simple strings
+- **Faster processing**: No complex label parsing overhead
+- **Lower memory usage**: Minimal label footprint
+- **Better reliability**: Consistent log acceptance without timestamp rejections
+
 ## Configuration Validation
 
 **Validate configurations before deployment:**

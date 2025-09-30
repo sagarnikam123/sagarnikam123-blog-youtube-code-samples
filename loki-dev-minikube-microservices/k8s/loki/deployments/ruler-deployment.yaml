@@ -43,25 +43,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: MINIO_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-creds
-              key: accesskey
-        - name: MINIO_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-creds
-              key: secretkey
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/loki
-          readOnly: true
-        env:
-        - name: HOSTNAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         - name: POD_IP
           valueFrom:
             fieldRef:
@@ -76,6 +57,10 @@ spec:
             secretKeyRef:
               name: minio-creds
               key: secretkey
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/loki
+          readOnly: true
       volumes:
       - name: config-volume
         configMap:

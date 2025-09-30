@@ -66,9 +66,9 @@ data:
         Match                   *
         host                    distributor.loki.svc.cluster.local
         port                    3100
-        labels                  job=fluentbit,namespace=$kubernetes.namespace_name,pod=$kubernetes.pod_name,container=$kubernetes.container_name
-        remove_keys             logtag,kubernetes.labels
-        auto_kubernetes_labels  on
+        labels                  job=fluentbit
+        remove_keys             logtag,kubernetes
+        auto_kubernetes_labels  off
         workers                 1
         Retry_Limit             False
 

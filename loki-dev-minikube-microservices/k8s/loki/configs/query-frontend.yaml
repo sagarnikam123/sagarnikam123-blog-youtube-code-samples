@@ -4,8 +4,10 @@ server:
   http_listen_port: 3100
   grpc_listen_port: 9095
   log_level: info
+ui:
+  enabled: true
 common:
-  instance_addr: "${HOSTNAME}"
+  instance_addr: "${POD_IP}"
   path_prefix: "/loki"
   storage:
     s3:
@@ -19,7 +21,13 @@ common:
   compactor_address: "compactor.loki.svc.cluster.local:3100"
   ring:
     kvstore:
-      store: inmemory
+      store: memberlist
+memberlist:
+  bind_addr: ["0.0.0.0"]
+  bind_port: 7946
+  advertise_addr: "${POD_IP}"
+  advertise_port: 7946
+  join_members: ["distributor.loki.svc.cluster.local:7946", "ingester.loki.svc.cluster.local:7946"]
 storage_config:
   aws:
     endpoint: "minio.loki.svc.cluster.local:9000"
@@ -28,6 +36,17 @@ storage_config:
     secret_access_key: "${MINIO_SECRET_KEY}"
     s3forcepathstyle: true
     insecure: true
+distributor:
+  ring:
+    kvstore:
+      store: memberlist
+    instance_port: 9095
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: memberlist
+      replication_factor: 1
 frontend:
   max_outstanding_per_tenant: 100
   # scheduler_address: "query-scheduler.loki.svc.cluster.local:9095"

@@ -1,7 +1,7 @@
 # Loki Development Minikube Microservices
 
-> 🧪 **DEVELOPMENT & LEARNING ENVIRONMENT** - Educational project optimized for Minikube with hardcoded credentials for easy setup. 
-> Perfect for blog tutorials and YouTube demonstrations. 
+> 🧪 **DEVELOPMENT & LEARNING ENVIRONMENT** - Educational project optimized for Minikube with hardcoded credentials for easy setup.
+> Perfect for blog tutorials and YouTube demonstrations.
 > See [SECURITY.md](SECURITY.md) and [PRODUCTION.md](PRODUCTION.md) for production hardening.
 
 Quick-start Loki distributed microservices stack for development, testing, and learning on Minikube with automated deployment and comprehensive tooling.
@@ -21,7 +21,7 @@ Quick-start Loki distributed microservices stack for development, testing, and l
 
 **Storage Requirements**: ~10Gi total (optimized for local development)
 - Ingester: 3Gi (data + WAL)
-- MinIO: 3Gi  
+- MinIO: 3Gi
 - Compactor: 2Gi
 - Caches: 2Gi total
 
@@ -61,12 +61,13 @@ loki-dev-minikube-microservices/
 │   ├── 📁 loki/              # Complete Loki stack
 │   │   ├── 📁 configs/       # All Loki configurations
 │   │   ├── 📁 deployments/   # All Loki deployments
-│   │   ├── services.yaml      # Loki services
-│   │   └── storage.yaml       # Loki PVCs
+│   │   ├── 📁 services/      # All Loki services
+│   │   └── 📁 storage/       # All Loki PVCs
 │   ├── 📁 fluent-bit/        # Complete Fluent Bit setup
 │   │   ├── configmap.yaml     # Fluent Bit configuration
 │   │   ├── daemonset.yaml     # Fluent Bit DaemonSet
-│   │   └── rbac.yaml          # Fluent Bit RBAC
+│   │   ├── service.yaml       # Fluent Bit service
+│   │   └── 📁 rbac/          # Fluent Bit RBAC
 │   ├── 📁 grafana/           # Complete Grafana setup
 │   │   ├── configmaps.yaml    # Grafana datasources & dashboards
 │   │   ├── deployment.yaml    # Grafana deployment
@@ -147,7 +148,7 @@ loki-dev-minikube-microservices/
 | **Grafana** | 12.1.0 | [grafana/grafana](https://github.com/grafana/grafana/releases) | [grafana/grafana](https://hub.docker.com/r/grafana/grafana/tags) |
 | **Prometheus** | v3.5.0 | [prometheus/prometheus](https://github.com/prometheus/prometheus/releases) | [prom/prometheus](https://hub.docker.com/r/prom/prometheus/tags) |
 | **MinIO** | RELEASE.2025-09-07T16-13-09Z | [minio/minio](https://github.com/minio/minio/releases) | [minio/minio](https://hub.docker.com/r/minio/minio/tags) |
-| **Fluent Bit** | 4.0.10 | [fluent/fluent-bit](https://github.com/fluent/fluent-bit/releases) | [fluent/fluent-bit](https://hub.docker.com/r/fluent/fluent-bit/tags) |
+| **Fluent Bit** | 4.1.0 | [fluent/fluent-bit](https://github.com/fluent/fluent-bit/releases) | [fluent/fluent-bit](https://hub.docker.com/r/fluent/fluent-bit/tags) |
 
 **Update any version:**
 ```bash
@@ -256,6 +257,32 @@ kubectl port-forward -n loki svc/minio 9000:9000
 
 See [CONFIGURATION.md](CONFIGURATION.md) for manual API testing procedures and examples.
 
+## Loki Web UI Access
+
+**Loki Web UI is available via Query Frontend for log exploration and querying:**
+
+```bash
+# Access Loki Web UI via Query Frontend
+kubectl port-forward -n loki svc/query-frontend 3100:3100
+# Open: http://localhost:3100
+
+# Alternative: Direct API access
+kubectl port-forward -n loki svc/query-frontend 3100:3100
+# API: http://localhost:3100/loki/api/v1/
+```
+
+**UI Features:**
+- **Log Explorer**: Query and filter logs with LogQL
+- **Label Browser**: Explore available labels and values
+- **Query Builder**: Visual query construction
+- **Live Tail**: Real-time log streaming
+- **Query History**: Previous queries and results
+
+**Access Methods:**
+- **NodePort**: Direct access via Minikube IP:30100
+- **Port Forward**: Local access via localhost:3100
+- **Service**: Minikube service command for automatic browser opening
+
 
 ## Production Considerations
 
@@ -325,6 +352,7 @@ kubectl delete namespace loki
 **Healthy Deployment:**
 - **All pods running** (Fluent Bit: 1 per node + 8 Loki components + MinIO + Prometheus + Grafana = 11+ pods total)
 - **Standard labels applied**: `kubectl get pods -l app.kubernetes.io/part-of=logging-stack`
+- **Loki Web UI accessible**: Query Frontend at http://localhost:3100
 - **Labels API working**: `curl localhost:3100/loki/api/v1/labels`
 - **Distributor**: `memberlist cluster succeeded`
 - **Ingester**: `checkpoint done`, `uploading tables`, `flushing stream`
