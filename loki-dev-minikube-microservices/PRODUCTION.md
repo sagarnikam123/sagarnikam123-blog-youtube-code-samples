@@ -148,7 +148,7 @@ spec:
 # High ingestion error rate
 - alert: LokiHighIngestionErrorRate
   expr: rate(loki_distributor_ingester_append_failures_total[5m]) > 0.1
-  
+
 # Query latency high
 - alert: LokiHighQueryLatency
   expr: histogram_quantile(0.99, rate(loki_request_duration_seconds_bucket[5m])) > 10
