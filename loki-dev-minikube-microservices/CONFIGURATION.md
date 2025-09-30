@@ -189,7 +189,7 @@ docker run --rm -v "$(pwd)/config:/config" grafana/loki:${LOKI_VERSION} \
   -config.file=/config/[component].yaml -verify-config -target=[component]
 
 # Examples:
-# distributor, ingester, querier, query-frontend, 
+# distributor, ingester, querier, query-frontend,
 # query-scheduler, compactor, ruler, index-gateway
 ```
 
@@ -220,7 +220,7 @@ docker run --rm -v "$(pwd)/config:/config" grafana/loki:${LOKI_VERSION} \
 
 **Key Scaling Factors:**
 - **Ingester replicas**: Based on write throughput and availability needs
-- **Querier replicas**: Based on query load and response time requirements  
+- **Querier replicas**: Based on query load and response time requirements
 - **Storage per ingester**: ~10-50GB per 1GB/day log volume
 - **Retention period**: Multiply storage by retention days
 
