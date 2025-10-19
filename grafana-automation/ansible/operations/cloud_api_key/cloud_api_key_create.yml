@@ -9,7 +9,7 @@
         name: "ansible-test-key"
         role: "Editor"
         org_slug: "{{ grafana_cloud_org_slug }}"
-        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        existing_cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         fail_if_already_created: false
         state: present
       register: api_key_result
