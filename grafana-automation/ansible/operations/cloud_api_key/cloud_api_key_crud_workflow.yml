@@ -10,7 +10,7 @@
         name: "ansible-test-key"
         role: "Editor"
         org_slug: "{{ grafana_cloud_org_slug }}"
-        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        existing_cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         fail_if_already_created: false
         state: present
       register: api_key_result
@@ -25,7 +25,7 @@
         url: "https://grafana.com/api/orgs/{{ grafana_cloud_org_slug }}/api-keys"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: api_keys_result
 
@@ -39,7 +39,7 @@
         name: "ansible-test-key"
         role: "Admin"
         org_slug: "{{ grafana_cloud_org_slug }}"
-        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        existing_cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         fail_if_already_created: false
         state: present
       register: updated_api_key_result
@@ -54,7 +54,7 @@
         url: "https://grafana.com/api/orgs/{{ grafana_cloud_org_slug }}/api-keys"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: updated_api_keys_result
 
@@ -67,7 +67,7 @@
       grafana.grafana.cloud_api_key:
         name: "ansible-test-key"
         org_slug: "{{ grafana_cloud_org_slug }}"
-        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        existing_cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         state: absent
       register: delete_result
       ignore_errors: true
@@ -82,7 +82,7 @@
         url: "https://grafana.com/api/orgs/{{ grafana_cloud_org_slug }}/api-keys"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: final_api_keys_result
 
