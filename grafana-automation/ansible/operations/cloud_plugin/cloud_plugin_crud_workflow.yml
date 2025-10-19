@@ -10,7 +10,7 @@
         name: "grafana-github-datasource"
         version: "latest"
         stack_slug: "{{ grafana_cloud_stack_slug }}"
-        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         state: present
       register: plugin_result
 
@@ -24,7 +24,7 @@
         url: "https://grafana.com/api/instances/{{ grafana_cloud_stack_slug }}/plugins"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: plugins_result
 
@@ -38,7 +38,7 @@
         name: "grafana-github-datasource"
         version: "1.0.14"
         stack_slug: "{{ grafana_cloud_stack_slug }}"
-        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         state: present
       register: updated_plugin_result
 
@@ -52,7 +52,7 @@
         url: "https://grafana.com/api/instances/{{ grafana_cloud_stack_slug }}/plugins"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: updated_plugins_result
 
@@ -65,7 +65,7 @@
       grafana.grafana.cloud_plugin:
         name: "grafana-github-datasource"
         stack_slug: "{{ grafana_cloud_stack_slug }}"
-        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         state: absent
       register: delete_result
       ignore_errors: true
@@ -80,7 +80,7 @@
         url: "https://grafana.com/api/instances/{{ grafana_cloud_stack_slug }}/plugins"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: final_plugins_result
 

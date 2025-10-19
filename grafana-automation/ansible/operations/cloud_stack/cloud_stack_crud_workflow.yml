@@ -9,7 +9,7 @@
       grafana.grafana.cloud_stack:
         name: "ansible-test-stack"
         stack_slug: "ansible-test-stack"
-        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         org_slug: "{{ grafana_cloud_org_slug }}"
         region: "us"
         delete_protection: true
@@ -26,7 +26,7 @@
         url: "https://grafana.com/api/instances"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: stacks_result
 
@@ -39,7 +39,7 @@
       grafana.grafana.cloud_stack:
         name: "ansible-test-stack"
         stack_slug: "ansible-test-stack"
-        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         org_slug: "{{ grafana_cloud_org_slug }}"
         region: "us"
         url: "https://grafana.<your-company>.com"
@@ -57,7 +57,7 @@
         url: "https://grafana.com/api/instances"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: updated_stacks_result
 
@@ -70,7 +70,7 @@
       grafana.grafana.cloud_stack:
         name: "ansible-test-stack"
         stack_slug: "ansible-test-stack"
-        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        cloud_api_key: "{{ grafana_cloud_access_policy_token }}"
         org_slug: "{{ grafana_cloud_org_slug }}"
         delete_protection: false
         state: absent
@@ -87,7 +87,7 @@
         url: "https://grafana.com/api/instances"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: final_stacks_result
 
