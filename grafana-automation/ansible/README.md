@@ -117,7 +117,7 @@ ansible/
 | Alert Contact Point     | ✅ | ✅ | ✅ | ✅ | ✅             | ✅ Working |
 | Alert Notification Policy | ✅ | ✅ | ✅ | ✅ | ✅             | ✅ Working |
 | Cloud API Key           | ❌ | ✅ | ❌ | ❌ | ❌             | ❌ Not Functional |
-| Cloud Plugin            | ❌ | ✅ | ❌ | ❌ | ❌             | 🔶 Read Only |
+| Cloud Plugin            | ❌ | ✅ | ❌ | ❌ | ❌             | ❌ Broken ([#453](https://github.com/grafana/grafana-ansible-collection/issues/453)) |
 | Cloud Stack             | ❌ | ✅ | ❌ | ❌ | ❌             | 🔶 Limited by Tier |
 
 **Status Legend:**
@@ -127,8 +127,10 @@ ansible/
 
 **Cloud Limitations:**
 - **API Keys**: Endpoint not available in Grafana Cloud API
-- **Plugins**: Module parameter issues and permission restrictions
+- **Plugins**: Module has KeyError bug in create/update operations ([Issue #453](https://github.com/grafana/grafana-ansible-collection/issues/453))
 - **Stacks**: Free tier allows only 1 stack, preventing create/update operations
+
+**Important**: Grafana Cloud operations require **Cloud Access Policy tokens**, not regular API keys. See [Grafana Cloud Access Policies Documentation](https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/) for setup instructions.
 
 ## 📖 Usage Examples
 
