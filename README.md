@@ -1,5 +1,5 @@
 # sagarnikam123-blog-youtube-code-samples
-A curated collection of code samples and projects shared on my blog and YouTube tutorials, organized for easy reference and reuse.
+A curated collection of production-ready code samples, automation frameworks, and DevOps projects shared through my blog and YouTube tutorials.
 
 ## 🔗 Links
 
