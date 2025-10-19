@@ -23,12 +23,13 @@ grafana_admin_name: "admin"
 # Note: Most operations use API keys, this is only for user CRUD operations
 grafana_admin_password: "<your-admin-password>"
 
-# Grafana Cloud API Token for Cloud-level operations (stack management, etc.)
-# How to get: grafana.com → Profile → Cloud API Keys → Generate API key
+# Grafana Cloud Access Policy Token for Cloud-level operations (stack management, etc.)
+# How to get: grafana.com → Profile → Access Policies → Create Access Policy → Generate Token
 # Format: glc_<jwt_token>
-# Permissions: Requires appropriate Cloud API permissions
-# Note: Different from service account tokens - this is for Cloud management API
-grafana_cloud_api_key: "<your-cloud-api-token>"
+# Permissions: Requires appropriate Cloud Access Policy permissions
+# Note: Cloud Access Policy tokens are required for Cloud API, not service account tokens
+# Documentation: https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/
+grafana_cloud_access_policy_token: "<your-cloud-access-policy-token>"
 
 # Your Grafana Cloud organization slug
 # How to get: Available in Grafana Cloud dashboard URL or organization settings
