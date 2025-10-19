@@ -1,0 +1,96 @@
+---
+- name: Cloud Stack CRUD Workflow
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    # CREATE
+    - name: Create Grafana Cloud stack
+      grafana.grafana.cloud_stack:
+        name: "ansible-test-stack"
+        stack_slug: "ansible-test-stack"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        region: "us"
+        delete_protection: true
+        state: present
+      register: stack_result
+
+    - name: Display stack creation result
+      debug:
+        var: stack_result
+
+    # READ
+    - name: Get Cloud stacks
+      uri:
+        url: "https://grafana.com/api/instances"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: stacks_result
+
+    - name: Display Cloud stacks
+      debug:
+        var: stacks_result.json
+
+    # UPDATE
+    - name: Update Grafana Cloud stack with custom URL
+      grafana.grafana.cloud_stack:
+        name: "ansible-test-stack"
+        stack_slug: "ansible-test-stack"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        region: "us"
+        url: "https://grafana.<your-company>.com"
+        delete_protection: false
+        state: present
+      register: updated_stack_result
+
+    - name: Display stack update result
+      debug:
+        var: updated_stack_result
+
+    # READ after UPDATE
+    - name: Get Cloud stacks after update
+      uri:
+        url: "https://grafana.com/api/instances"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: updated_stacks_result
+
+    - name: Display updated Cloud stacks
+      debug:
+        var: updated_stacks_result.json
+
+    # DELETE
+    - name: Delete Grafana Cloud stack
+      grafana.grafana.cloud_stack:
+        name: "ansible-test-stack"
+        stack_slug: "ansible-test-stack"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        delete_protection: false
+        state: absent
+      register: delete_result
+      ignore_errors: true
+
+    - name: Display stack deletion result
+      debug:
+        var: delete_result
+
+    # READ after DELETE
+    - name: Get Cloud stacks after delete
+      uri:
+        url: "https://grafana.com/api/instances"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: final_stacks_result
+
+    - name: Display final Cloud stacks
+      debug:
+        var: final_stacks_result.json

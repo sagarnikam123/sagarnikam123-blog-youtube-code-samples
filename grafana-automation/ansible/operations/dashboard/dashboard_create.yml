@@ -1,0 +1,68 @@
+---
+- name: Create Dashboards
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Download Node Exporter dashboard JSON
+      uri:
+        url: "https://grafana.com/api/dashboards/1860/revisions/37/download"
+        method: GET
+        return_content: yes
+      register: node_exporter_dashboard
+
+    - name: Debug downloaded dashboard structure
+      debug:
+        msg: "Dashboard keys: {{ node_exporter_dashboard.json.keys() | list }}"
+
+    - name: Import Node Exporter dashboard
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard: "{{ node_exporter_dashboard.json }}"
+          overwrite: true
+        state: present
+
+    - name: Download and import multiple dashboards
+      uri:
+        url: "https://grafana.com/api/dashboards/{{ item.id }}/revisions/{{ item.revision }}/download"
+        method: GET
+        return_content: yes
+      register: dashboard_json
+      loop:
+        - { id: 13639, revision: 2, name: "Loki Dashboard" }     # by Sadlil
+        - { id: 12019, revision: 1, name: "Grafana Stats" }      # by eldintest
+      loop_control:
+        loop_var: item
+        label: "{{ item.name }}"
+
+    - name: Import downloaded dashboards
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard: "{{ item.json }}"
+          overwrite: true
+        state: present
+      loop: "{{ dashboard_json.results }}"
+      loop_control:
+        label: "Dashboard import"
+
+    - name: Create simple custom dashboard
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard:
+            title: "Simple Dashboard"
+            uid: "simple-dashboard"
+            tags: ["ansible"]
+            timezone: "browser"
+            panels: []
+            time:
+              from: "now-6h"
+              to: "now"
+            refresh: "5s"
+          overwrite: true
+        state: present

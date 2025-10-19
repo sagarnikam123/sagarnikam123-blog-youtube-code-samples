@@ -1,0 +1,18 @@
+---
+- name: Update Contact Points
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update email contact point settings
+      grafana.grafana.alert_contact_point:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        name: "ops-email"
+        uid: "opsemail-updated"
+        type: "email"
+        settings:
+          addresses: "admin@example.com,team@example.com,oncall@example.com"
+          subject: "Grafana Alert - Updated"
+        disableResolveMessage: false
+        state: present

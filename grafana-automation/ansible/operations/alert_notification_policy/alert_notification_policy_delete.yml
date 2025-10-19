@@ -1,0 +1,17 @@
+---
+- name: Delete Notification Policies
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Reset notification policy to default
+      grafana.grafana.alert_notification_policy:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        rootPolicyReceiver: "grafana-default-email"
+        groupByStr: []
+        groupWait: "30s"
+        groupInterval: "5m"
+        repeatInterval: "4h"
+        routes: []
+      ignore_errors: true

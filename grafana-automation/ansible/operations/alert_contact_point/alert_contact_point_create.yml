@@ -1,0 +1,32 @@
+---
+- name: Create Contact Points
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Create email contact point
+      grafana.grafana.alert_contact_point:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        name: "ops-email"
+        uid: "opsemail"
+        type: "email"
+        settings:
+          addresses: "admin@example.com,team@example.com"
+          subject: "Grafana Alert"
+        disableResolveMessage: false
+        state: present
+
+    - name: Create slack contact point
+      grafana.grafana.alert_contact_point:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        name: "ops-slack"
+        uid: "opsslack"
+        type: "slack"
+        settings:
+          url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+          channel: "#alerts"
+          username: "Grafana"
+        disableResolveMessage: false
+        state: present

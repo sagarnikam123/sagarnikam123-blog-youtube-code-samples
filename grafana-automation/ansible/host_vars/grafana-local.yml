@@ -1,0 +1,4 @@
+# Host Variables for grafana-local (Development)
+---
+grafana_url: "http://localhost:3000"
+grafana_api_key: "<your-local-api-token>"

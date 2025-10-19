@@ -1,0 +1,14 @@
+---
+- name: Update Folders
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update folder title
+      grafana.grafana.folder:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        title: "Infrastructure Monitoring"  # Updated title
+        uid: "infrastructure"
+        overwrite: true
+        state: present

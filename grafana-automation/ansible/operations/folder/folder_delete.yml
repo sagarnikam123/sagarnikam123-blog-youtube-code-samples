@@ -1,0 +1,26 @@
+---
+- name: Delete Folders
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Delete single folder
+      grafana.grafana.folder:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        title: "Security"  # Required even for deletion
+        uid: "security"
+        state: absent
+      ignore_errors: true
+
+    - name: Delete multiple folders
+      grafana.grafana.folder:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        title: "{{ item.title }}"
+        uid: "{{ item.uid }}"
+        state: absent
+      loop:
+        - { title: "Infrastructure", uid: "infrastructure" }
+        - { title: "Applications", uid: "applications" }
+      ignore_errors: true

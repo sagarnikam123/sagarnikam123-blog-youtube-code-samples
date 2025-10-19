@@ -1,0 +1,44 @@
+---
+- name: Read Users
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Get organization users (with Bearer token)
+      uri:
+        url: "{{ grafana_url }}/api/org/users"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 403]
+      register: users_result
+
+    - name: Display organization users
+      debug:
+        msg: "Found {{ users_result.json | length }} organization users"
+      when: users_result.status == 200
+
+    - name: Show user details
+      debug:
+        msg: "User: {{ item.name }} ({{ item.login }}, Role: {{ item.role }}, Email: {{ item.email }})"
+      loop: "{{ users_result.json if users_result.status == 200 else [] }}"
+      when: users_result.status == 200
+
+    - name: Access denied
+      debug:
+        msg: "Access denied - check service account permissions"
+      when: users_result.status == 403
+
+    - name: Get current user info
+      uri:
+        url: "{{ grafana_url }}/api/user"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: current_user
+
+    - name: Display current user
+      debug:
+        msg: "Current user: {{ current_user.json.name }} ({{ current_user.json.login }})"

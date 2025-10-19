@@ -1,0 +1,91 @@
+---
+- name: Cloud API Key CRUD Workflow
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    # CREATE
+    - name: Create Grafana Cloud API key
+      grafana.grafana.cloud_api_key:
+        name: "ansible-test-key"
+        role: "Editor"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        fail_if_already_created: false
+        state: present
+      register: api_key_result
+
+    - name: Display created API key info
+      debug:
+        var: api_key_result
+
+    # READ
+    - name: Get Cloud API keys
+      uri:
+        url: "https://grafana.com/api/orgs/{{ grafana_cloud_org_slug }}/api-keys"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: api_keys_result
+
+    - name: Display Cloud API keys
+      debug:
+        var: api_keys_result.json
+
+    # UPDATE
+    - name: Update Grafana Cloud API key (recreate with new role)
+      grafana.grafana.cloud_api_key:
+        name: "ansible-test-key"
+        role: "Admin"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        fail_if_already_created: false
+        state: present
+      register: updated_api_key_result
+
+    - name: Display updated API key info
+      debug:
+        var: updated_api_key_result
+
+    # READ after UPDATE
+    - name: Get Cloud API keys after update
+      uri:
+        url: "https://grafana.com/api/orgs/{{ grafana_cloud_org_slug }}/api-keys"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: updated_api_keys_result
+
+    - name: Display updated Cloud API keys
+      debug:
+        var: updated_api_keys_result.json
+
+    # DELETE
+    - name: Delete Grafana Cloud API key
+      grafana.grafana.cloud_api_key:
+        name: "ansible-test-key"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        state: absent
+      register: delete_result
+      ignore_errors: true
+
+    - name: Display delete result
+      debug:
+        var: delete_result
+
+    # READ after DELETE
+    - name: Get Cloud API keys after delete
+      uri:
+        url: "https://grafana.com/api/orgs/{{ grafana_cloud_org_slug }}/api-keys"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: final_api_keys_result
+
+    - name: Display final Cloud API keys
+      debug:
+        var: final_api_keys_result.json

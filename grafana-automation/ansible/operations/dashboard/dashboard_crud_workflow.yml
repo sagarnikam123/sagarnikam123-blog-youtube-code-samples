@@ -1,0 +1,114 @@
+---
+- name: Dashboard Management Operations
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files:
+  gather_facts: yes
+
+  tasks:
+    # Uncomment if you have dashboard JSON files
+    # - name: Import dashboard from file
+    #   grafana.grafana.dashboard:
+    #     grafana_url: "{{ grafana_url }}"
+    #     grafana_api_key: "{{ grafana_api_key }}"
+    #     dashboard: "{{ lookup('ansible.builtin.file', 'dashboards/system-overview.json') | from_json }}"
+    #     state: present
+
+    - name: Create custom dashboard
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard:
+            title: "CRUD Workflow Dashboard"
+            uid: "crud-workflow"
+            tags: ["ansible", "crud"]
+            timezone: "browser"
+            panels: []
+            time:
+              from: "now-6h"
+              to: "now"
+            refresh: "5s"
+          overwrite: true
+        state: present
+
+    - name: Read all dashboards
+      uri:
+        url: "{{ grafana_url }}/api/search?type=dash-db"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: dashboards_search
+
+    - name: Display found dashboards
+      debug:
+        msg: "Found {{ dashboards_search.json | length }} dashboards: {{ dashboards_search.json | map(attribute='title') | list }}"
+
+    - name: Update dashboard title and settings
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard:
+            title: "CRUD Workflow Dashboard - Updated"
+            uid: "crud-workflow"
+            tags: ["ansible", "crud", "updated"]
+            timezone: "browser"
+            panels: []
+            time:
+              from: "now-12h"
+              to: "now"
+            refresh: "10s"
+          overwrite: true
+        state: present
+
+    - name: Read updated dashboard
+      uri:
+        url: "{{ grafana_url }}/api/dashboards/uid/crud-workflow"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 404]
+      register: updated_dashboard
+
+    - name: Display updated dashboard info
+      debug:
+        msg: "Dashboard title: {{ updated_dashboard.json.dashboard.title }}, Version: {{ updated_dashboard.json.dashboard.version }}"
+      when: updated_dashboard.status == 200
+
+    - name: Delete the workflow dashboard
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard:
+            uid: "crud-workflow"
+        state: absent
+
+    - name: Verify deletion
+      uri:
+        url: "{{ grafana_url }}/api/dashboards/uid/crud-workflow"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 404]
+      register: verify_deletion
+
+    - name: Confirm deletion result
+      debug:
+        msg: "Dashboard deletion {{ 'successful' if verify_deletion.status == 404 else 'failed' }}"
+
+    - name: Final dashboard count
+      uri:
+        url: "{{ grafana_url }}/api/search?type=dash-db"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: final_dashboards
+
+    - name: Display final dashboard count
+      debug:
+        msg: "Final dashboard count: {{ final_dashboards.json | length }}"

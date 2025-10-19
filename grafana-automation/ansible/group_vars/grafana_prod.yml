@@ -1,0 +1,9 @@
+# Group Variables for Production Grafana Instances
+# Common settings shared by all production hosts
+
+---
+grafana_environment: "production"
+grafana_admin_name: "admin"
+grafana_admin_password: "admin-password"
+
+# Note: grafana_url and grafana_api_key are defined in host_vars/ for each host

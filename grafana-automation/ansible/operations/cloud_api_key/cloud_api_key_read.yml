@@ -1,0 +1,32 @@
+---
+- name: Read Cloud API Keys
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Check available Cloud API endpoints
+      uri:
+        url: "https://grafana.com/api/instances/{{ grafana_cloud_stack_slug }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: instance_info
+
+    - name: Display available Cloud API endpoints
+      debug:
+        msg: |
+          ✅ Cloud API Authentication: SUCCESS
+
+          Available endpoints for {{ grafana_cloud_stack_slug }}:
+          {% for link in instance_info.json.links %}
+          - {{ link.rel }}: {{ link.href }}
+          {% endfor %}
+
+          ❌ API Key Management: NOT AVAILABLE via Cloud API
+
+          Note: API keys must be managed through:
+          1. Grafana instance UI: {{ grafana_url }}admin/api-keys
+          2. Instance API (if available): {{ grafana_url }}api/auth/keys
+
+          Cloud API is for instance-level management, not internal resource management.

@@ -1,0 +1,26 @@
+---
+- name: Delete Datasources
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Delete datasource by name
+      grafana.grafana.datasource:
+        dataSource:
+          name: "InfluxDB"
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Delete multiple datasources
+      grafana.grafana.datasource:
+        dataSource:
+          name: "{{ item }}"
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        state: absent
+      loop:
+        - "Loki"
+        - "Prometheus"
+      ignore_errors: true

@@ -1,0 +1,4 @@
+# Host Variables for grafana-prod-1 (Production - use vault in real environments)
+---
+grafana_url: "https://<your-prod-grafana-1>.example.com"
+grafana_api_key: "<your-prod-1-api-token>"

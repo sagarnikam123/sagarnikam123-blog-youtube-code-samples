@@ -1,0 +1,19 @@
+---
+- name: Update Cloud API Key
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update Grafana Cloud API key (recreate with new role)
+      grafana.grafana.cloud_api_key:
+        name: "ansible-test-key"
+        role: "Admin"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        fail_if_already_created: false
+        state: present
+      register: updated_api_key_result
+
+    - name: Display updated API key info
+      debug:
+        var: updated_api_key_result

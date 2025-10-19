@@ -1,0 +1,4 @@
+# Host Variables for grafana-prod-2
+---
+grafana_url: "https://<your-prod-grafana-2>.example.com"
+grafana_api_key: "<your-prod-2-api-token>"

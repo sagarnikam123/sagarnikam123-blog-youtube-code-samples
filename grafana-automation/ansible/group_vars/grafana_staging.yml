@@ -1,0 +1,9 @@
+# Group Variables for Staging Grafana Instances
+# Common settings shared by all staging hosts
+
+---
+grafana_environment: "staging"
+grafana_admin_name: "admin"
+grafana_admin_password: "staging-admin-password"
+
+# Note: grafana_url and grafana_api_key are defined in host_vars/ for each host

@@ -1,0 +1,108 @@
+---
+- name: Alert Contact Point CRUD Workflow
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    # CREATE - Create 3 contact points
+    - name: Create multiple contact points
+      grafana.grafana.alert_contact_point:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        name: "{{ item.name }}"
+        uid: "{{ item.uid }}"
+        type: "{{ item.type }}"
+        settings: "{{ item.settings }}"
+        disableResolveMessage: false
+        state: present
+      loop:
+        - name: "ops-email-wf"
+          uid: "opsemailwf"
+          type: "email"
+          settings:
+            addresses: "ops@example.com"
+            subject: "Operations Alert"
+        - name: "dev-slack-wf"
+          uid: "devslackwf"
+          type: "slack"
+          settings:
+            url: "https://hooks.slack.com/services/DEV/SLACK/WEBHOOK"
+            channel: "#dev-alerts"
+            username: "Grafana-Dev"
+        - name: "security-email-wf"
+          uid: "secemailwf"
+          type: "email"
+          settings:
+            addresses: "security@example.com,admin@example.com"
+            subject: "Security Alert"
+
+    # READ - Read all contact points
+    - name: Get all contact points after creation
+      uri:
+        url: "{{ grafana_url }}/api/v1/provisioning/contact-points"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: all_contact_points_result
+
+    - name: Display all contact points
+      debug:
+        var: all_contact_points_result.json
+
+    # UPDATE - Update one contact point (ops-email-wf)
+    - name: Update ops-email-wf contact point
+      grafana.grafana.alert_contact_point:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        name: "ops-email-wf"
+        uid: "opsemailwf-updated"
+        type: "email"
+        settings:
+          addresses: "ops@example.com,team@example.com,oncall@example.com"
+          subject: "Operations Alert - Updated"
+        disableResolveMessage: false
+        state: present
+
+    # READ - Read all contact points after update
+    - name: Get all contact points after update
+      uri:
+        url: "{{ grafana_url }}/api/v1/provisioning/contact-points"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: updated_contact_points_result
+
+    - name: Display contact points after update
+      debug:
+        var: updated_contact_points_result.json
+
+    # DELETE - Delete one contact point (dev-slack-wf)
+    - name: Delete dev-slack-wf contact point
+      grafana.grafana.alert_contact_point:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        name: "dev-slack-wf"
+        uid: "devslackwf"
+        type: "slack"
+        settings:
+          url: "https://hooks.slack.com/services/DEV/SLACK/WEBHOOK"
+          channel: "#dev-alerts"
+          username: "Grafana-Dev"
+        state: absent
+      ignore_errors: true
+
+    # READ - Read all contact points after delete
+    - name: Get all contact points after delete
+      uri:
+        url: "{{ grafana_url }}/api/v1/provisioning/contact-points"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: final_contact_points_result
+
+    - name: Display final contact points
+      debug:
+        var: final_contact_points_result.json

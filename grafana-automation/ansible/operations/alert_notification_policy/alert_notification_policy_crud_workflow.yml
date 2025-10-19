@@ -1,0 +1,90 @@
+---
+- name: Alert Notification Policy CRUD Workflow
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    # CREATE
+    - name: Create notification policy
+      grafana.grafana.alert_notification_policy:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        rootPolicyReceiver: "grafana-default-email"
+        groupByStr: ["alertname"]
+        groupWait: "10s"
+        groupInterval: "5m"
+        repeatInterval: "12h"
+        routes:
+          - receiver: "grafana-default-email"
+            object_matchers: [["severity", "=", "critical"]]
+
+    # READ
+    - name: Get notification policies
+      uri:
+        url: "{{ grafana_url }}/api/v1/provisioning/policies"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: policies_result
+
+    - name: Display notification policies
+      debug:
+        var: policies_result.json
+
+    # UPDATE
+    - name: Update notification policy settings
+      grafana.grafana.alert_notification_policy:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        rootPolicyReceiver: "grafana-default-email"
+        groupByStr: ["alertname", "cluster"]
+        groupWait: "15s"
+        groupInterval: "10m"
+        repeatInterval: "24h"
+        routes:
+          - receiver: "grafana-default-email"
+            object_matchers: [["severity", "=", "critical"]]
+          - receiver: "grafana-default-email"
+            object_matchers: [["severity", "=", "warning"]]
+
+    # READ after UPDATE
+    - name: Get notification policies after update
+      uri:
+        url: "{{ grafana_url }}/api/v1/provisioning/policies"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: updated_policies_result
+
+    - name: Display updated notification policies
+      debug:
+        var: updated_policies_result.json
+
+    # DELETE
+    - name: Reset notification policy to default
+      grafana.grafana.alert_notification_policy:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        rootPolicyReceiver: "grafana-default-email"
+        groupByStr: []
+        groupWait: "30s"
+        groupInterval: "5m"
+        repeatInterval: "4h"
+        routes: []
+      ignore_errors: true
+
+    # READ after DELETE
+    - name: Get notification policies after reset
+      uri:
+        url: "{{ grafana_url }}/api/v1/provisioning/policies"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: final_policies_result
+
+    - name: Display final notification policies
+      debug:
+        var: final_policies_result.json

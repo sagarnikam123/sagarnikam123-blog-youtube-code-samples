@@ -1,0 +1,4 @@
+# Host Variables for grafana-dev-1 (Development - use vault in real environments)
+---
+grafana_url: "https://<your-dev-grafana>.example.com"
+grafana_api_key: "<your-dev-api-token>"

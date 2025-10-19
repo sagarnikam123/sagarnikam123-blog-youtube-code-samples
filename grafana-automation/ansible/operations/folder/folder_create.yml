@@ -1,0 +1,27 @@
+---
+- name: Create Folders
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Create single folder
+      grafana.grafana.folder:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        title: "System Monitoring"
+        uid: "system-monitoring"
+        overwrite: true
+        state: present
+
+    - name: Create multiple folders
+      grafana.grafana.folder:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        title: "{{ item.title }}"
+        uid: "{{ item.uid }}"
+        overwrite: true
+        state: present
+      loop:
+        - { title: "Infrastructure", uid: "infrastructure" }
+        - { title: "Applications", uid: "applications" }
+        - { title: "Security", uid: "security" }

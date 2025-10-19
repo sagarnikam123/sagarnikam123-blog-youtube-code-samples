@@ -1,0 +1,4 @@
+# Host Variables for grafana-staging-1 (Staging - use vault in real environments)
+---
+grafana_url: "https://<your-staging-grafana>.example.com"
+grafana_api_key: "<your-staging-api-token>"

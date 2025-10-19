@@ -1,0 +1,9 @@
+# Group Variables for Grafana Cloud Instances
+# Common settings shared by all cloud hosts
+
+---
+grafana_environment: "cloud"
+# Note: Grafana Cloud uses different authentication (cloud API keys)
+# grafana_admin_name and grafana_admin_password not typically used for cloud instances
+
+# Note: grafana_url and grafana_api_key are defined in host_vars/ for each host

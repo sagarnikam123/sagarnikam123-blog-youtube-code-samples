@@ -1,0 +1,18 @@
+---
+- name: Read Dashboards
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Search all dashboards
+      uri:
+        url: "{{ grafana_url }}/api/search?type=dash-db"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: dashboards_search
+
+    - name: Display dashboards
+      debug:
+        var: dashboards_search.json

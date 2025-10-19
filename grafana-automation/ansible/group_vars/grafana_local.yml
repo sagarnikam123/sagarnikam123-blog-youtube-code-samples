@@ -1,0 +1,9 @@
+# Group Variables for Local Grafana Instance
+# Common settings for local development
+
+---
+grafana_environment: "local"
+grafana_admin_name: "admin"
+grafana_admin_password: "admin#123"
+
+# Note: grafana_url and grafana_api_key are defined in host_vars/ for each host

@@ -1,0 +1,23 @@
+---
+- name: Update Dashboards
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update simple dashboard title
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard:
+            title: "Simple Dashboard - Updated"
+            uid: "simple-dashboard"
+            tags: ["ansible", "updated"]
+            timezone: "browser"
+            panels: []
+            time:
+              from: "now-12h"
+              to: "now"
+            refresh: "10s"
+          overwrite: true
+        state: present

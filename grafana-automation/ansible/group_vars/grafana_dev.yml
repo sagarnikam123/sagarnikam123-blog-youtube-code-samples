@@ -1,0 +1,9 @@
+# Group Variables for Development Grafana Instances
+# Common settings shared by all development hosts
+
+---
+grafana_environment: "development"
+grafana_admin_name: "admin"
+grafana_admin_password: "dev-admin-password"
+
+# Note: grafana_url and grafana_api_key are defined in host_vars/ for each host

@@ -1,0 +1,43 @@
+# Host Variables for grafana-cloud (Development - use vault in real environments)
+# NOTE: Replace with your actual Grafana Cloud credentials
+---
+
+# Your Grafana Cloud instance URL
+# How to get: Available in Grafana Cloud dashboard at grafana.com after creating a stack
+# Format: https://<your-stack-name>.grafana.net/
+grafana_url: "https://<your-stack-name>.grafana.net/"
+
+# Service Account Token for Grafana instance API operations (datasources, dashboards, etc.)
+# How to get: Grafana UI → Administration → Service accounts → Create service account → Add token
+# Format: glsa_<random_string>
+# Permissions: Use Admin role for full access or specific scopes as needed
+grafana_api_key: "<your-service-account-token>"
+
+# Grafana admin username (only needed for user management operations)
+# How to get: Default is 'admin' or your custom admin username
+# Note: Most operations use API keys, this is only for user CRUD operations
+grafana_admin_name: "admin"
+
+# Grafana admin password (only needed for user management operations)
+# How to get: Set during Grafana Cloud stack creation or reset via Grafana Cloud UI
+# Note: Most operations use API keys, this is only for user CRUD operations
+grafana_admin_password: "<your-admin-password>"
+
+# Grafana Cloud API Token for Cloud-level operations (stack management, etc.)
+# How to get: grafana.com → Profile → Cloud API Keys → Generate API key
+# Format: glc_<jwt_token>
+# Permissions: Requires appropriate Cloud API permissions
+# Note: Different from service account tokens - this is for Cloud management API
+grafana_cloud_api_key: "<your-cloud-api-token>"
+
+# Your Grafana Cloud organization slug
+# How to get: Available in Grafana Cloud dashboard URL or organization settings
+# Format: Usually your organization name in lowercase
+# Example: https://grafana.com/orgs/<org_slug>
+grafana_cloud_org_slug: "<your-org-slug>"
+
+# Your Grafana Cloud stack slug (usually same as org slug for single stack)
+# How to get: Available in Grafana Cloud dashboard or stack settings
+# Format: Usually your stack name in lowercase
+# Example: https://grafana.com/api/instances/<stack_slug>
+grafana_cloud_stack_slug: "<your-stack-slug>"

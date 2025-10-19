@@ -1,0 +1,26 @@
+---
+- name: Delete Users
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Delete single user
+      grafana.grafana.user:
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        login: "<username>"
+        state: absent
+      ignore_errors: true
+
+    - name: Delete multiple users
+      grafana.grafana.user:
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        login: "{{ item }}"
+        state: absent
+      loop:
+        - "<developer1>"
+        - "<operator1>"
+      ignore_errors: true

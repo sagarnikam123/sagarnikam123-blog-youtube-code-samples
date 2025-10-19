@@ -1,0 +1,21 @@
+---
+- name: Update Cloud Stack
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update Grafana Cloud stack with custom URL
+      grafana.grafana.cloud_stack:
+        name: "ansible-test-stack"
+        stack_slug: "ansible-test-stack"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        region: "us"
+        url: "https://grafana.<your-company>.com"
+        delete_protection: false
+        state: present
+      register: updated_stack_result
+
+    - name: Display stack update result
+      debug:
+        var: updated_stack_result

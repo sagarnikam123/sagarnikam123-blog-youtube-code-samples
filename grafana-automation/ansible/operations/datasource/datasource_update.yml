@@ -1,0 +1,26 @@
+---
+- name: Update Datasources
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update Prometheus datasource configuration
+      grafana.grafana.datasource:
+        dataSource: |
+          {
+            "name": "Prometheus",
+            "type": "prometheus",
+            "access": "proxy",
+            "url": "http://prometheus-server:9090",
+            "isDefault": true,
+            "jsonData": {
+              "httpMethod": "GET",
+              "manageAlerts": false,
+              "prometheusType": "Prometheus",
+              "cacheLevel": "Low",
+              "timeInterval": "30s"
+            }
+          }
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        state: present

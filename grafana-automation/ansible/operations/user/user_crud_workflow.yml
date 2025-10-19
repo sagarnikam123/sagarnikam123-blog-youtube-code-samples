@@ -1,0 +1,80 @@
+---
+- name: User Management Operations
+  hosts: "{{ target_hosts | default('localhost') }}"
+  gather_facts: yes
+
+  tasks:
+    - name: Create CRUD workflow user
+      grafana.grafana.user:
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        login: "<test_user>"
+        password: "<test_password>"
+        name: "CRUD Test User"
+        email: "crud@example.com"
+        state: present
+
+    - name: Read organization users
+      uri:
+        url: "{{ grafana_url }}/api/org/users"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 403]
+      register: users_result
+
+    - name: Display users count and names
+      debug:
+        msg: "Found {{ users_result.json | length }} organization users: {{ users_result.json | map(attribute='login') | list | join(', ') }}"
+      when: users_result.status == 200
+
+    - name: Update CRUD user
+      grafana.grafana.user:
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        login: "<test_user>"
+        password: "<updated_password>"
+        name: "CRUD Test User - Updated"
+        email: "crud.updated@example.com"
+        state: present
+
+    - name: Read users after update
+      uri:
+        url: "{{ grafana_url }}/api/org/users"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 403]
+      register: updated_users
+
+    - name: Display users after update
+      debug:
+        msg: "After update - {{ updated_users.json | length }} users: {{ updated_users.json | map(attribute='name') | list | join(', ') }}"
+      when: updated_users.status == 200
+
+    - name: Delete CRUD user
+      grafana.grafana.user:
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        login: "<test_user>"
+        state: absent
+
+    - name: Verify deletion
+      uri:
+        url: "{{ grafana_url }}/api/org/users"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 403]
+      register: final_users
+
+    - name: Display final users
+      debug:
+        msg: "Final - {{ final_users.json | length }} users: {{ final_users.json | map(attribute='login') | list | join(', ') }}"
+      when: final_users.status == 200

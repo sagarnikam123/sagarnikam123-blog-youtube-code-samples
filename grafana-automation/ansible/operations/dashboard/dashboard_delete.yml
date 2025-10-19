@@ -1,0 +1,34 @@
+---
+- name: Delete Dashboards
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Get all dashboards to see what exists
+      uri:
+        url: "{{ grafana_url }}/api/search?type=dash-db"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: existing_dashboards
+
+    - name: Display existing dashboards
+      debug:
+        msg: "Found dashboards: {{ existing_dashboards.json | map(attribute='uid') | list }}"
+
+    - name: Delete dashboards by UID
+      grafana.grafana.dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        dashboard:
+          dashboard:
+            uid: "{{ item }}"
+        state: absent
+      loop:
+        - "cpu-monitoring"      # CPU Monitoring dashboard
+        - "rYdddlPWk"           # Node Exporter dashboard
+        - "system-overview"     # System Overview dashboard
+      ignore_errors: yes
+      loop_control:
+        label: "Deleting dashboard {{ item }}"

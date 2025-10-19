@@ -1,0 +1,35 @@
+---
+- name: Read Datasources
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Get all datasources
+      uri:
+        url: "{{ grafana_url }}/api/datasources"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: datasources_result
+
+    - name: Display all datasources
+      debug:
+        var: datasources_result.json
+
+    - name: Get specific datasource by name
+      uri:
+        url: "{{ grafana_url }}/api/datasources/name/{{ datasource_name }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 404]
+      vars:
+        datasource_name: "Prometheus"
+      register: datasource_info
+
+    - name: Display specific datasource
+      debug:
+        var: datasource_info.json
+      when: datasource_info.status == 200

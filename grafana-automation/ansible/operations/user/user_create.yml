@@ -1,0 +1,32 @@
+---
+- name: Create Users
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Create single user
+      grafana.grafana.user:
+        login: "<username>"
+        password: "<password>"
+        email: "<user@example.com>"
+        name: "<Full Name>"
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        state: present
+
+    - name: Create multiple users
+      grafana.grafana.user:
+        login: "{{ item.login }}"
+        password: "{{ item.password }}"
+        email: "{{ item.email }}"
+        name: "{{ item.name }}"
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        state: present
+      loop:
+        - { login: "<developer1>", password: "<dev_password>", name: "<Developer One>", email: "<dev1@company.com>" }
+        - { login: "<operator1>", password: "<ops_password>", name: "<Operator One>", email: "<ops1@company.com>" }
+      loop_control:
+        label: "Creating user {{ item.login }}"

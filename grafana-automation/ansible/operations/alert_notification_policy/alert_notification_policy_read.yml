@@ -1,0 +1,18 @@
+---
+- name: Read Notification Policies
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Get notification policies
+      uri:
+        url: "{{ grafana_url }}/api/v1/provisioning/policies"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: policies_result
+
+    - name: Display notification policies
+      debug:
+        var: policies_result.json

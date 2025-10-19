@@ -1,0 +1,18 @@
+---
+- name: Update Cloud Plugin
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update Grafana Cloud plugin to specific version
+      grafana.grafana.cloud_plugin:
+        name: "grafana-github-datasource"
+        version: "1.0.14"
+        stack_slug: "{{ grafana_cloud_stack_slug }}"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        state: present
+      register: updated_plugin_result
+
+    - name: Display plugin update result
+      debug:
+        var: updated_plugin_result

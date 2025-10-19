@@ -1,0 +1,18 @@
+---
+- name: Delete Cloud Plugin
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Uninstall Grafana Cloud plugin
+      grafana.grafana.cloud_plugin:
+        name: "grafana-github-datasource"
+        stack_slug: "{{ grafana_cloud_stack_slug }}"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        state: absent
+      register: delete_result
+      ignore_errors: true
+
+    - name: Display plugin deletion result
+      debug:
+        var: delete_result

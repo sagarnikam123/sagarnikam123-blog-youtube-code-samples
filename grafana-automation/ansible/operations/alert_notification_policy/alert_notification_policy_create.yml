@@ -1,0 +1,20 @@
+---
+- name: Create Notification Policies
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Create basic notification policy
+      grafana.grafana.alert_notification_policy:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        rootPolicyReceiver: "grafana-default-email"
+        groupByStr: ["alertname", "cluster"]
+        groupWait: "10s"
+        groupInterval: "5m"
+        repeatInterval: "12h"
+        routes:
+          - receiver: "grafana-default-email"
+            object_matchers: [["severity", "=", "critical"]]
+          - receiver: "grafana-default-email"
+            object_matchers: [["env", "=", "production"]]

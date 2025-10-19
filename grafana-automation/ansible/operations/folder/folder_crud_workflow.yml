@@ -1,0 +1,138 @@
+---
+- name: Folder Management Operations - Complete CRUD Workflow
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    # READ - Check existing folders before operations
+    - name: "READ: Get all existing folders"
+      uri:
+        url: "{{ grafana_url }}/api/folders"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: existing_folders
+
+    - name: "READ: Display existing folders"
+      debug:
+        msg: "{{ 'Existing folders:\n' + (existing_folders.json | map(attribute='title') | join('\n- ')) if (existing_folders is defined and existing_folders.json is defined and existing_folders.json | length > 0) else ('No existing folders found' if (existing_folders is defined and existing_folders.json is defined) else 'Skipped in check mode') }}"
+
+    # CREATE - Single folder
+    - name: "CREATE: Create or update single folder"
+      uri:
+        url: "{{ grafana_url }}/api/folders"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          title: "System Monitoring"
+          uid: "system-monitoring"
+        status_code: [200, 409, 412]  # Handle existing folder cases
+      register: single_folder_result
+      failed_when: single_folder_result.status not in [200, 409, 412]
+      tags:
+        - create
+        - folders
+        - single
+
+    # CREATE - Multiple folders
+    - name: "CREATE: Create or update multiple folders"
+      uri:
+        url: "{{ grafana_url }}/api/folders"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          title: "{{ item.title }}"
+          uid: "{{ item.uid }}"
+        status_code: [200, 409, 412]  # Handle existing folder cases
+      register: multiple_folders_result
+      failed_when: false  # Don't fail on existing folders
+      loop:
+        - { title: "Infrastructure", uid: "infrastructure" }
+        - { title: "Applications", uid: "applications" }
+        - { title: "Security", uid: "security" }
+      tags:
+        - create
+        - folders
+        - multiple
+
+    # READ - Check created folders
+    - name: "READ: Get all folders after creation"
+      uri:
+        url: "{{ grafana_url }}/api/folders"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: created_folders
+
+    - name: "READ: Display created folders"
+      debug:
+        msg: "{{ 'All folders after creation:\n- ' + (created_folders.json | map(attribute='title') | join('\n- ')) if (created_folders is defined and created_folders.json is defined and created_folders.json | length > 0) else ('No folders found' if (created_folders is defined and created_folders.json is defined) else 'Skipped in check mode') }}"
+
+    # UPDATE - Modify one folder
+    - name: "UPDATE: Update Infrastructure folder title"
+      uri:
+        url: "{{ grafana_url }}/api/folders/infrastructure"
+        method: PUT
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          title: "Infrastructure Monitoring"  # Updated title
+          uid: "infrastructure"
+        status_code: [200, 412]
+      register: update_result
+      failed_when: update_result.status not in [200, 412]
+      tags:
+        - update
+        - folders
+
+    # READ - Verify update
+    - name: "READ: Get updated folder by UID"
+      uri:
+        url: "{{ grafana_url }}/api/folders/infrastructure"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 404]
+      register: updated_folder
+
+    - name: "READ: Display updated folder"
+      debug:
+        msg: "Updated folder title: {{ updated_folder.json.title }}"
+      when: updated_folder is defined and updated_folder.status is defined and updated_folder.status == 200
+
+    # DELETE - Remove one folder
+    - name: "DELETE: Delete Security folder"
+      grafana.grafana.folder:
+        grafana_url: "{{ grafana_url }}"
+        grafana_api_key: "{{ grafana_api_key }}"
+        title: "Security"  # Required even for deletion
+        uid: "security"
+        state: absent
+      tags:
+        - delete
+        - folders
+
+    # READ - Final check of remaining folders
+    - name: "READ: Get final folder list"
+      uri:
+        url: "{{ grafana_url }}/api/folders"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: final_folders
+
+    - name: "READ: Display remaining folders"
+      debug:
+        msg: "{{ 'Final remaining folders:\n- ' + (final_folders.json | map(attribute='title') | join('\n- ')) if (final_folders is defined and final_folders.json is defined and final_folders.json | length > 0) else ('No folders remaining' if (final_folders is defined and final_folders.json is defined) else 'Skipped in check mode') }}"

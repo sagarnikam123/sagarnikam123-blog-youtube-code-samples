@@ -1,0 +1,18 @@
+---
+- name: Read Cloud Plugins
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Get plugins from Grafana instance
+      uri:
+        url: "{{ grafana_url }}api/plugins"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: plugins_result
+
+    - name: Display plugins
+      debug:
+        var: plugins_result.json

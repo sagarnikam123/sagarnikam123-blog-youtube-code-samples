@@ -1,0 +1,35 @@
+---
+- name: Read Folders
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Get all folders
+      uri:
+        url: "{{ grafana_url }}/api/folders"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: folders_result
+
+    - name: Display all folders
+      debug:
+        var: folders_result.json
+
+    - name: Get specific folder by UID
+      uri:
+        url: "{{ grafana_url }}/api/folders/{{ folder_uid }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 404]
+      vars:
+        folder_uid: "system-monitoring"
+      register: folder_info
+
+    - name: Display specific folder
+      debug:
+        var: folder_info.json
+      when: folder_info.status == 200

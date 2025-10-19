@@ -1,0 +1,16 @@
+---
+- name: Update Users
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Update user information
+      grafana.grafana.user:
+        grafana_url: "{{ grafana_url }}"
+        admin_name: "{{ grafana_admin_name }}"
+        admin_password: "{{ grafana_admin_password }}"
+        login: "<username>"
+        password: "<new_password>"
+        name: "<Updated Full Name>"
+        email: "<updated_user@example.com>"
+        state: present

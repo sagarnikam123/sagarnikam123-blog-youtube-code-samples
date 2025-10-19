@@ -1,0 +1,18 @@
+---
+- name: Read Cloud Stacks
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Get Cloud stacks via API
+      uri:
+        url: "https://grafana.com/api/instances"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: stacks_result
+
+    - name: Display Cloud stacks
+      debug:
+        var: stacks_result.json

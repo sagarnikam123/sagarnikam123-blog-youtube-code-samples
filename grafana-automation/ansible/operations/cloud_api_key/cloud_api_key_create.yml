@@ -1,0 +1,19 @@
+---
+- name: Create Cloud API Key
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    - name: Create Grafana Cloud API key
+      grafana.grafana.cloud_api_key:
+        name: "ansible-test-key"
+        role: "Editor"
+        org_slug: "{{ grafana_cloud_org_slug }}"
+        existing_cloud_api_key: "{{ grafana_cloud_api_key }}"
+        fail_if_already_created: false
+        state: present
+      register: api_key_result
+
+    - name: Display created API key info
+      debug:
+        var: api_key_result

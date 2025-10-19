@@ -1,0 +1,89 @@
+---
+- name: Cloud Plugin CRUD Workflow
+  hosts: "{{ target_hosts | default('localhost') }}"
+  vars_files: "{{ vault_files | default([]) }}"
+
+  tasks:
+    # CREATE
+    - name: Install Grafana Cloud plugin
+      grafana.grafana.cloud_plugin:
+        name: "grafana-github-datasource"
+        version: "latest"
+        stack_slug: "{{ grafana_cloud_stack_slug }}"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        state: present
+      register: plugin_result
+
+    - name: Display plugin installation result
+      debug:
+        var: plugin_result
+
+    # READ
+    - name: Get Cloud stack plugins
+      uri:
+        url: "https://grafana.com/api/instances/{{ grafana_cloud_stack_slug }}/plugins"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: plugins_result
+
+    - name: Display Cloud plugins
+      debug:
+        var: plugins_result.json
+
+    # UPDATE
+    - name: Update Grafana Cloud plugin to specific version
+      grafana.grafana.cloud_plugin:
+        name: "grafana-github-datasource"
+        version: "1.0.14"
+        stack_slug: "{{ grafana_cloud_stack_slug }}"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        state: present
+      register: updated_plugin_result
+
+    - name: Display plugin update result
+      debug:
+        var: updated_plugin_result
+
+    # READ after UPDATE
+    - name: Get Cloud stack plugins after update
+      uri:
+        url: "https://grafana.com/api/instances/{{ grafana_cloud_stack_slug }}/plugins"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: updated_plugins_result
+
+    - name: Display updated Cloud plugins
+      debug:
+        var: updated_plugins_result.json
+
+    # DELETE
+    - name: Uninstall Grafana Cloud plugin
+      grafana.grafana.cloud_plugin:
+        name: "grafana-github-datasource"
+        stack_slug: "{{ grafana_cloud_stack_slug }}"
+        cloud_api_key: "{{ grafana_cloud_api_key }}"
+        state: absent
+      register: delete_result
+      ignore_errors: true
+
+    - name: Display plugin deletion result
+      debug:
+        var: delete_result
+
+    # READ after DELETE
+    - name: Get Cloud stack plugins after delete
+      uri:
+        url: "https://grafana.com/api/instances/{{ grafana_cloud_stack_slug }}/plugins"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+        return_content: yes
+      register: final_plugins_result
+
+    - name: Display final Cloud plugins
+      debug:
+        var: final_plugins_result.json

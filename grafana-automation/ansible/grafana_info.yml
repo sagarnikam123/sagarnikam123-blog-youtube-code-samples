@@ -1,0 +1,240 @@
+---
+- name: Get Comprehensive Grafana Information
+  hosts: "{{ target_hosts | default('localhost') }}"
+  gather_facts: yes
+
+  tasks:
+    # === SYSTEM HEALTH & BASIC INFO ===
+    - name: Get Grafana health status
+      uri:
+        url: "{{ grafana_url }}/api/health"
+        method: GET
+        return_content: yes
+        status_code: [200, 400, 403]
+      register: health_result
+      ignore_errors: yes
+
+    - name: Display health status
+      debug:
+        msg: "Grafana Status: {{ health_result.json.database | default('Unknown') }} (Version: {{ health_result.json.version | default('Unknown') }})"
+      when: health_result.status is defined and health_result.status == 200
+
+    - name: Health check not available
+      debug:
+        msg: "Health endpoint not accessible (Amazon Managed Grafana restriction)"
+      when: health_result.status is defined and health_result.status != 200
+
+    - name: Get organization info
+      uri:
+        url: "{{ grafana_url }}/api/org"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: org_result
+
+    - name: Display organization info
+      debug:
+        msg: "Organization: {{ org_result.json.name }} (ID: {{ org_result.json.id }})"
+      when: org_result.json is defined
+
+    # === INFRASTRUCTURE RESOURCES ===
+    - name: Get all folders
+      uri:
+        url: "{{ grafana_url }}/api/folders"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: folders_result
+
+    - name: Display folders
+      debug:
+        msg: "Found {{ folders_result.json | length }} folders"
+
+    - name: Show folder details
+      debug:
+        msg: "Folder: {{ item.title }} (UID: {{ item.uid }})"
+      loop: "{{ folders_result.json }}"
+      when: folders_result.json | length > 0
+
+    - name: Get all datasources
+      uri:
+        url: "{{ grafana_url }}/api/datasources"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: datasources_result
+
+    - name: Display datasources
+      debug:
+        msg: "Found {{ datasources_result.json | length }} datasources"
+
+    - name: Show datasource details
+      debug:
+        msg: "Datasource: {{ item.name }} (Type: {{ item.type }}, URL: {{ item.url }})"
+      loop: "{{ datasources_result.json }}"
+      when: datasources_result.json | length > 0
+
+    # === CONTENT RESOURCES ===
+    - name: Get all dashboards
+      uri:
+        url: "{{ grafana_url }}/api/search?type=dash-db"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+      register: dashboards_result
+
+    - name: Display dashboards
+      debug:
+        msg: "Found {{ dashboards_result.json | length }} dashboards"
+
+    - name: Show dashboard details
+      debug:
+        msg: "Dashboard: {{ item.title }} (UID: {{ item.uid }}, Folder: {{ item.folderTitle | default('General') }})"
+      loop: "{{ dashboards_result.json }}"
+      when: dashboards_result.json | length > 0
+
+    # === USER MANAGEMENT ===
+    - name: Get organization users
+      uri:
+        url: "{{ grafana_url }}/api/org/users"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 403]
+      register: users_result
+
+    - name: Display users
+      debug:
+        msg: "Found {{ users_result.json | length }} organization users"
+      when: users_result.status == 200
+
+    - name: Show user details
+      debug:
+        msg: "User: {{ item.name }} ({{ item.login }}, Role: {{ item.role }})"
+      loop: "{{ users_result.json if users_result.status == 200 else [] }}"
+      when: users_result.status == 200 and users_result.json | length > 0
+
+    - name: Users access denied
+      debug:
+        msg: "Organization users access denied"
+      when: users_result.status == 403
+
+    - name: Get all teams
+      uri:
+        url: "{{ grafana_url }}/api/teams/search"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 403]
+      register: teams_result
+
+    - name: Display teams
+      debug:
+        msg: "Found {{ teams_result.json.totalCount }} teams"
+      when: teams_result.status == 200
+
+    - name: Show team details
+      debug:
+        msg: "Team: {{ item.name }} (ID: {{ item.id }}, Members: {{ item.memberCount }})"
+      loop: "{{ teams_result.json.teams }}"
+      when: teams_result.status == 200 and teams_result.json.teams is defined and teams_result.json.teams | length > 0
+
+    - name: Teams access denied
+      debug:
+        msg: "Teams access denied (requires teams:read permission)"
+      when: teams_result.status == 403
+
+    # # === ALERTING CONFIGURATION ===
+    # - name: Get alert rules
+    #   uri:
+    #     url: "{{ grafana_url }}/api/ruler/grafana/api/v1/rules"
+    #     method: GET
+    #     headers:
+    #       Authorization: "Bearer {{ grafana_api_key }}"
+    #     return_content: yes
+    #     status_code: [200, 404]
+    #   register: alert_rules_result
+
+    # - name: Display alert rules count
+    #   debug:
+    #     msg: "Found {{ alert_rules_result.json | length }} alert rule groups"
+    #   when: alert_rules_result.status == 200
+
+    # - name: Get alertmanager config
+    #   uri:
+    #     url: "{{ grafana_url }}/api/alertmanager/grafana/config"
+    #     method: GET
+    #     headers:
+    #       Authorization: "Bearer {{ grafana_api_key }}"
+    #     return_content: yes
+    #     status_code: [200, 404]
+    #   register: alertmanager_result
+
+    # - name: Display alertmanager status
+    #   debug:
+    #     msg: "Alertmanager configured with {{ alertmanager_result.json.route.routes | default([]) | length }} notification routes"
+    #   when: alertmanager_result.status == 200 and alertmanager_result.json.route is defined
+
+    # # === SYSTEM CONFIGURATION ===
+    # - name: Get installed plugins
+    #   uri:
+    #     url: "{{ grafana_url }}/api/plugins"
+    #     method: GET
+    #     headers:
+    #       Authorization: "Bearer {{ grafana_api_key }}"
+    #     return_content: yes
+    #   register: plugins_result
+
+    # - name: Display plugins count
+    #   debug:
+    #     msg: "Found {{ plugins_result.json | length }} plugins installed"
+
+    # - name: Show plugin details
+    #   debug:
+    #     msg: "Plugin: {{ item.name }} ({{ item.type }}, Version: {{ item.info.version }})"
+    #   loop: "{{ plugins_result.json }}"
+    #   when: plugins_result.json | length > 0 and item.enabled
+
+    - name: Get Grafana settings
+      uri:
+        url: "{{ grafana_url }}/api/admin/settings"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ grafana_api_key }}"
+        return_content: yes
+        status_code: [200, 403]
+      register: settings_result
+
+    - name: Display key settings
+      debug:
+        msg: "Auth: {{ settings_result.json.auth | default('N/A') }}, SMTP: {{ 'Enabled' if settings_result.json.smtp.enabled | default(false) else 'Disabled' }}"
+      when: settings_result.status == 200
+
+    - name: Settings access denied
+      debug:
+        msg: "Admin settings access denied (requires admin privileges)"
+      when: settings_result.status == 403
+
+    # === COMPREHENSIVE SUMMARY ===
+    - name: "=== GRAFANA INSTANCE SUMMARY ==="
+      debug:
+        msg: "Health: {{ health_result.json.database | default('N/A') }} | Organization: {{ org_result.json.name | default('N/A') }}"
+      when: org_result.json is defined or health_result.json is defined
+
+    - name: "Resources Summary"
+      debug:
+        msg: "Folders: {{ folders_result.json | length }} | Datasources: {{ datasources_result.json | length }} | Dashboards: {{ dashboards_result.json | length }}"
+
+    - name: "Access Summary"
+      debug:
+        msg: "Users: {{ users_result.json | length if users_result.status == 200 else 'Access Denied' }} | Teams: {{ teams_result.json.totalCount if teams_result.status == 200 else 'Access Denied' }}"
+
+    # - name: "System Summary"
+    #   debug:
+    #     msg: "Plugins: {{ plugins_result.json | length }} | Alert Rules: {{ alert_rules_result.json | length if alert_rules_result.status == 200 else 'N/A' }}"
