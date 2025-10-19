@@ -10,3 +10,6 @@ A curated collection of code samples and projects shared on my blog and YouTube 
 
 ### 🔍 Logging & Observability
 - **[loki-dev-minikube-microservices/](loki-dev-minikube-microservices/)** - Loki 3.5.5 distributed microservices deployment for development and learning on Minikube with automated setup, comprehensive tooling, and step-by-step guides.
+
+### 🤖 Automation & Infrastructure
+- **[grafana-automation/](grafana-automation/)** - Complete Ansible automation framework for managing Grafana resources with full CRUD operations, multi-environment support, and production-ready security practices.
