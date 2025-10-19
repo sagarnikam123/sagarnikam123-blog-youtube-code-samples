@@ -9,7 +9,7 @@
         url: "https://grafana.com/api/instances"
         method: GET
         headers:
-          Authorization: "Bearer {{ grafana_cloud_api_key }}"
+          Authorization: "Bearer {{ grafana_cloud_access_policy_token }}"
         return_content: yes
       register: stacks_result
 
