@@ -1,9 +1,23 @@
 target: distributor
 auth_enabled: false
+
 server:
   http_listen_port: 3100
   grpc_listen_port: 9095
   log_level: info
+
+ui:
+  enabled: true
+  node_name: "${HOSTNAME:-distributor}"
+  advertise_addr: "${POD_IP}"
+  cluster_name: "loki-microservices"
+  debug: true
+  discovery:
+    join_peers:
+      - "query-frontend.loki.svc.cluster.local:3100"
+      - "ingester.loki.svc.cluster.local:3100"
+      - "querier.loki.svc.cluster.local:3100"
+
 common:
   instance_addr: "${POD_IP}"
   path_prefix: "/loki"
@@ -12,6 +26,7 @@ common:
     kvstore:
       store: memberlist
     instance_port: 9095
+
 memberlist:
   bind_addr: ["0.0.0.0"]
   bind_port: 7946
@@ -20,12 +35,15 @@ memberlist:
   join_members:
     - "ingester.loki.svc.cluster.local:7946"
   abort_if_cluster_join_fails: false
+
 distributor:
   ring:
     kvstore:
       store: memberlist
+
 analytics:
   reporting_enabled: false
+
 schema_config:
   configs:
     - from: 2024-04-01
