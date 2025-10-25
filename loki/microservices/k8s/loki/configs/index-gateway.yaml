@@ -1,11 +1,19 @@
 target: index-gateway
 auth_enabled: false
+
 server:
   http_listen_port: 3100
   grpc_listen_port: 9095
   log_level: info
+
+ui:
+  enabled: true
+  node_name: "${HOSTNAME:-index-gateway}"
+  advertise_addr: "${POD_IP}"
+  cluster_name: "loki-microservices"
+
 common:
-  instance_addr: "${HOSTNAME}"
+  instance_addr: "${POD_IP}"
   path_prefix: "/loki"
   storage:
     s3:
@@ -19,6 +27,7 @@ common:
   ring:
     kvstore:
       store: memberlist
+
 storage_config:
   aws:
     endpoint: "minio.loki.svc.cluster.local:9000"
@@ -31,6 +40,7 @@ storage_config:
     active_index_directory: "/loki/tsdb-index"
     cache_location: "/loki/tsdb-cache"
     cache_ttl: 24h
+
 memberlist:
   abort_if_cluster_join_fails: false
   bind_port: 7946
