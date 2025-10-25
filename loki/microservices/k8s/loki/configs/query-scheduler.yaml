@@ -1,22 +1,33 @@
 target: query-scheduler
 auth_enabled: false
+
 server:
   http_listen_port: 3100
   grpc_listen_port: 9095
   log_level: info
+
+ui:
+  enabled: true
+  node_name: "${HOSTNAME:-query-scheduler}"
+  advertise_addr: "${POD_IP}"
+  cluster_name: "loki-microservices"
+
 common:
   path_prefix: "/loki"
   ring:
     kvstore:
       store: memberlist
+
 storage_config:
   tsdb_shipper:
     active_index_directory: "/loki/tsdb-index"
     cache_location: "/loki/tsdb-cache"
+
 memberlist:
   bind_addr: ["0.0.0.0"]
   bind_port: 7946
   abort_if_cluster_join_fails: false
+
 query_scheduler:
   max_outstanding_requests_per_tenant: 32000
   grpc_client_config:
@@ -25,8 +36,10 @@ query_scheduler:
   scheduler_ring:
     kvstore:
       store: memberlist
+
 analytics:
   reporting_enabled: false
+
 schema_config:
   configs:
     - from: 2024-04-01
