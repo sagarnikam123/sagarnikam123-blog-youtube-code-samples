@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit
+  namespace: loki
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: log-collector
+    app.kubernetes.io/version: "${FLUENT_BIT_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
+spec:
+  type: ClusterIP
+  selector:
+    app: fluent-bit
+  ports:
+    - port: 2020
+      targetPort: 2020
+      protocol: TCP
+      name: metrics

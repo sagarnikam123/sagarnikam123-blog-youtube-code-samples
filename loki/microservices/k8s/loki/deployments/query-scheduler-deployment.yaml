@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki-query-scheduler
+  namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: query-scheduler
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki-query-scheduler
+  template:
+    metadata:
+      labels:
+        app: loki-query-scheduler
+    spec:
+      containers:
+      - name: loki-query-scheduler
+        image: grafana/loki:${LOKI_VERSION}
+        args:
+        - -config.file=/etc/loki/query-scheduler.yaml
+        - -target=query-scheduler
+        - -config.expand-env=true
+        ports:
+        - containerPort: 3100
+        - containerPort: 9095
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "200m"
+            memory: "512Mi"
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: accesskey
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: secretkey
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/loki
+          readOnly: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: query-scheduler-config

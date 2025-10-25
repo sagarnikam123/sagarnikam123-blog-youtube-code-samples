@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki-distributor
+  namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: distributor
+    app.kubernetes.io/version: "${LOKI_VERSION}"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki-distributor
+  template:
+    metadata:
+      labels:
+        app: loki-distributor
+        app.kubernetes.io/name: loki
+        app.kubernetes.io/component: distributor
+    spec:
+      securityContext:
+        fsGroup: 10001
+      containers:
+      - name: loki-distributor
+        image: grafana/loki:${LOKI_VERSION}
+        args:
+        - -config.file=/etc/loki/distributor.yaml
+        - -target=distributor
+        - -config.expand-env=true
+        ports:
+        - containerPort: 3100
+          name: http
+        - containerPort: 9095
+          name: grpc
+        - containerPort: 7946
+          name: memberlist
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: accesskey
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: secretkey
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/loki
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: distributor-config
+      - name: tmp
+        emptyDir: {}

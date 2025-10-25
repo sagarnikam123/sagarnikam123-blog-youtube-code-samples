@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: loki
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+    # Loki Components
+    - job_name: 'loki-distributor'
+      static_configs:
+      - targets: ['distributor.loki.svc.cluster.local:3100']
+      metrics_path: /metrics
+      scrape_interval: 15s
+
+    - job_name: 'loki-ingester'
+      static_configs:
+      - targets: ['ingester.loki.svc.cluster.local:3100']
+      metrics_path: /metrics
+      scrape_interval: 15s
+
+    - job_name: 'loki-querier'
+      static_configs:
+      - targets: ['querier.loki.svc.cluster.local:3100']
+      metrics_path: /metrics
+      scrape_interval: 15s
+
+    - job_name: 'loki-query-frontend'
+      static_configs:
+      - targets: ['query-frontend.loki.svc.cluster.local:3100']
+      metrics_path: /metrics
+      scrape_interval: 15s
+
+    - job_name: 'loki-compactor'
+      static_configs:
+      - targets: ['compactor.loki.svc.cluster.local:3100']
+      metrics_path: /metrics
+      scrape_interval: 15s
+
+    - job_name: 'loki-ruler'
+      static_configs:
+      - targets: ['ruler.loki.svc.cluster.local:3100']
+      metrics_path: /metrics
+      scrape_interval: 15s
+
+    - job_name: 'loki-index-gateway'
+      static_configs:
+      - targets: ['index-gateway.loki.svc.cluster.local:3100']
+      metrics_path: /metrics
+      scrape_interval: 15s
+
+    # Fluent Bit
+    - job_name: 'fluent-bit'
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+          - loki
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: fluent-bit
+      - source_labels: [__meta_kubernetes_pod_ip]
+        target_label: __address__
+        replacement: ${1}:2020
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: instance
