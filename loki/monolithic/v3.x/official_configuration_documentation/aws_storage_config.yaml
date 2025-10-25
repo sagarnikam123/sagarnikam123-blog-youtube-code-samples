@@ -1,0 +1,82 @@
+# Deprecated: Configures storing indexes in DynamoDB.
+dynamodb:
+  # DynamoDB endpoint URL with escaped Key and Secret encoded. If only region is
+  # specified as a host, proper endpoint will be deduced. Use
+  # inmemory:///<table-name> to use a mock in-memory implementation.
+  # CLI flag: -dynamodb.url
+  [dynamodb_url: <url>]
+
+  # DynamoDB table management requests per second limit.
+  # CLI flag: -dynamodb.api-limit
+  [api_limit: <float> | default = 2]
+
+  # DynamoDB rate cap to back off when throttled.
+  # CLI flag: -dynamodb.throttle-limit
+  [throttle_limit: <float> | default = 10]
+
+  metrics:
+    # Use metrics-based autoscaling, via this query URL
+    # CLI flag: -metrics.url
+    [url: <string> | default = ""]
+
+    # Queue length above which we will scale up capacity
+    # CLI flag: -metrics.target-queue-length
+    [target_queue_length: <int> | default = 100000]
+
+    # Scale up capacity by this multiple
+    # CLI flag: -metrics.scale-up-factor
+    [scale_up_factor: <float> | default = 1.3]
+
+    # Ignore throttling below this level (rate per second)
+    # CLI flag: -metrics.ignore-throttle-below
+    [ignore_throttle_below: <float> | default = 1]
+
+    # query to fetch ingester queue length
+    # CLI flag: -metrics.queue-length-query
+    [queue_length_query: <string> | default = "sum(avg_over_time(loki_ingester_flush_queue_length{job=\"cortex/ingester\"}[2m])) or sum(avg_over_time(cortex_ingester_flush_queue_length{job=\"cortex/ingester\"}[2m]))"]
+
+    # query to fetch throttle rates per table
+    # CLI flag: -metrics.write-throttle-query
+    [write_throttle_query: <string> | default = "sum(rate(cortex_dynamo_throttled_total{operation=\"DynamoDB.BatchWriteItem\"}[1m])) by (table) > 0"]
+
+    # query to fetch write capacity usage per table
+    # CLI flag: -metrics.usage-query
+    [write_usage_query: <string> | default = "sum(rate(cortex_dynamo_consumed_capacity_total{operation=\"DynamoDB.BatchWriteItem\"}[15m])) by (table) > 0"]
+
+    # query to fetch read capacity usage per table
+    # CLI flag: -metrics.read-usage-query
+    [read_usage_query: <string> | default = "sum(rate(cortex_dynamo_consumed_capacity_total{operation=\"DynamoDB.QueryPages\"}[1h])) by (table) > 0"]
+
+    # query to fetch read errors per table
+    # CLI flag: -metrics.read-error-query
+    [read_error_query: <string> | default = "sum(increase(cortex_dynamo_failures_total{operation=\"DynamoDB.QueryPages\",error=\"ProvisionedThroughputExceededException\"}[1m])) by (table) > 0"]
+
+  # Number of chunks to group together to parallelise fetches (zero to disable)
+  # CLI flag: -dynamodb.chunk-gang-size
+  [chunk_gang_size: <int> | default = 10]
+
+  # Max number of chunk-get operations to start in parallel
+  # CLI flag: -dynamodb.chunk.get-max-parallelism
+  [chunk_get_max_parallelism: <int> | default = 32]
+
+  backoff_config:
+    # Minimum backoff time
+    # CLI flag: -dynamodb.min-backoff
+    [min_period: <duration> | default = 100ms]
+
+    # Maximum backoff time
+    # CLI flag: -dynamodb.max-backoff
+    [max_period: <duration> | default = 50s]
+
+    # Maximum number of times to retry an operation
+    # CLI flag: -dynamodb.max-retries
+    [max_retries: <int> | default = 20]
+
+  # KMS key used for encrypting DynamoDB items.  DynamoDB will use an Amazon
+  # owned KMS key if not provided.
+  # CLI flag: -dynamodb.kms-key-id
+  [kms_key_id: <string> | default = ""]
+
+# The s3_storage_config block configures the connection to Amazon S3 object
+# storage backend.
+[<s3_storage_config>]
