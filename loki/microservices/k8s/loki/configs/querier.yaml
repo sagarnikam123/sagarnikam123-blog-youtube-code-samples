@@ -1,9 +1,23 @@
 target: querier
 auth_enabled: false
+
 server:
   http_listen_port: 3100
   grpc_listen_port: 9095
   log_level: info
+
+ui:
+  enabled: true
+  node_name: "${HOSTNAME:-querier}"
+  advertise_addr: "${POD_IP}"
+  cluster_name: "loki-microservices"
+  debug: true
+  discovery:
+    join_peers:
+      - "query-frontend.loki.svc.cluster.local:3100"
+      - "distributor.loki.svc.cluster.local:3100"
+      - "ingester.loki.svc.cluster.local:3100"
+
 common:
   instance_addr: "${POD_IP}"
   path_prefix: "/loki"
@@ -21,6 +35,7 @@ common:
       store: memberlist
     instance_port: 9095
   compactor_address: "compactor.loki.svc.cluster.local:3100"
+
 storage_config:
   aws:
     endpoint: "minio.loki.svc.cluster.local:9000"
@@ -33,6 +48,7 @@ storage_config:
     active_index_directory: "/loki/tsdb-index"
     cache_location: "/loki/tsdb-cache"
     cache_ttl: 24h
+
 memberlist:
   bind_addr: ["0.0.0.0"]
   bind_port: 7946
@@ -41,6 +57,7 @@ memberlist:
   join_members:
     - "ingester.loki.svc.cluster.local:7946"
   abort_if_cluster_join_fails: false
+
 querier:
   tail_max_duration: 12h
   query_ingesters_within: 0h
@@ -49,8 +66,10 @@ querier:
   max_concurrent: 4
 frontend_worker:
   frontend_address: "query-frontend.loki.svc.cluster.local:9095"
+
 analytics:
   reporting_enabled: false
+
 schema_config:
   configs:
     - from: 2024-04-01
