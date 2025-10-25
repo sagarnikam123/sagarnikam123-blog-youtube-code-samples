@@ -38,10 +38,22 @@ memberlist:
     - "distributor.loki.svc.cluster.local:7946"
     - "ingester.loki.svc.cluster.local:7946"
     - "querier.loki.svc.cluster.local:7946"
+
 index_gateway:
-  mode: simple
+  mode: ring
+  ring:
+    kvstore:
+      store: memberlist
+    heartbeat_period: 15s
+    heartbeat_timeout: 1m
+    instance_addr: "${POD_IP}"
+    instance_port: 9095
+    instance_id: "${HOSTNAME:-index-gateway}"
+    replication_factor: 1
+
 analytics:
   reporting_enabled: false
+
 schema_config:
   configs:
     - from: 2024-04-01
