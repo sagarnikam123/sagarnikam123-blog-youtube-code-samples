@@ -1,0 +1,177 @@
+# Loki 3.x All Rings Enabled Configuration
+# Enables all ring components for complete UI functionality
+
+target: all
+auth_enabled: false
+
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 3100
+  grpc_listen_address: 0.0.0.0
+  grpc_listen_port: 9095
+  log_format: "logfmt"
+  log_level: warn
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /tmp/loki/chunks
+      rules_directory: /tmp/loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+    instance_addr: 0.0.0.0
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    address: 0.0.0.0
+    port: 9095
+    readiness_check_ring_health: false
+  wal:
+    dir: /tmp/loki/wal
+
+ingester_client:
+  remote_timeout: 5s
+  pool_config:
+    health_check_ingesters: true
+    remote_timeout: 1s
+
+querier:
+  max_concurrent: 4
+
+# Enable query scheduler ring with proper configuration
+query_scheduler:
+  use_scheduler_ring: true
+  scheduler_ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 15s
+    heartbeat_timeout: 1m
+    instance_addr: 0.0.0.0
+    instance_port: 9095
+
+frontend:
+  scheduler_address: "127.0.0.1:9095"
+
+frontend_worker:
+  scheduler_address: "127.0.0.1:9095"
+
+# Enable ruler ring
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /tmp/loki/rules
+  rule_path: /tmp/loki/rules
+  enable_sharding: true
+  ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 5s
+    heartbeat_timeout: 1m
+    instance_addr: 0.0.0.0
+    instance_port: 9095
+
+compactor:
+  working_directory: /tmp/loki/compactor
+  compaction_interval: 10m
+  retention_enabled: false
+  compactor_ring:
+    kvstore:
+      store: inmemory
+
+# Enable index gateway ring mode
+index_gateway:
+  mode: "ring"
+  ring:
+    kvstore:
+      store: inmemory
+      prefix: "collectors/"
+    heartbeat_period: 15s
+    heartbeat_timeout: 1m
+    instance_addr: 0.0.0.0
+    instance_port: 9095
+    instance_id: "${HOSTNAME:-loki-index-gateway}"
+    replication_factor: 1
+
+# Enable pattern ingester ring
+pattern_ingester:
+  enabled: true
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      heartbeat_timeout: 1m
+      replication_factor: 1
+    num_tokens: 128
+    heartbeat_period: 5s
+    heartbeat_timeout: 1m
+    address: 0.0.0.0
+    port: 9095
+    id: "${HOSTNAME:-pattern-ingester-1}"
+    readiness_check_ring_health: false
+  client_config:
+    pool_config:
+      health_check_ingesters: true
+      remote_timeout: 5s
+    remote_timeout: 5s
+    grpc_client_config:
+      grpc_compression: 'snappy'
+      connect_timeout: 5s
+
+# Enable bloom gateway (no ring configuration needed)
+bloom_gateway:
+  enabled: true
+  client:
+    grpc_client_config:
+      grpc_compression: 'snappy'
+      connect_timeout: 5s
+    addresses: "127.0.0.1:9095"
+
+storage_config:
+  filesystem:
+    directory: /tmp/loki/chunks
+  tsdb_shipper:
+    active_index_directory: /tmp/loki/index
+    cache_location: /tmp/loki/index_cache
+
+schema_config:
+  configs:
+  - from: 2022-01-01
+    store: tsdb
+    object_store: filesystem
+    schema: v13
+    index:
+      prefix: index_
+      period: 24h
+
+limits_config:
+  ingestion_rate_mb: 4
+  ingestion_burst_size_mb: 6
+  reject_old_samples: true
+  reject_old_samples_max_age: 1w
+  allow_structured_metadata: true
+  volume_enabled: true
+
+ui:
+  enabled: true
+  node_name: ${HOSTNAME:-"loki-local"}
+  advertise_addr: 0.0.0.0
+  cluster_name: ${HOSTNAME:-"loki-local-cluster"}
+  debug: true
+  discovery:
+    join_peers: ["127.0.0.1:3100"]
+
+analytics:
+  reporting_enabled: false
