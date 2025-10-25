@@ -1,9 +1,17 @@
 target: compactor
 auth_enabled: false
+
 server:
   http_listen_port: 3100
   grpc_listen_port: 9095
   log_level: info
+
+ui:
+  enabled: true
+  node_name: "${HOSTNAME:-compactor}"
+  advertise_addr: "${POD_IP}"
+  cluster_name: "loki-microservices"
+
 common:
   instance_addr: "${POD_IP}"
   path_prefix: "/loki"
@@ -20,6 +28,7 @@ common:
     kvstore:
       store: memberlist
     instance_port: 9095
+
 storage_config:
   aws:
     endpoint: "minio.loki.svc.cluster.local:9000"
@@ -28,6 +37,7 @@ storage_config:
     secret_access_key: "${MINIO_SECRET_KEY}"
     s3forcepathstyle: true
     insecure: true
+
 memberlist:
   bind_addr: ["0.0.0.0"]
   bind_port: 7946
@@ -36,6 +46,7 @@ memberlist:
   join_members:
     - "ingester.loki.svc.cluster.local:7946"
   abort_if_cluster_join_fails: false
+
 compactor:
   working_directory: "/loki/compactor"
   compaction_interval: 10m
@@ -43,8 +54,10 @@ compactor:
   compactor_ring:
     kvstore:
       store: memberlist
+
 analytics:
   reporting_enabled: false
+
 schema_config:
   configs:
     - from: 2024-04-01
