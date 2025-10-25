@@ -1,14 +1,13 @@
 # GitHub Analysis - Sensitive Files
 utilities/github-analysis/conf/.env.github
 utilities/github-analysis/conf/.env*
-*.env
 *.env.*
 
-# Generated CSV/Markdown files
-utilities/github-analysis/github-*.csv
-utilities/github-analysis/github-*.md
+# Generated files
 utilities/github-analysis/*.csv
 utilities/github-analysis/*.md
+utilities/github-analysis/*.json
+utilities/github-analysis/*.xlsx
 
 # Python
 __pycache__/
@@ -34,7 +33,7 @@ wheels/
 MANIFEST
 
 # Virtual environments
-.env
+*.env
 .venv
 env/
 venv/
