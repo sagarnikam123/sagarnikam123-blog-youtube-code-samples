@@ -57,7 +57,7 @@ echo ""
 
 # Check each component individually
 echo "📡 DISTRIBUTOR LOGS:"
-kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor --tail=10 2>/dev/null || echo "  ❌ No distributor pods found"
+kubectl logs -n loki -l app=loki-distributor --tail=10 2>/dev/null || echo "  ❌ No distributor pods found"
 
 echo ""
 echo "📊 INGESTER LOGS:"
@@ -65,27 +65,27 @@ kubectl logs -n loki loki-ingester-0 --tail=10 2>/dev/null || echo "  ❌ Ingest
 
 echo ""
 echo "🔍 QUERIER LOGS:"
-kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=querier --tail=10 2>/dev/null || echo "  ❌ No querier pods found"
+kubectl logs -n loki -l app=loki-querier --tail=10 2>/dev/null || echo "  ❌ No querier pods found"
 
 echo ""
 echo "🎯 QUERY-FRONTEND LOGS:"
-kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=query-frontend --tail=10 2>/dev/null || echo "  ❌ No query-frontend pods found"
+kubectl logs -n loki -l app=loki-query-frontend --tail=10 2>/dev/null || echo "  ❌ No query-frontend pods found"
 
 echo ""
 echo "📅 QUERY-SCHEDULER LOGS:"
-kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=query-scheduler --tail=10 2>/dev/null || echo "  ❌ No query-scheduler pods found"
+kubectl logs -n loki -l app=loki-query-scheduler --tail=10 2>/dev/null || echo "  ❌ No query-scheduler pods found"
 
 echo ""
 echo "🗜️ COMPACTOR LOGS:"
-kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=compactor --tail=10 2>/dev/null || echo "  ❌ No compactor pods found"
+kubectl logs -n loki -l app=loki-compactor --tail=10 2>/dev/null || echo "  ❌ No compactor pods found"
 
 echo ""
 echo "📏 RULER LOGS:"
-kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=ruler --tail=10 2>/dev/null || echo "  ❌ No ruler pods found"
+kubectl logs -n loki -l app=loki-ruler --tail=10 2>/dev/null || echo "  ❌ No ruler pods found"
 
 echo ""
 echo "🏛️ INDEX-GATEWAY LOGS:"
-kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/component=index-gateway --tail=10 2>/dev/null || echo "  ❌ No index-gateway pods found"
+kubectl logs -n loki -l app=loki-index-gateway --tail=10 2>/dev/null || echo "  ❌ No index-gateway pods found"
 
 echo ""
 echo "🗄️ MINIO LOGS:"
