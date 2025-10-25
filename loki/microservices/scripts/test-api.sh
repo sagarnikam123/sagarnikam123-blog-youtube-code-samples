@@ -215,6 +215,41 @@ else
 fi
 
 echo ""
+echo "🎛️ Step 10: Testing UI Endpoints"
+
+# Test services endpoint
+SERVICES_RESPONSE=$(curl -s --max-time 10 "http://localhost:3101/services" || echo "timeout")
+if [[ "$SERVICES_RESPONSE" != "timeout" ]]; then
+    echo "  ✅ Services endpoint responding"
+else
+    echo "  ❌ Services endpoint timeout"
+fi
+
+# Test config endpoint
+CONFIG_RESPONSE=$(curl -s --max-time 10 "http://localhost:3101/config" || echo "timeout")
+if [[ "$CONFIG_RESPONSE" != "timeout" ]]; then
+    echo "  ✅ Config endpoint responding"
+else
+    echo "  ❌ Config endpoint timeout"
+fi
+
+# Test UI nodes endpoint
+NODES_RESPONSE=$(curl -s --max-time 10 "http://localhost:3101/ui/nodes" || echo "timeout")
+if [[ "$NODES_RESPONSE" != "timeout" ]] && (echo "$NODES_RESPONSE" | grep -q "<html\|<!DOCTYPE"); then
+    echo "  ✅ UI nodes endpoint responding"
+else
+    echo "  ❌ UI nodes endpoint timeout or invalid response"
+fi
+
+# Test UI rings endpoint
+RINGS_RESPONSE=$(curl -s --max-time 10 "http://localhost:3101/ui/rings" || echo "timeout")
+if [[ "$RINGS_RESPONSE" != "timeout" ]] && (echo "$RINGS_RESPONSE" | grep -q "<html\|<!DOCTYPE"); then
+    echo "  ✅ UI rings endpoint responding"
+else
+    echo "  ❌ UI rings endpoint timeout or invalid response"
+fi
+
+echo ""
 echo "🎉 Complete Stack API Testing Finished!"
 echo ""
 echo "📋 Summary:"
@@ -229,7 +264,11 @@ echo "  • Prometheus API: ✅"
 echo ""
 echo "🔗 Access URLs:"
 echo "  • Loki Web UI: http://localhost:3100/ui/ (kubectl port-forward -n loki svc/query-frontend 3100:3100)"
-echo "  • Loki Query API: http://localhost:3100/loki/api/v1/ (kubectl port-forward -n loki svc/query-frontend 3100:3100)"
+echo "  • Loki Services: http://localhost:3100/services"
+echo "  • Loki Config: http://localhost:3100/config"
+echo "  • Loki UI Nodes: http://localhost:3100/ui/nodes"
+echo "  • Loki UI Rings: http://localhost:3100/ui/rings"
+echo "  • Loki Query API: http://localhost:3100/loki/api/v1/"
 echo "  • MinIO UI: http://localhost:9000 (kubectl port-forward -n loki svc/minio 9000:9000)"
 echo "  • Grafana UI: http://localhost:3000 (kubectl port-forward -n loki svc/grafana 3000:3000)"
 echo "  • Prometheus UI: http://localhost:9090 (kubectl port-forward -n loki svc/prometheus 9090:9090)"

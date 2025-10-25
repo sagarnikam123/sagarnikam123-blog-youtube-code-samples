@@ -264,12 +264,15 @@ See [CONFIGURATION.md](CONFIGURATION.md) for manual API testing procedures and e
 ```bash
 # Access Loki Web UI via Query Frontend
 kubectl port-forward -n loki svc/query-frontend 3100:3100
-# Open: http://localhost:3100
-
-# Alternative: Direct API access
-kubectl port-forward -n loki svc/query-frontend 3100:3100
-# API: http://localhost:3100/loki/api/v1/
 ```
+
+**UI Endpoints:**
+- **Main UI**: http://localhost:3100/ui/
+- **Services**: http://localhost:3100/services
+- **Configuration**: http://localhost:3100/config
+- **Cluster Nodes**: http://localhost:3100/ui/nodes
+- **Ring Status**: http://localhost:3100/ui/rings
+- **API**: http://localhost:3100/loki/api/v1/
 
 **UI Features:**
 - **Log Explorer**: Query and filter logs with LogQL
@@ -277,6 +280,9 @@ kubectl port-forward -n loki svc/query-frontend 3100:3100
 - **Query Builder**: Visual query construction
 - **Live Tail**: Real-time log streaming
 - **Query History**: Previous queries and results
+- **Cluster View**: All 8 microservices visible
+- **Ring Monitoring**: Component ring status and health
+- **Node Details**: Individual component information
 
 **Access Methods:**
 - **NodePort**: Direct access via Minikube IP:30100
