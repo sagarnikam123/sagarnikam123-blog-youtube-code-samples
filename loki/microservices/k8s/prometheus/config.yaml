@@ -69,3 +69,4 @@ data:
         replacement: ${1}:2020
       - source_labels: [__meta_kubernetes_pod_name]
         target_label: instance
+      metrics_path: /api/v2/metrics/prometheus
