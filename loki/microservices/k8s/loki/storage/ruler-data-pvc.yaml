@@ -1,0 +1,20 @@
+# Optimized for MacBook Pro Development
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ruler-data
+  namespace: loki
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: ruler-storage
+    app.kubernetes.io/version: "3.5.7"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # Small size for rules storage
