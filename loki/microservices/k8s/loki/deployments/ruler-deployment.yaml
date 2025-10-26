@@ -21,6 +21,15 @@ spec:
       labels:
         app: loki-ruler
     spec:
+      securityContext:
+        fsGroup: 10001
+      initContainers:
+      - name: init-permissions
+        image: busybox:1.35
+        command: ['sh', '-c', 'chown -R 10001:10001 /loki']
+        volumeMounts:
+        - name: ruler-data
+          mountPath: /loki
       containers:
       - name: loki-ruler
         image: grafana/loki:${LOKI_VERSION}
@@ -61,7 +70,17 @@ spec:
         - name: config-volume
           mountPath: /etc/loki
           readOnly: true
+        - name: ruler-data
+          mountPath: /loki
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
       volumes:
       - name: config-volume
         configMap:
           name: ruler-config
+      - name: ruler-data
+        persistentVolumeClaim:
+          claimName: ruler-data
