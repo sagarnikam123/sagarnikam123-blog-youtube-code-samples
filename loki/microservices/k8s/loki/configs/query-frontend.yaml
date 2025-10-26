@@ -61,10 +61,7 @@ ingester:
 
 frontend:
   max_outstanding_per_tenant: 100
-  # scheduler_address: "query-scheduler.loki.svc.cluster.local:9095"
-
-frontend_worker:
-  frontend_address: "query-frontend.loki.svc.cluster.local:9095"
+  scheduler_address: "query-scheduler.loki.svc.cluster.local:9095"
 
 analytics:
   reporting_enabled: false
