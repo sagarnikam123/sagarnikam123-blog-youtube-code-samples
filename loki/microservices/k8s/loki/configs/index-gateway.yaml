@@ -13,13 +13,14 @@ ui:
   cluster_name: "loki-microservices"  # default = ""
   debug: true  # default = false
   rejoin_interval: 3m  # default = 3m
-  cluster_max_join_peers: 3  # default = 3
+  cluster_max_join_peers: 4  # Set to 4 to match join_peers count
   enable_ipv6: false  # default = false
   discovery:
     join_peers:  # default = []
       - "query-frontend.loki.svc.cluster.local:3100"
       - "distributor.loki.svc.cluster.local:3100"
       - "ingester.loki.svc.cluster.local:3100"
+      - "querier.loki.svc.cluster.local:3100"
 
 common:
   instance_addr: "${POD_IP}"  # default = ""
@@ -32,11 +33,16 @@ common:
       secret_access_key: "${MINIO_SECRET_KEY}"
       insecure: true
       s3forcepathstyle: true
-  replication_factor: 1  # default = 3
+  replication_factor: 1  # Set to 1 for single-replica development setup (global)
   ring:
     kvstore:
       store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+      prefix: collectors/  # default = "collectors/"
     instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
+    heartbeat_period: 15s  # default = 15s
+    heartbeat_timeout: 1m  # default = 1m
+    num_tokens: 128  # default = 128
+    replication_factor: 1  # Set to 1 for single-replica development setup (ring-specific)
 
 storage_config:
   aws:
@@ -74,15 +80,7 @@ memberlist:
 index_gateway:
   mode: ring  # default = "simple", supported: simple, ring
   ring:
-    kvstore:
-      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
-      prefix: collectors/  # default = "collectors/"
-    heartbeat_period: 15s  # default = 15s
-    heartbeat_timeout: 1m  # default = 1m
-    instance_addr: "${POD_IP}"  # default = ""
-    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
     instance_id: "${HOSTNAME:-index-gateway}"  # default = "<hostname>"
-    replication_factor: 1  # default = 3
     zone_awareness_enabled: false  # default = false
     instance_enable_ipv6: false  # default = false
     tokens_file_path: ""  # default = "" (tokens not stored)
