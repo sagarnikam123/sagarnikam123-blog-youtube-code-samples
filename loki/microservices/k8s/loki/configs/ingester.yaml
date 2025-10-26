@@ -1,26 +1,35 @@
+# Components to run. Default "all" runs Loki in single binary mode.
+# "read" = querier + query-frontend (all in same process)
+# "write" = distributor + compactor (all in same process)
+# Supported: all, compactor, distributor, ingester, querier, query-scheduler,
+# ingester-querier, query-frontend, index-gateway, ruler, table-manager, read, write
+
 target: ingester
-auth_enabled: false
+auth_enabled: false  # default = true
 
 server:
-  http_listen_port: 3100
-  grpc_listen_port: 9095
-  log_level: info
+  http_listen_port: 3100  # default = 3100
+  grpc_listen_port: 9095  # default = 9095
+  log_level: info  # default = "info", supported: debug, info, warn, error
 
 ui:
-  enabled: true
-  node_name: "${HOSTNAME:-ingester}"
-  advertise_addr: "${POD_IP}"
-  cluster_name: "loki-microservices"
-  debug: true
+  enabled: true  # default = false
+  node_name: "${HOSTNAME:-ingester}"  # default = "<hostname>"
+  advertise_addr: "${POD_IP}"  # default = ""
+  cluster_name: "loki-microservices"  # default = ""
+  debug: true  # default = false
+  rejoin_interval: 3m  # default = 3m
+  cluster_max_join_peers: 3  # default = 3
+  enable_ipv6: false  # default = false
   discovery:
-    join_peers:
+    join_peers:  # default = []
       - "query-frontend.loki.svc.cluster.local:3100"
       - "distributor.loki.svc.cluster.local:3100"
       - "querier.loki.svc.cluster.local:3100"
 
 common:
-  instance_addr: "${POD_IP}"
-  path_prefix: "/loki"
+  instance_addr: "${POD_IP}"  # default = ""
+  path_prefix: "/loki"  # default = ""
   storage:
     s3:
       endpoint: "minio.loki.svc.cluster.local:9000"
@@ -29,11 +38,11 @@ common:
       secret_access_key: "${MINIO_SECRET_KEY}"
       insecure: true
       s3forcepathstyle: true
-  replication_factor: 1
+  replication_factor: 1  # default = 3
   ring:
     kvstore:
-      store: memberlist
-    instance_port: 9095
+      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
 
 storage_config:
   aws:
@@ -43,64 +52,95 @@ storage_config:
     secret_access_key: "${MINIO_SECRET_KEY}"
     s3forcepathstyle: true
     insecure: true
+  index_cache_validity: 5m  # default = 5m
+  max_parallel_get_chunk: 150  # default = 150
+  max_chunk_batch_size: 50  # default = 50
 
 memberlist:
-  bind_addr: ["0.0.0.0"]
-  bind_port: 7946
-  advertise_addr: "${POD_IP}"
-  advertise_port: 7946
-  abort_if_cluster_join_fails: true
+  bind_addr: ["0.0.0.0"]  # default = []
+  bind_port: 7946  # default = 7946
+  advertise_addr: "${POD_IP}"  # default = ""
+  advertise_port: 7946  # default = 7946
+  abort_if_cluster_join_fails: true  # default = false
+  stream_timeout: 2s  # default = 2s
+  retransmit_factor: 4  # default = 4
+  pull_push_interval: 30s  # default = 30s
+  gossip_interval: 200ms  # default = 200ms
+  gossip_nodes: 3  # default = 3
+  compression_enabled: true  # default = true
 
 ingester:
   lifecycler:
     ring:
       kvstore:
-        store: memberlist
-      replication_factor: 1
-    heartbeat_period: 5s
-    join_after: 30s
+        store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+      heartbeat_timeout: 1m  # default = 1m
+      replication_factor: 1  # default = 3
+    num_tokens: 128  # default = 128
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    address: "${POD_IP}"  # default = ""
+    port: 9095  # default = 0 (uses server.grpc-listen-port)
+    id: "${HOSTNAME:-ingester}"  # default = "<hostname>"
+    join_after: 30s  # default = 0s
+    min_ready_duration: 15s  # default = 15s
+    readiness_check_ring_health: false  # default = true
   wal:
-    enabled: true
-    dir: "/loki/wal"
-  chunk_idle_period: 30m
-  chunk_retain_period: 0s
-  max_chunk_age: 2h
-  chunk_target_size: 1572864
-  chunk_encoding: snappy
+    enabled: true  # default = true
+    dir: "/loki/wal"  # default = "wal"
+    checkpoint_duration: 5m  # default = 5m
+    flush_on_shutdown: false  # default = false
+  chunk_idle_period: 30m  # default = 30m
+  chunk_retain_period: 0s  # default = 0s
+  max_chunk_age: 2h  # default = 2h
+  chunk_target_size: 1572864  # default = 1572864 (1.5MB)
+  chunk_encoding: snappy  # default = "gzip", supported: none, gzip, lz4-64k, snappy, lz4-256k, lz4-1M, lz4, flate, zstd
 
 pattern_ingester:
-  enabled: true
+  enabled: true  # default = false
   lifecycler:
     ring:
       kvstore:
-        store: memberlist
-      heartbeat_timeout: 1m
-      replication_factor: 1
-    num_tokens: 128
-    heartbeat_period: 5s
-    heartbeat_timeout: 1m
-    address: "${POD_IP}"
-    port: 9095
-    id: "${HOSTNAME:-pattern-ingester}"
-    readiness_check_ring_health: false
+        store: memberlist  # default = "memberlist"
+      heartbeat_timeout: 1m  # default = 1m
+      replication_factor: 1  # default = 3
+    num_tokens: 128  # default = 128
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    address: "${POD_IP}"  # default = ""
+    port: 9095  # default = 0
+    id: "${HOSTNAME:-pattern-ingester}"  # default = "<hostname>"
+    readiness_check_ring_health: false  # default = true
   client_config:
     pool_config:
-      health_check_ingesters: true
-      remote_timeout: 5s
-    remote_timeout: 5s
+      health_check_ingesters: true  # default = true
+      remote_timeout: 5s  # default = 1s
+    remote_timeout: 5s  # default = 5s
     grpc_client_config:
-      grpc_compression: 'snappy'
-      connect_timeout: 5s
+      grpc_compression: 'snappy'  # default = "", supported: gzip, snappy
+      connect_timeout: 5s  # default = 5s
+
+ingester_client:
+  pool_config:
+    client_cleanup_period: 15s  # default = 15s
+    health_check_ingesters: true  # default = true
+    remote_timeout: 1s  # default = 1s
+  remote_timeout: 5s  # default = 5s
+  grpc_client_config:
+    grpc_compression: 'snappy'  # default = "", supported: gzip, snappy
+    connect_timeout: 5s  # default = 5s
 
 analytics:
-  reporting_enabled: false
+  reporting_enabled: false  # default = true
 
 schema_config:
   configs:
-    - from: 2024-04-01
-      store: tsdb
-      object_store: s3
-      schema: v13
+    - from: 2024-04-01  # required, format: YYYY-MM-DD
+      store: tsdb  # default = "", supported: tsdb, boltdb-shipper
+      object_store: s3  # default = "", supported: aws/s3, azure, gcs, alibabacloud, bos, cos, swift, filesystem
+      schema: v13  # default = "", current recommended: v13
       index:
-        prefix: index_
-        period: 24h
+        prefix: index_  # default = ""
+        period: 24h  # required
+        path_prefix: index/  # default = "index/"
+      row_shards: 16  # default = 16, only used if schema is v10 or greater
