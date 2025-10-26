@@ -1,20 +1,29 @@
 target: index-gateway
-auth_enabled: false
+auth_enabled: false  # default = true
 
 server:
-  http_listen_port: 3100
-  grpc_listen_port: 9095
-  log_level: info
+  http_listen_port: 3100  # default = 3100
+  grpc_listen_port: 9095  # default = 9095
+  log_level: info  # default = "info", supported: debug, info, warn, error
 
 ui:
-  enabled: true
-  node_name: "${HOSTNAME:-index-gateway}"
-  advertise_addr: "${POD_IP}"
-  cluster_name: "loki-microservices"
+  enabled: true  # default = false
+  node_name: "${HOSTNAME:-index-gateway}"  # default = "<hostname>"
+  advertise_addr: "${POD_IP}"  # default = ""
+  cluster_name: "loki-microservices"  # default = ""
+  debug: true  # default = false
+  rejoin_interval: 3m  # default = 3m
+  cluster_max_join_peers: 3  # default = 3
+  enable_ipv6: false  # default = false
+  discovery:
+    join_peers:  # default = []
+      - "query-frontend.loki.svc.cluster.local:3100"
+      - "distributor.loki.svc.cluster.local:3100"
+      - "ingester.loki.svc.cluster.local:3100"
 
 common:
-  instance_addr: "${POD_IP}"
-  path_prefix: "/loki"
+  instance_addr: "${POD_IP}"  # default = ""
+  path_prefix: "/loki"  # default = ""
   storage:
     s3:
       endpoint: "minio.loki.svc.cluster.local:9000"
@@ -23,10 +32,11 @@ common:
       secret_access_key: "${MINIO_SECRET_KEY}"
       insecure: true
       s3forcepathstyle: true
-  replication_factor: 1
+  replication_factor: 1  # default = 3
   ring:
     kvstore:
-      store: memberlist
+      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
 
 storage_config:
   aws:
@@ -36,40 +46,58 @@ storage_config:
     secret_access_key: "${MINIO_SECRET_KEY}"
     s3forcepathstyle: true
     insecure: true
+  index_cache_validity: 5m  # default = 5m
+  max_parallel_get_chunk: 150  # default = 150
+  max_chunk_batch_size: 50  # default = 50
   tsdb_shipper:
-    active_index_directory: "/loki/tsdb-index"
-    cache_location: "/loki/tsdb-cache"
-    cache_ttl: 24h
+    active_index_directory: "/loki/tsdb-index"  # default = ""
+    cache_location: "/loki/tsdb-cache"  # default = ""
+    cache_ttl: 24h  # default = 24h
 
 memberlist:
-  abort_if_cluster_join_fails: false
-  bind_port: 7946
-  join_members:
+  bind_addr: ["0.0.0.0"]  # default = []
+  bind_port: 7946  # default = 7946
+  advertise_addr: "${POD_IP}"  # default = ""
+  advertise_port: 7946  # default = 7946
+  join_members:  # default = []
     - "distributor.loki.svc.cluster.local:7946"
     - "ingester.loki.svc.cluster.local:7946"
     - "querier.loki.svc.cluster.local:7946"
+  abort_if_cluster_join_fails: false  # default = false
+  stream_timeout: 2s  # default = 2s
+  retransmit_factor: 4  # default = 4
+  pull_push_interval: 30s  # default = 30s
+  gossip_interval: 200ms  # default = 200ms
+  gossip_nodes: 3  # default = 3
+  compression_enabled: true  # default = true
 
 index_gateway:
-  mode: ring
+  mode: ring  # default = "simple", supported: simple, ring
   ring:
     kvstore:
-      store: memberlist
-    heartbeat_period: 15s
-    heartbeat_timeout: 1m
-    instance_addr: "${POD_IP}"
-    instance_port: 9095
-    instance_id: "${HOSTNAME:-index-gateway}"
-    replication_factor: 1
+      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+      prefix: collectors/  # default = "collectors/"
+    heartbeat_period: 15s  # default = 15s
+    heartbeat_timeout: 1m  # default = 1m
+    instance_addr: "${POD_IP}"  # default = ""
+    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
+    instance_id: "${HOSTNAME:-index-gateway}"  # default = "<hostname>"
+    replication_factor: 1  # default = 3
+    zone_awareness_enabled: false  # default = false
+    instance_enable_ipv6: false  # default = false
+    tokens_file_path: ""  # default = "" (tokens not stored)
 
 analytics:
-  reporting_enabled: false
+  reporting_enabled: false  # default = true
 
 schema_config:
   configs:
-    - from: 2024-04-01
-      store: tsdb
-      object_store: s3
-      schema: v13
+    - from: 2024-04-01  # required, format: YYYY-MM-DD
+      store: tsdb  # default = "", supported: tsdb, boltdb-shipper
+      object_store: s3  # default = "", supported: aws/s3, azure, gcs, alibabacloud, bos, cos, swift, filesystem
+      schema: v13  # default = "", current recommended: v13
       index:
-        prefix: index_
-        period: 24h
+        prefix: index_  # default = ""
+        period: 24h  # required
+        path_prefix: index/  # default = "index/"
+      row_shards: 16  # default = 16, only used if schema is v10 or greater
