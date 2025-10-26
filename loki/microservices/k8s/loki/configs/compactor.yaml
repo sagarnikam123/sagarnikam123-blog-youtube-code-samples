@@ -19,13 +19,14 @@ ui:
   cluster_name: "loki-microservices"  # default = ""
   debug: true  # default = false
   rejoin_interval: 3m  # default = 3m
-  cluster_max_join_peers: 3  # default = 3
+  cluster_max_join_peers: 4  # Set to 4 to match join_peers count
   enable_ipv6: false  # default = false
   discovery:
     join_peers:  # default = []
       - "query-frontend.loki.svc.cluster.local:3100"
       - "distributor.loki.svc.cluster.local:3100"
       - "ingester.loki.svc.cluster.local:3100"
+      - "querier.loki.svc.cluster.local:3100"
 
 common:
   instance_addr: "${POD_IP}"  # default = ""
@@ -38,11 +39,16 @@ common:
       secret_access_key: "${MINIO_SECRET_KEY}"
       insecure: true
       s3forcepathstyle: true
-  replication_factor: 1  # default = 3
+  replication_factor: 1  # Set to 1 for single-replica development setup (global)
   ring:
     kvstore:
       store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+      prefix: collectors/  # default = "collectors/"
     instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
+    heartbeat_period: 15s  # default = 15s
+    heartbeat_timeout: 1m  # default = 1m
+    num_tokens: 128  # default = 128
+    replication_factor: 1  # Set to 1 for single-replica development setup (ring-specific)
 
 storage_config:
   aws:
@@ -62,6 +68,7 @@ memberlist:
   advertise_addr: "${POD_IP}"  # default = ""
   advertise_port: 7946  # default = 7946
   join_members:  # default = []
+    - "distributor.loki.svc.cluster.local:7946"
     - "ingester.loki.svc.cluster.local:7946"
   abort_if_cluster_join_fails: false  # default = false
   stream_timeout: 2s  # default = 2s
@@ -87,13 +94,6 @@ compactor:
   tables_to_compact: 0  # default = 0 (compact all available tables)
   skip_latest_n_tables: 0  # default = 0
   compactor_ring:
-    kvstore:
-      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
-      prefix: collectors/  # default = "collectors/"
-    heartbeat_period: 15s  # default = 15s
-    heartbeat_timeout: 1m  # default = 1m
-    instance_addr: "${POD_IP}"  # default = ""
-    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
     instance_id: "${HOSTNAME:-compactor}"  # default = "<hostname>"
     zone_awareness_enabled: false  # default = false
     instance_enable_ipv6: false  # default = false
