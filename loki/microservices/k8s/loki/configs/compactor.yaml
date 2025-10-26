@@ -107,7 +107,7 @@ compactor_grpc_client:
   connect_timeout: 5s  # default = 5s
   max_recv_msg_size: 104857600  # default = 4MB (4194304), setting to 100MB
   max_send_msg_size: 104857600  # default = 4MB (4194304), setting to 100MB
-  use_gzip_compression: false  # default = false
+
   rate_limit: 0  # default = 0 (no limit)
   rate_limit_burst: 0  # default = 0 (no limit)
   backoff_on_ratelimits: false  # default = false
