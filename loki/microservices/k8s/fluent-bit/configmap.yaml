@@ -31,7 +31,7 @@ data:
         Read_from_Head      False
         Refresh_Interval    10
         Rotate_Wait         5
-        Ignore_Older        1h
+        Ignore_Older        30m
         Skip_Long_Lines     Off
         Skip_Empty_Lines    On
         DB                  /fluent-bit/state/flb_kube.db
