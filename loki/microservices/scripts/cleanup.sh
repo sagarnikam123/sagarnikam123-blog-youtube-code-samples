@@ -70,6 +70,7 @@ echo "📈 Deleting Prometheus..."
 kubectl delete -f k8s/prometheus/ --ignore-not-found=true
 
 echo "🗄️  Deleting MinIO..."
+kubectl delete job minio-setup -n loki --ignore-not-found=true
 kubectl delete -f k8s/minio/ --ignore-not-found=true
 
 # Delete Services
