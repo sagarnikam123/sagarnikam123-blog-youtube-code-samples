@@ -65,7 +65,7 @@ querier:
     max_look_back_period: 168h
   max_concurrent: 4
 frontend_worker:
-  frontend_address: "query-frontend.loki.svc.cluster.local:9095"
+  scheduler_address: "query-scheduler.loki.svc.cluster.local:9095"
 
 analytics:
   reporting_enabled: false
