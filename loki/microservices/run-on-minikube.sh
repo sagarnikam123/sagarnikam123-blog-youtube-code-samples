@@ -86,12 +86,21 @@ kubectl apply -f k8s/minio/storage.yaml
 # Deploy MinIO
 echo "🗄️  Deploying MinIO..."
 for file in k8s/minio/*.yaml; do
-    envsubst < "$file" | kubectl apply -f -
+    # Skip setup-job.yaml as it's applied separately
+    if [[ "$(basename "$file")" != "setup-job.yaml" ]]; then
+        envsubst < "$file" | kubectl apply -f -
+    fi
 done
 
 # Wait for MinIO to be ready
 echo "⏳ Waiting for MinIO to be ready..."
 kubectl wait --for=condition=ready pod -l app=minio -n loki --timeout=300s
+
+# Setup MinIO buckets
+echo "🪣 Setting up MinIO buckets..."
+kubectl apply -f k8s/minio/setup-job.yaml
+echo "⏳ Waiting for bucket setup to complete..."
+kubectl wait --for=condition=complete job/minio-setup -n loki --timeout=120s
 
 # Create Services
 echo "🌐 Creating services..."
@@ -113,14 +122,37 @@ kubectl create configmap index-gateway-config --from-file=k8s/loki/configs/index
 
 # Deploy components in proper order
 echo "🔧 Deploying Loki components..."
-
-# Deploy Loki components with version substitution
-echo "  🔍 Deploying Loki components..."
 export LOKI_VERSION GRAFANA_VERSION PROMETHEUS_VERSION MINIO_VERSION FLUENT_BIT_VERSION
-for file in k8s/loki/deployments/*.yaml; do
-    echo "    Deploying $(basename "$file")..."
-    envsubst < "$file" | kubectl apply -f -
-done
+
+# Step 1: Deploy Ingester first (core ring component)
+echo "  📊 Deploying Ingester (core ring component)..."
+envsubst < k8s/loki/deployments/ingester-statefulset.yaml | kubectl apply -f -
+echo "  ⏳ Waiting for Ingester to be ready..."
+kubectl wait --for=condition=ready pod/loki-ingester-0 -n loki --timeout=120s
+
+# Step 2: Deploy ring-dependent components
+echo "  📡 Deploying Distributor (ring-dependent)..."
+envsubst < k8s/loki/deployments/distributor-deployment.yaml | kubectl apply -f -
+echo "  🗜️ Deploying Compactor (ring-dependent)..."
+envsubst < k8s/loki/deployments/compactor-deployment.yaml | kubectl apply -f -
+
+# Step 3: Deploy Query Scheduler first (query components dependency)
+echo "  📅 Deploying Query Scheduler..."
+envsubst < k8s/loki/deployments/query-scheduler-deployment.yaml | kubectl apply -f -
+echo "  ⏳ Waiting for Query Scheduler to be ready..."
+kubectl wait --for=condition=ready pod -l app=loki-query-scheduler -n loki --timeout=60s
+
+# Step 4: Deploy Query Frontend and Querier
+echo "  🎯 Deploying Query Frontend..."
+envsubst < k8s/loki/deployments/query-frontend-deployment.yaml | kubectl apply -f -
+echo "  🔍 Deploying Querier..."
+envsubst < k8s/loki/deployments/querier-deployment.yaml | kubectl apply -f -
+
+# Step 5: Deploy remaining components
+echo "  📏 Deploying Ruler..."
+envsubst < k8s/loki/deployments/ruler-deployment.yaml | kubectl apply -f -
+echo "  🏛️ Deploying Index Gateway..."
+envsubst < k8s/loki/deployments/index-gateway-deployment.yaml | kubectl apply -f -
 
 # Deploy Fluent Bit for log collection
 echo "  📝 Deploying Fluent Bit..."
@@ -144,10 +176,10 @@ for file in k8s/grafana/*.yaml; do
     envsubst < "$file" | kubectl apply -f -
 done
 
-# Wait for critical components
-echo "⏳ Waiting for critical components to be ready..."
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=loki,app.kubernetes.io/component=ingester -n loki --timeout=120s
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=loki,app.kubernetes.io/component=distributor -n loki --timeout=60s
+# Wait for remaining components
+echo "⏳ Waiting for remaining components to be ready..."
+kubectl wait --for=condition=ready pod -l app=loki-distributor -n loki --timeout=60s
+kubectl wait --for=condition=ready pod -l app=loki-query-frontend -n loki --timeout=60s
 
 # Show deployment status
 echo "✅ Deployment complete! Checking status..."
@@ -177,7 +209,7 @@ echo "    Open: http://localhost:9000 (minioadmin/minioadmin)"
 echo ""
 echo "  🔍 Loki Web UI & API (via Query Frontend):"
 echo "    kubectl port-forward -n loki svc/query-frontend 3100:3100"
-echo "    Web UI: http://localhost:3100"
+echo "    Web UI: http://localhost:3100/ui/"
 echo "    API: http://localhost:3100/loki/api/v1/"
 echo ""
 echo "  📡 Loki Ingestion (via Distributor):"
@@ -198,7 +230,7 @@ echo "  kubectl logs -n loki -l app.kubernetes.io/name=loki,app.kubernetes.io/co
 echo "  kubectl logs -n loki loki-ingester-0"
 echo ""
 echo "🧪 Next Steps:"
-echo "  ./scripts/check-deployment-health.sh # 1. Check deployment health"
-echo "  ./scripts/check-all-logs.sh         # 2. Check component logs"
+echo "  ./scripts/health-check.sh           # 1. Check deployment health"
+echo "  ./scripts/logs.sh                   # 2. Check component logs"
 echo "  ./scripts/test-api.sh               # 3. Test API functionality"
-echo "  ./scripts/check-versions.sh         # 4. Check current versions"
+echo "  ./scripts/versions.sh               # 4. Check current versions"
