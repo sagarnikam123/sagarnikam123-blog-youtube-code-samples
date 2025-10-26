@@ -13,10 +13,12 @@ ui:
   cluster_name: "loki-microservices"
 
 common:
+  instance_addr: "${POD_IP}"
   path_prefix: "/loki"
   ring:
     kvstore:
       store: memberlist
+    instance_port: 9095
 
 storage_config:
   tsdb_shipper:
@@ -26,6 +28,11 @@ storage_config:
 memberlist:
   bind_addr: ["0.0.0.0"]
   bind_port: 7946
+  advertise_addr: "${POD_IP}"
+  advertise_port: 7946
+  join_members:
+    - "distributor.loki.svc.cluster.local:7946"
+    - "ingester.loki.svc.cluster.local:7946"
   abort_if_cluster_join_fails: false
 
 query_scheduler:
