@@ -12,6 +12,15 @@ ui:
   advertise_addr: "${POD_IP}"
   cluster_name: "loki-microservices"
   debug: true
+  rejoin_interval: 3m
+  cluster_max_join_peers: 4
+  enable_ipv6: false
+  discovery:
+    join_peers:
+      - "query-frontend.loki.svc.cluster.local:3100"
+      - "distributor.loki.svc.cluster.local:3100"
+      - "ingester.loki.svc.cluster.local:3100"
+      - "querier.loki.svc.cluster.local:3100"
 
 common:
   instance_addr: "${POD_IP}"
@@ -26,16 +35,6 @@ common:
       s3forcepathstyle: true
   replication_factor: 1
   compactor_address: "compactor.loki.svc.cluster.local:3100"
-  ring:
-    kvstore:
-      store: memberlist
-
-memberlist:
-  bind_addr: ["0.0.0.0"]
-  bind_port: 7946
-  advertise_addr: "${POD_IP}"
-  advertise_port: 7946
-  join_members: ["distributor.loki.svc.cluster.local:7946", "ingester.loki.svc.cluster.local:7946"]
 
 storage_config:
   aws:
@@ -46,22 +45,21 @@ storage_config:
     s3forcepathstyle: true
     insecure: true
 
-distributor:
-  ring:
-    kvstore:
-      store: memberlist
-    instance_port: 9095
-
-ingester:
-  lifecycler:
-    ring:
-      kvstore:
-        store: memberlist
-      replication_factor: 1
-
 frontend:
   max_outstanding_per_tenant: 100
   scheduler_address: "query-scheduler.loki.svc.cluster.local:9095"
+  query_stats_enabled: true
+  log_queries_longer_than: 5s
+
+query_range:
+  align_queries_with_step: false
+  cache_results: true
+  max_retries: 5
+  parallelise_shardable_queries: true
+  cache_index_stats_results: true
+  cache_volume_results: true
+  cache_series_results: true
+  cache_label_results: true
 
 analytics:
   reporting_enabled: false
