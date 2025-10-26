@@ -1,55 +1,81 @@
+# Components to run. Default "all" runs Loki in single binary mode.
+# "read" = querier + query-frontend (all in same process)
+# "write" = distributor + compactor (all in same process)
+# Supported: all, compactor, distributor, ingester, querier, query-scheduler,
+# ingester-querier, query-frontend, index-gateway, ruler, table-manager, read, write
+
 target: distributor
-auth_enabled: false
+auth_enabled: false  # default = true
 
 server:
-  http_listen_port: 3100
-  grpc_listen_port: 9095
-  log_level: info
+  http_listen_port: 3100  # default = 3100
+  grpc_listen_port: 9095  # default = 9095
+  log_level: info  # default = "info", supported: debug, info, warn, error
 
 ui:
-  enabled: true
-  node_name: "${HOSTNAME:-distributor}"
-  advertise_addr: "${POD_IP}"
-  cluster_name: "loki-microservices"
-  debug: true
+  enabled: true  # default = false
+  node_name: "${HOSTNAME:-distributor}"  # default = "<hostname>"
+  advertise_addr: "${POD_IP}"  # default = ""
+  cluster_name: "loki-microservices"  # default = ""
+  debug: true  # default = false
+  rejoin_interval: 3m  # default = 3m
+  cluster_max_join_peers: 3  # default = 3
+  enable_ipv6: false  # default = false
   discovery:
-    join_peers:
+    join_peers:  # default = []
       - "query-frontend.loki.svc.cluster.local:3100"
       - "ingester.loki.svc.cluster.local:3100"
       - "querier.loki.svc.cluster.local:3100"
 
 common:
-  instance_addr: "${POD_IP}"
-  path_prefix: "/loki"
-  replication_factor: 1
+  instance_addr: "${POD_IP}"  # default = ""
+  path_prefix: "/loki"  # default = ""
+  replication_factor: 1  # default = 3
   ring:
     kvstore:
-      store: memberlist
-    instance_port: 9095
+      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
 
 memberlist:
-  bind_addr: ["0.0.0.0"]
-  bind_port: 7946
-  advertise_addr: "${POD_IP}"
-  advertise_port: 7946
-  join_members:
+  bind_addr: ["0.0.0.0"]  # default = []
+  bind_port: 7946  # default = 7946
+  advertise_addr: "${POD_IP}"  # default = ""
+  advertise_port: 7946  # default = 7946
+  join_members:  # default = []
     - "ingester.loki.svc.cluster.local:7946"
-  abort_if_cluster_join_fails: false
+  abort_if_cluster_join_fails: false  # default = false
+  stream_timeout: 2s  # default = 2s
+  retransmit_factor: 4  # default = 4
+  pull_push_interval: 30s  # default = 30s
+  gossip_interval: 200ms  # default = 200ms
+  gossip_nodes: 3  # default = 3
+  compression_enabled: true  # default = true
 
 distributor:
   ring:
     kvstore:
-      store: memberlist
+      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+      prefix: collectors/  # default = "collectors/"
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    instance_addr: "${POD_IP}"  # default = ""
+    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
+  push_worker_count: 256  # default = 256
+  kafka_writes_enabled: false  # default = false
+  ingester_writes_enabled: true  # default = true
+  ingest_limits_enabled: false  # default = false
 
 analytics:
-  reporting_enabled: false
+  reporting_enabled: false  # default = true
 
 schema_config:
   configs:
-    - from: 2024-04-01
-      store: tsdb
-      object_store: s3
-      schema: v13
+    - from: 2024-04-01  # required, format: YYYY-MM-DD
+      store: tsdb  # default = "", supported: tsdb, boltdb-shipper
+      object_store: s3  # default = "", supported: aws/s3, azure, gcs, alibabacloud, bos, cos, swift, filesystem
+      schema: v13  # default = "", current recommended: v13
       index:
-        prefix: index_
-        period: 24h
+        prefix: index_  # default = ""
+        period: 24h  # required
+        path_prefix: index/  # default = "index/"
+      row_shards: 16  # default = 16, only used if schema is v10 or greater
