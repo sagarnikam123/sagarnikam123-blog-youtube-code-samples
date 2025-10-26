@@ -65,6 +65,16 @@ distributor:
   ingester_writes_enabled: true  # default = true
   ingest_limits_enabled: false  # default = false
 
+ingester_client:
+  pool_config:
+    client_cleanup_period: 15s  # default = 15s
+    health_check_ingesters: true  # default = true
+    remote_timeout: 1s  # default = 1s
+  remote_timeout: 5s  # default = 5s
+  grpc_client_config:
+    grpc_compression: 'snappy'  # default = "", supported: gzip, snappy
+    connect_timeout: 5s  # default = 5s
+
 analytics:
   reporting_enabled: false  # default = true
 
