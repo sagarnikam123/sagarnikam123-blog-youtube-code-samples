@@ -19,30 +19,44 @@ ui:
   cluster_name: "loki-microservices"  # default = ""
   debug: true  # default = false
   rejoin_interval: 3m  # default = 3m
-  cluster_max_join_peers: 3  # default = 3
+  cluster_max_join_peers: 4  # Set to 4 to match join_peers count
   enable_ipv6: false  # default = false
   discovery:
     join_peers:  # default = []
       - "query-frontend.loki.svc.cluster.local:3100"
+      - "distributor.loki.svc.cluster.local:3100"
       - "ingester.loki.svc.cluster.local:3100"
       - "querier.loki.svc.cluster.local:3100"
 
 common:
   instance_addr: "${POD_IP}"  # default = ""
   path_prefix: "/loki"  # default = ""
-  replication_factor: 1  # default = 3
+  storage:
+    s3:
+      endpoint: "minio.loki.svc.cluster.local:9000"
+      bucketnames: "loki-chunks"
+      access_key_id: "${MINIO_ACCESS_KEY}"
+      secret_access_key: "${MINIO_SECRET_KEY}"
+      insecure: true
+      s3forcepathstyle: true
+  replication_factor: 1  # Set to 1 for single-replica development setup (global)
   ring:
     kvstore:
       store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
+      prefix: collectors/  # default = "collectors/"
     instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
+    heartbeat_period: 5s  # default = 15s
+    heartbeat_timeout: 1m  # default = 1m
+    num_tokens: 128  # default = 128
+    replication_factor: 1  # Set to 1 for single-replica development setup (ring-specific)
 
 memberlist:
   bind_addr: ["0.0.0.0"]  # default = []
   bind_port: 7946  # default = 7946
   advertise_addr: "${POD_IP}"  # default = ""
   advertise_port: 7946  # default = 7946
-  join_members:  # default = []
-    - "ingester.loki.svc.cluster.local:7946"
+  join_members:
+    - "ingester.loki.svc.cluster.local:7946"  # Join ingester to discover the ring
   abort_if_cluster_join_fails: false  # default = false
   stream_timeout: 2s  # default = 2s
   retransmit_factor: 4  # default = 4
@@ -52,14 +66,6 @@ memberlist:
   compression_enabled: true  # default = true
 
 distributor:
-  ring:
-    kvstore:
-      store: memberlist  # default = "consul", supported: consul, etcd, inmemory, memberlist, multi
-      prefix: collectors/  # default = "collectors/"
-    heartbeat_period: 5s  # default = 5s
-    heartbeat_timeout: 1m  # default = 1m
-    instance_addr: "${POD_IP}"  # default = ""
-    instance_port: 9095  # default = 0 (uses server.grpc-listen-port)
   push_worker_count: 256  # default = 256
   kafka_writes_enabled: false  # default = false
   ingester_writes_enabled: true  # default = true
@@ -74,6 +80,18 @@ ingester_client:
   grpc_client_config:
     grpc_compression: 'snappy'  # default = "", supported: gzip, snappy
     connect_timeout: 5s  # default = 5s
+
+storage_config:
+  aws:
+    endpoint: "minio.loki.svc.cluster.local:9000"
+    bucketnames: "loki-chunks"
+    access_key_id: "${MINIO_ACCESS_KEY}"
+    secret_access_key: "${MINIO_SECRET_KEY}"
+    s3forcepathstyle: true
+    insecure: true
+  index_cache_validity: 5m  # default = 5m
+  max_parallel_get_chunk: 150  # default = 150
+  max_chunk_batch_size: 50  # default = 50
 
 analytics:
   reporting_enabled: false  # default = true
