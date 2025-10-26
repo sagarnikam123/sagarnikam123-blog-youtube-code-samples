@@ -3,12 +3,20 @@ set -e
 
 # Configuration - Default values
 LOG_LINES=10  # Number of log lines to display per component (default: 10)
+COMPONENT=""  # Specific component to check (empty = all components)
+
+# Valid components list
+VALID_COMPONENTS=("distributor" "ingester" "querier" "query-frontend" "query-scheduler" "compactor" "ruler" "index-gateway" "minio" "fluent-bit" "grafana" "prometheus")
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
     -n|--lines)
       LOG_LINES="$2"
+      shift 2
+      ;;
+    -c|--component)
+      COMPONENT="$2"
       shift 2
       ;;
     -h|--help)
@@ -26,19 +34,21 @@ while [[ $# -gt 0 ]]; do
       echo "  • Highlight key health indicators"
       echo ""
       echo "🚀 USAGE:"
-      echo "  ./scripts/check-all-logs.sh                    # Check logs (default: 10 lines)"
+      echo "  ./scripts/check-all-logs.sh                    # Check all components (default: 10 lines)"
       echo "  ./scripts/check-all-logs.sh -n 20             # Show 20 lines per component"
-      echo "  ./scripts/check-all-logs.sh --lines 50        # Show 50 lines per component"
+      echo "  ./scripts/check-all-logs.sh -c distributor    # Check only distributor"
+      echo "  ./scripts/check-all-logs.sh -c ingester -n 50 # Check ingester with 50 lines"
       echo "  ./scripts/check-all-logs.sh -h|--help         # Show this help"
       echo ""
       echo "📋 OPTIONS:"
-      echo "  -n, --lines NUMBER    Number of log lines to display per component (default: 10)"
-      echo "  -h, --help           Show this help message"
+      echo "  -n, --lines NUMBER      Number of log lines to display per component (default: 10)"
+      echo "  -c, --component NAME    Check specific component only (default: all)"
+      echo "  -h, --help             Show this help message"
       echo ""
-      echo "📋 ANALYZED COMPONENTS:"
+      echo "📋 AVAILABLE COMPONENTS:"
       echo "  • Loki: distributor, ingester, querier, query-frontend"
       echo "  • Loki: query-scheduler, compactor, ruler, index-gateway"
-      echo "  • Supporting: MinIO, Fluent Bit, Grafana, Prometheus"
+      echo "  • Supporting: minio, fluent-bit, grafana, prometheus"
       echo ""
       echo "🔍 HEALTH INDICATORS:"
       echo "  • Distributor: 'memberlist cluster succeeded'"
@@ -72,13 +82,26 @@ if ! [[ "$LOG_LINES" =~ ^[0-9]+$ ]] || [[ "$LOG_LINES" -eq 0 ]]; then
   exit 1
 fi
 
+# Validate component if specified
+if [[ -n "$COMPONENT" ]]; then
+  if [[ ! " ${VALID_COMPONENTS[*]} " =~ " ${COMPONENT} " ]]; then
+    echo "❌ Error: Invalid component '$COMPONENT'"
+    echo "Valid components: ${VALID_COMPONENTS[*]}"
+    exit 1
+  fi
+fi
+
 # Check for help flag (legacy support)
 if false; then
     # This block is now handled above
     exit 0
 fi
 
-echo "🔍 Checking All Loki Component Logs (showing $LOG_LINES lines per component)"
+if [[ -n "$COMPONENT" ]]; then
+  echo "🔍 Checking $COMPONENT Logs (showing $LOG_LINES lines)"
+else
+  echo "🔍 Checking All Loki Component Logs (showing $LOG_LINES lines per component)"
+fi
 echo "===================================="
 
 # Get all pod names first
@@ -86,56 +109,103 @@ echo "📊 Current Pod Status:"
 kubectl get pods -n loki
 
 echo ""
-echo "📋 Component Log Analysis:"
+if [[ -n "$COMPONENT" ]]; then
+  echo "📋 $COMPONENT Log Analysis:"
+else
+  echo "📋 Component Log Analysis:"
+fi
 echo ""
 
-# Check each component individually
-echo "📡 DISTRIBUTOR LOGS:"
-kubectl logs -n loki -l app=loki-distributor --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No distributor pods found"
+# Component-specific functions
+check_distributor() {
+  echo "📡 DISTRIBUTOR LOGS:"
+  kubectl logs -n loki -l app=loki-distributor --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No distributor pods found"
+}
 
-echo ""
-echo "📊 INGESTER LOGS:"
-kubectl logs -n loki loki-ingester-0 --tail=$LOG_LINES 2>/dev/null || echo "  ❌ Ingester not found"
+check_ingester() {
+  echo "📊 INGESTER LOGS:"
+  kubectl logs -n loki loki-ingester-0 --tail=$LOG_LINES 2>/dev/null || echo "  ❌ Ingester not found"
+}
 
-echo ""
-echo "🔍 QUERIER LOGS:"
-kubectl logs -n loki -l app=loki-querier --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No querier pods found"
+check_querier() {
+  echo "🔍 QUERIER LOGS:"
+  kubectl logs -n loki -l app=loki-querier --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No querier pods found"
+}
 
-echo ""
-echo "🎯 QUERY-FRONTEND LOGS:"
-kubectl logs -n loki -l app=loki-query-frontend --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No query-frontend pods found"
+check_query-frontend() {
+  echo "🎯 QUERY-FRONTEND LOGS:"
+  kubectl logs -n loki -l app=loki-query-frontend --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No query-frontend pods found"
+}
 
-echo ""
-echo "📅 QUERY-SCHEDULER LOGS:"
-kubectl logs -n loki -l app=loki-query-scheduler --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No query-scheduler pods found"
+check_query-scheduler() {
+  echo "📅 QUERY-SCHEDULER LOGS:"
+  kubectl logs -n loki -l app=loki-query-scheduler --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No query-scheduler pods found"
+}
 
-echo ""
-echo "🗜️ COMPACTOR LOGS:"
-kubectl logs -n loki -l app=loki-compactor --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No compactor pods found"
+check_compactor() {
+  echo "🗜️ COMPACTOR LOGS:"
+  kubectl logs -n loki -l app=loki-compactor --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No compactor pods found"
+}
 
-echo ""
-echo "📏 RULER LOGS:"
-kubectl logs -n loki -l app=loki-ruler --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No ruler pods found"
+check_ruler() {
+  echo "📏 RULER LOGS:"
+  kubectl logs -n loki -l app=loki-ruler --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No ruler pods found"
+}
 
-echo ""
-echo "🏛️ INDEX-GATEWAY LOGS:"
-kubectl logs -n loki -l app=loki-index-gateway --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No index-gateway pods found"
+check_index-gateway() {
+  echo "🏛️ INDEX-GATEWAY LOGS:"
+  kubectl logs -n loki -l app=loki-index-gateway --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No index-gateway pods found"
+}
 
-echo ""
-echo "🗄️ MINIO LOGS:"
-kubectl logs -n loki -l app=minio --tail=$LOG_LINES 2>/dev/null || echo "  ❌ MinIO not found"
+check_minio() {
+  echo "🗄️ MINIO LOGS:"
+  kubectl logs -n loki -l app=minio --tail=$LOG_LINES 2>/dev/null || echo "  ❌ MinIO not found"
+}
 
-echo ""
-echo "📝 FLUENT BIT LOGS:"
-kubectl logs -n loki -l app=fluent-bit --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No fluent-bit pods found"
+check_fluent-bit() {
+  echo "📝 FLUENT BIT LOGS:"
+  kubectl logs -n loki -l app=fluent-bit --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No fluent-bit pods found"
+}
 
-echo ""
-echo "📈 GRAFANA LOGS:"
-kubectl logs -n loki -l app=grafana --tail=$LOG_LINES 2>/dev/null || echo "  ❌ Grafana not found"
+check_grafana() {
+  echo "📈 GRAFANA LOGS:"
+  kubectl logs -n loki -l app=grafana --tail=$LOG_LINES 2>/dev/null || echo "  ❌ Grafana not found"
+}
 
-echo ""
-echo "📉 PROMETHEUS LOGS:"
-kubectl logs -n loki -l app=prometheus --tail=$LOG_LINES 2>/dev/null || echo "  ❌ Prometheus not found"
+check_prometheus() {
+  echo "📉 PROMETHEUS LOGS:"
+  kubectl logs -n loki -l app=prometheus --tail=$LOG_LINES 2>/dev/null || echo "  ❌ Prometheus not found"
+}
+
+# Check specific component or all components
+if [[ -n "$COMPONENT" ]]; then
+  check_$COMPONENT
+else
+  # Check all components
+  check_distributor
+  echo ""
+  check_ingester
+  echo ""
+  check_querier
+  echo ""
+  check_query-frontend
+  echo ""
+  check_query-scheduler
+  echo ""
+  check_compactor
+  echo ""
+  check_ruler
+  echo ""
+  check_index-gateway
+  echo ""
+  check_minio
+  echo ""
+  check_fluent-bit
+  echo ""
+  check_grafana
+  echo ""
+  check_prometheus
+fi
 
 echo ""
 echo "✅ Log check complete!"
