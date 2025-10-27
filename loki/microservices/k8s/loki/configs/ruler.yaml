@@ -39,7 +39,7 @@ common:
       store: memberlist
       prefix: collectors/  # default = "collectors/"
     instance_port: 9095
-    heartbeat_period: 5s  # default = 5s
+    heartbeat_period: 15s  # default = 15s
     heartbeat_timeout: 1m  # default = 1m
     num_tokens: 128  # default = 128
     replication_factor: 1  # Set to 1 for single-replica development setup (ring-specific)
