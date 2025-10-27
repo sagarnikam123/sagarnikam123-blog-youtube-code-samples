@@ -60,9 +60,11 @@ export MINIO_VERSION="RELEASE.2025-09-07T16-13-09Z" # Latest from minio/minio
 export FLUENT_BIT_VERSION="4.1.0"   # Latest from fluent/fluent-bit
 
 echo "🚀 Starting Loki ${LOKI_VERSION} Distributed Microservices Deployment"
+echo ""
 
 # Check if Minikube is running
-echo "📦 Checking Minikube status..."
+echo "📦 Minikube Status"
+echo "Checking Minikube status..."
 if minikube status | grep -q "Running"; then
     echo "✅ Minikube is already running"
 else
@@ -70,21 +72,33 @@ else
     minikube start --cpus=6 --memory=12288mb
 fi
 
+echo ""
+
 # Create Namespace
-echo "🏗️  Creating namespace..."
+echo "🏗️  Namespace"
+echo "Creating namespace..."
 kubectl create namespace loki --dry-run=client -o yaml | kubectl apply -f -
 
+echo ""
+
 # Create Secrets
-echo "🔐 Creating MinIO secrets..."
+echo "🔐 Secrets"
+echo "Creating MinIO secrets..."
 kubectl apply -f k8s/minio/secret.yaml
 
+echo ""
+
 # Apply Storage
-echo "💾 Creating persistent volumes..."
+echo "💾 Persistent Volumes"
+echo "Creating persistent volumes..."
 kubectl apply -f k8s/loki/storage/
 kubectl apply -f k8s/minio/storage.yaml
 
+echo ""
+
 # Deploy MinIO
-echo "🗄️  Deploying MinIO..."
+echo "🗄️  MinIO"
+echo "Deploying MinIO..."
 for file in k8s/minio/*.yaml; do
     # Skip setup-job.yaml as it's applied separately
     if [[ "$(basename "$file")" != "setup-job.yaml" ]]; then
@@ -93,24 +107,29 @@ for file in k8s/minio/*.yaml; do
 done
 
 # Wait for MinIO to be ready
-echo "⏳ Waiting for MinIO to be ready..."
+echo "Waiting for MinIO to be ready..."
 kubectl wait --for=condition=ready pod -l app=minio -n loki --timeout=300s
 
-# Setup MinIO buckets
-echo "🪣 Setting up MinIO buckets..."
+echo "Setting up MinIO buckets..."
 kubectl apply -f k8s/minio/setup-job.yaml
-echo "⏳ Waiting for bucket setup to complete..."
+echo "Waiting for bucket setup to complete..."
 kubectl wait --for=condition=complete job/minio-setup -n loki --timeout=120s
 
+echo ""
+
 # Create Services
-echo "🌐 Creating services..."
+echo "🌐 Services"
+echo "Creating services..."
 for file in k8s/loki/services/*.yaml; do
     envsubst < "$file" | kubectl apply -f -
 done
 
 
+echo ""
+
 # Create ConfigMaps with all configurations
-echo "⚙️  Creating Loki ConfigMaps..."
+echo "⚙️  ConfigMaps"
+echo "Creating Loki ConfigMaps..."
 kubectl create configmap distributor-config --from-file=k8s/loki/configs/distributor.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap ingester-config --from-file=k8s/loki/configs/ingester.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap querier-config --from-file=k8s/loki/configs/querier.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
@@ -120,69 +139,85 @@ kubectl create configmap compactor-config --from-file=k8s/loki/configs/compactor
 kubectl create configmap ruler-config --from-file=k8s/loki/configs/ruler.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap index-gateway-config --from-file=k8s/loki/configs/index-gateway.yaml -n loki --dry-run=client -o yaml | kubectl apply -f -
 
+echo ""
+
 # Deploy components in proper order
-echo "🔧 Deploying Loki components..."
+echo "🔧 Loki Components"
 export LOKI_VERSION GRAFANA_VERSION PROMETHEUS_VERSION MINIO_VERSION FLUENT_BIT_VERSION
 
 # Step 1: Deploy Ingester first (core ring component)
-echo "  📊 Deploying Ingester (core ring component)..."
+echo "📊 Deploying Ingester (core ring component)..."
 envsubst < k8s/loki/deployments/ingester-statefulset.yaml | kubectl apply -f -
-echo "  ⏳ Waiting for Ingester to be ready..."
+echo "Waiting for Ingester to be ready..."
 kubectl wait --for=condition=ready pod/loki-ingester-0 -n loki --timeout=120s
 
 # Step 2: Deploy ring-dependent components
-echo "  📡 Deploying Distributor (ring-dependent)..."
+echo "📡 Deploying Distributor (ring-dependent)..."
 envsubst < k8s/loki/deployments/distributor-deployment.yaml | kubectl apply -f -
-echo "  🗜️ Deploying Compactor (ring-dependent)..."
+echo "🗜️ Deploying Compactor (ring-dependent)..."
 envsubst < k8s/loki/deployments/compactor-deployment.yaml | kubectl apply -f -
 
 # Step 3: Deploy Query Scheduler first (query components dependency)
-echo "  📅 Deploying Query Scheduler..."
+echo "📅 Deploying Query Scheduler..."
 envsubst < k8s/loki/deployments/query-scheduler-deployment.yaml | kubectl apply -f -
-echo "  ⏳ Waiting for Query Scheduler to be ready..."
+echo "Waiting for Query Scheduler to be ready..."
 kubectl wait --for=condition=ready pod -l app=loki-query-scheduler -n loki --timeout=60s
 
 # Step 4: Deploy Query Frontend and Querier
-echo "  🎯 Deploying Query Frontend..."
+echo "🎯 Deploying Query Frontend..."
 envsubst < k8s/loki/deployments/query-frontend-deployment.yaml | kubectl apply -f -
-echo "  🔍 Deploying Querier..."
+echo "🔍 Deploying Querier..."
 envsubst < k8s/loki/deployments/querier-deployment.yaml | kubectl apply -f -
 
 # Step 5: Deploy remaining components
-echo "  📏 Deploying Ruler..."
+echo "📏 Deploying Ruler..."
 envsubst < k8s/loki/deployments/ruler-deployment.yaml | kubectl apply -f -
-echo "  🏛️ Deploying Index Gateway..."
+echo "🏛️ Deploying Index Gateway..."
 envsubst < k8s/loki/deployments/index-gateway-deployment.yaml | kubectl apply -f -
 
+echo ""
+
 # Deploy Fluent Bit for log collection
-echo "  📝 Deploying Fluent Bit..."
+echo "📝 Fluent Bit"
+echo "Deploying Fluent Bit..."
 kubectl apply -f k8s/fluent-bit/rbac/
 for file in k8s/fluent-bit/*.yaml; do
-    echo "    Deploying $(basename "$file")..."
+    echo "Deploying $(basename "$file")..."
     envsubst < "$file" | kubectl apply -f -
 done
+
+echo ""
 
 # Deploy Prometheus for metrics collection
-echo "  📈 Deploying Prometheus..."
+echo "📈 Prometheus"
+echo "Deploying Prometheus..."
 for file in k8s/prometheus/*.yaml; do
-    echo "    Deploying $(basename "$file")..."
+    echo "Deploying $(basename "$file")..."
     envsubst < "$file" | kubectl apply -f -
 done
+
+echo ""
 
 # Deploy Grafana for log visualization
-echo "  📊 Deploying Grafana..."
+echo "📊 Grafana"
+echo "Deploying Grafana..."
 for file in k8s/grafana/*.yaml; do
-    echo "    Deploying $(basename "$file")..."
+    echo "Deploying $(basename "$file")..."
     envsubst < "$file" | kubectl apply -f -
 done
 
+echo ""
+
 # Wait for remaining components
-echo "⏳ Waiting for remaining components to be ready..."
+echo "⏳ Final Health Check"
+echo "Waiting for remaining components to be ready..."
 kubectl wait --for=condition=ready pod -l app=loki-distributor -n loki --timeout=60s
 kubectl wait --for=condition=ready pod -l app=loki-query-frontend -n loki --timeout=60s
 
+echo ""
+
 # Show deployment status
-echo "✅ Deployment complete! Checking status..."
+echo "✅ Deployment Status"
 echo ""
 echo "📊 Pod Status:"
 kubectl get pods -n loki
@@ -199,6 +234,7 @@ echo ""
 echo "🔧 ConfigMap Status:"
 kubectl get configmaps -n loki
 
+echo ""
 echo ""
 echo "🎉 Loki ${LOKI_VERSION} Distributed Microservices Stack is Ready!"
 echo ""
