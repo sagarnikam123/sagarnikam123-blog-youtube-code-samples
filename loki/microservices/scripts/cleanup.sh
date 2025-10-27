@@ -50,15 +50,25 @@ fi
 LOKI_VERSION=$(grep "^export LOKI_VERSION=" ./run-on-minikube.sh | cut -d'"' -f2 2>/dev/null || echo "3.5.x")
 
 echo "🧹 Cleaning up Loki ${LOKI_VERSION} Distributed Microservices Deployment"
+echo ""
 
-# Stop any port forwards
+# ============================================================================
+# 🔌 Port Forward Cleanup
+# ============================================================================
 echo "🔌 Stopping port forwards..."
 pkill -f "kubectl port-forward" 2>/dev/null || true
+echo ""
 
-# Delete components using directory structure
+# ============================================================================
+# 🔍 Loki Components Cleanup
+# ============================================================================
 echo "🔍 Deleting Loki components..."
 kubectl delete -f k8s/loki/deployments/ --ignore-not-found=true
+echo ""
 
+# ============================================================================
+# 📝 Supporting Services Cleanup
+# ============================================================================
 echo "📝 Deleting Fluent Bit..."
 kubectl delete -f k8s/fluent-bit/ --ignore-not-found=true
 kubectl delete -f k8s/fluent-bit/rbac/ --ignore-not-found=true
@@ -68,39 +78,60 @@ kubectl delete -f k8s/grafana/ --ignore-not-found=true
 
 echo "📈 Deleting Prometheus..."
 kubectl delete -f k8s/prometheus/ --ignore-not-found=true
+echo ""
 
-echo "🗄️  Deleting MinIO..."
+# ============================================================================
+# 🗄️ Storage Services Cleanup
+# ============================================================================
+echo "🗄️ Deleting MinIO..."
 kubectl delete job minio-setup -n loki --ignore-not-found=true
 kubectl delete -f k8s/minio/ --ignore-not-found=true
+echo ""
 
-# Delete Services
+# ============================================================================
+# 🌐 Network Services Cleanup
+# ============================================================================
 echo "🌐 Deleting Loki services..."
 kubectl delete -f k8s/loki/services/ --ignore-not-found=true
+echo ""
 
-# Delete ConfigMaps (Loki configs are created dynamically, others deleted with components)
-echo "⚙️  Deleting Loki ConfigMaps..."
+# ============================================================================
+# ⚙️ Configuration Cleanup
+# ============================================================================
+echo "⚙️ Deleting Loki ConfigMaps..."
 kubectl delete configmap distributor-config ingester-config querier-config query-frontend-config query-scheduler-config compactor-config ruler-config index-gateway-config -n loki --ignore-not-found=true
 
-# Delete Secrets
 echo "🔐 Deleting secrets..."
 kubectl delete secret minio-creds -n loki --ignore-not-found=true
+echo ""
 
-# Force delete any stuck pods
+# ============================================================================
+# 🔨 Force Cleanup Stuck Resources
+# ============================================================================
 echo "🔨 Force deleting any stuck pods..."
 kubectl delete pods --all -n loki --force --grace-period=0 2>/dev/null || true
+echo ""
 
-# Delete Storage
+# ============================================================================
+# 💾 Persistent Storage Cleanup
+# ============================================================================
 echo "💾 Deleting Loki storage..."
 kubectl delete -f k8s/loki/storage/ --ignore-not-found=true
+echo ""
 
-# Delete namespace
-echo "🗑️  Deleting namespace..."
+# ============================================================================
+# 🗑️ Namespace Cleanup
+# ============================================================================
+echo "🗑️ Deleting namespace..."
 kubectl delete namespace loki --ignore-not-found=true --timeout=30s || {
     echo "⚠️  Namespace deletion timed out, forcing cleanup..."
     kubectl delete namespace loki --force --grace-period=0 2>/dev/null || true
 }
+echo ""
 
-# Clean up any dangling resources
+# ============================================================================
+# 🧽 Final Cleanup
+# ============================================================================
 echo "🧽 Cleaning up any remaining resources..."
 kubectl delete pv --selector=app=loki --ignore-not-found=true 2>/dev/null || true
 
