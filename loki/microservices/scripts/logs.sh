@@ -132,12 +132,12 @@ check_querier() {
   kubectl logs -n loki -l app=loki-querier --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No querier pods found"
 }
 
-check_query-frontend() {
+check_query_frontend() {
   echo "🎯 QUERY-FRONTEND LOGS:"
   kubectl logs -n loki -l app=loki-query-frontend --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No query-frontend pods found"
 }
 
-check_query-scheduler() {
+check_query_scheduler() {
   echo "📅 QUERY-SCHEDULER LOGS:"
   kubectl logs -n loki -l app=loki-query-scheduler --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No query-scheduler pods found"
 }
@@ -152,7 +152,7 @@ check_ruler() {
   kubectl logs -n loki -l app=loki-ruler --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No ruler pods found"
 }
 
-check_index-gateway() {
+check_index_gateway() {
   echo "🏛️ INDEX-GATEWAY LOGS:"
   kubectl logs -n loki -l app=loki-index-gateway --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No index-gateway pods found"
 }
@@ -162,7 +162,7 @@ check_minio() {
   kubectl logs -n loki -l app=minio --tail=$LOG_LINES 2>/dev/null || echo "  ❌ MinIO not found"
 }
 
-check_fluent-bit() {
+check_fluent_bit() {
   echo "📝 FLUENT BIT LOGS:"
   kubectl logs -n loki -l app=fluent-bit --tail=$LOG_LINES 2>/dev/null || echo "  ❌ No fluent-bit pods found"
 }
@@ -188,19 +188,19 @@ else
   echo ""
   check_querier
   echo ""
-  check_query-frontend
+  check_query_frontend
   echo ""
-  check_query-scheduler
+  check_query_scheduler
   echo ""
   check_compactor
   echo ""
   check_ruler
   echo ""
-  check_index-gateway
+  check_index_gateway
   echo ""
   check_minio
   echo ""
-  check_fluent-bit
+  check_fluent_bit
   echo ""
   check_grafana
   echo ""
