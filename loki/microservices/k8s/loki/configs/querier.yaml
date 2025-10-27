@@ -33,10 +33,11 @@ common:
       secret_access_key: "${MINIO_SECRET_KEY}"
       insecure: true
       s3forcepathstyle: true
-  replication_factor: 1
+  replication_factor: 1  # Set to 1 for single-node development setup (global)
   ring:
     kvstore:
       store: memberlist
+      prefix: collectors/
   compactor_address: "compactor.loki.svc.cluster.local:3100"
 
 memberlist:
