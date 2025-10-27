@@ -1,0 +1,94 @@
+# Prometheus Configuration for Loki Monolithic Stack
+# Scrapes metrics from Loki and Fluent Bit
+
+global:
+  scrape_interval: 15s      # Set the scrape interval to every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'monolithic'
+    environment: 'local'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'
+rule_files:
+  - "alert-rules/*.yml"
+
+# Scrape configuration
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Loki metrics
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['localhost:3100']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'loki-monolithic'
+
+  # Fluent Bit metrics v1
+  - job_name: 'fluent-bit-v1'
+    static_configs:
+      - targets: ['localhost:2020']
+    scrape_interval: 15s
+    metrics_path: /api/v1/metrics/prometheus
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'fluent-bit-v1'
+
+  # Fluent Bit metrics v2
+  - job_name: 'fluent-bit-v2'
+    static_configs:
+      - targets: ['localhost:2020']
+    scrape_interval: 15s
+    metrics_path: /api/v2/metrics/prometheus
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'fluent-bit-v2'
+
+  # Grafana metrics (optional)
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['localhost:3000']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'grafana-local'
+
+  # Node Exporter (if installed)
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['localhost:9100']
+  #   scrape_interval: 30s
+  #   metrics_path: /metrics
+
+# Storage and web configuration are handled via command line flags
+# See start-prometheus.sh for:
+# --storage.tsdb.path=/tmp/prometheus/data
+# --storage.tsdb.retention.time=7d
+# --storage.tsdb.retention.size=1GB
+# --web.listen-address=0.0.0.0:9090
+# --web.enable-lifecycle
+# --web.enable-admin-api
