@@ -175,6 +175,14 @@ See [LABELS.md](LABELS.md) and [CONFIGURATION.md](CONFIGURATION.md) for complete
 
 ## Configuration
 
+### Loki Targets
+
+You can see the complete list of targets for your version of Loki by running Loki with the flag `-list-targets`, for example:
+
+```bash
+docker run docker.io/grafana/loki:3.5.7 -config.file=/etc/loki/local-config.yaml -list-targets
+```
+
 See [CONFIGURATION.md](CONFIGURATION.md) for detailed configuration patterns, component-specific settings, and validation procedures.
 
 ## Deployment
