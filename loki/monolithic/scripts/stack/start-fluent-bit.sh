@@ -5,7 +5,7 @@
 
 # Get script directory and set working directory to monolithic root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MONOLITHIC_DIR="$(dirname "$SCRIPT_DIR")"
+MONOLITHIC_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$MONOLITHIC_DIR"
 
 # 🔧 EDIT THIS VARIABLE TO CHANGE CONFIG:
@@ -29,7 +29,6 @@ FLUENT_BIT_CONFIG="log-scrapers/fluent-bit/conf/fluent-bit-loki-minimal.conf"
 
 echo "🚀 Starting Fluent Bit with: $FLUENT_BIT_CONFIG"
 echo "📊 Metrics available at: http://127.0.0.1:2020/metrics"
-echo "📁 Working directory: $(pwd)"
 echo "🛑 Press Ctrl+C to stop Fluent Bit"
 echo ""
 
