@@ -1,0 +1,526 @@
+# Loki 3.5.x monolithic
+
+# =============================================================================
+# CONFIGURATION SUMMARY
+# =============================================================================
+# Purpose: Loki 3.5.x Development Configuration - Local Filesystem Storage
+# Target: Single-node monolithic deployment for development and testing
+#
+# Key Features:
+# • Target: all (monolithic mode - all components in single process)
+# • Authentication: disabled (auth_enabled: false)
+# • UI: enabled with debug mode for development
+# • Storage: Local filesystem (/tmp/loki/) - non-persistent for testing
+# • KV Store: inmemory (no external dependencies)
+# • Caching: embedded_cache enabled for all query types
+# • Compression: snappy for all gRPC clients and query results
+# • Encoding: protobuf for frontend responses
+# • Retention: 24h for logs, 7d for metrics
+# • Performance: Optimized for development (4 concurrent queries, 1h cache)
+# • Rings: All components use inmemory kvstore with replication_factor=1
+# • Bloom Filters: disabled (not needed for development)
+# • Pattern Ingester: disabled (optional feature)
+# • Index Gateway: simple mode (no ring distribution)
+#
+# Use Cases:
+# ✓ Local development and testing
+# ✓ Learning Loki configuration
+# ✓ Quick prototyping and demos
+# ✗ Production deployments (use S3/persistent storage configs)
+# ✗ Multi-node clusters (use memberlist/consul configs)
+# =============================================================================
+
+# Components to run. Default "all" runs Loki in single binary mode.
+# "read" = querier + query-frontend (all in same process)
+# "write" = distributor + compactor (all in same process)
+# Supported: all, compactor, distributor, ingester, querier, query-scheduler,
+# ingester-querier, query-frontend, index-gateway, ruler, table-manager, read, write
+
+target: all # default = "all"
+
+auth_enabled: false # default = true
+
+server:
+  http_listen_network: tcp
+  http_listen_address: 127.0.0.1  # default = ""
+  http_listen_port: 3100  # default = 3100, change in production if you want
+  grpc_listen_address: 127.0.0.1  # default = ""
+  grpc_listen_port: 9095  # default = 9095
+  report_grpc_codes_in_instrumentation_label_enabled: true  # default = false
+  grpc_server_max_concurrent_streams: 0 # default = 100 (0 = unlimited)
+  log_format: "logfmt"  # default = "logfmt", Valid formats: [logfmt, json]
+  log_level: warn # default = "info", Valid levels: [debug, info, warn, error]
+
+ui:
+  enabled: true # default = false
+  node_name: ${HOSTNAME:-"loki-ui"}  # default = "loki"
+  advertise_addr: 127.0.0.1
+  cluster_name: "loki-local-cluster"
+  debug: true
+  discovery:
+    join_peers: ["127.0.0.1:3100"]
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory # default = "consul", supported - consul, etcd, inmemory, memberlist, multi
+    heartbeat_period: 5s # default = 5s
+    heartbeat_timeout: 1m # default = 1m
+    instance_id: ${HOSTNAME:-"loki-distributor"}
+    instance_port: 9095 # default = 0, defaults to server.grpc-listen-port
+    instance_addr: 127.0.0.1
+
+querier:
+  query_ingesters_within: 3h # default = 3h
+  max_concurrent: 4  # default = 4, 2-core CPU → 4, 4-core CPU → 8
+
+query_scheduler:
+  grpc_client_config:
+    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+  use_scheduler_ring: true  # default = false
+  scheduler_ring:
+    kvstore:
+      store: inmemory  # default = "consul", etcd, inmemory, memberlist, multi
+    heartbeat_period: 15s # default = 15s
+    heartbeat_timeout: 1m  # default = 1m
+    # num_tokens: 128  # default = 128
+    # replication_factor: 1  # default = 3
+    instance_id: ${HOSTNAME:-"loki-query_scheduler"} # default = "<hostname>"
+    instance_port: 9095  # default = 0, defaults to server.grpc-listen-port
+    instance_addr: 127.0.0.1  # default = ""
+
+frontend:
+  query_stats_enabled: true # default = false
+  scheduler_address: 127.0.0.1 # default = ""
+  grpc_client_config:
+    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+  address: 127.0.0.1 # default = ""
+  port: 9095  # default = 0, defaults to server.grpc-listen-port
+  encoding: "protobuf"  # default = "json"
+  compress_responses: true
+
+query_range:
+  align_queries_with_step: true # default = false
+  results_cache:
+    cache:
+      default_validity: 1h # default = 1h
+      embedded_cache:
+        enabled: true # default = false
+    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+  cache_results: true # default = false
+  max_retries: 5  # default = 5
+  parallelise_shardable_queries: true # default = true
+  cache_index_stats_results: true # default = true
+  index_stats_results_cache:
+    cache:
+      default_validity: 1h # default = 1h
+      embedded_cache:
+        enabled: true # default = false
+    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+  cache_volume_results: true # default = true
+  volume_results_cache:
+    cache:
+      default_validity: 1h # default = 1h
+      embedded_cache:
+        enabled: true # default = false
+    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+  cache_instant_metric_results: true # default = false
+  instant_metric_results_cache:
+    cache:
+      default_validity: 1h # default = 1h
+      embedded_cache:
+        enabled: true # default = false
+    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+  instant_metric_query_split_align: true # default = false
+  cache_series_results: true # default = true
+  series_results_cache:
+    cache:
+      default_validity: 1h # default = 1h
+      embedded_cache:
+        enabled: true # default = false
+    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+  cache_label_results: true # default = true
+  label_results_cache:
+    cache:
+      default_validity: 1h # default = 1h
+      embedded_cache:
+        enabled: true # default = false
+    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+
+ruler:
+  ruler_client:
+    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+  evaluation_interval: 1m # default = 1m, How frequently to evaluate rules
+  poll_interval: 1m # default = 1m , How frequently to poll for rule changes
+  storage:
+    type: local # default = '', configdb, azure, gcs, s3, swift, local, bos, cos
+    local:
+      directory: /tmp/loki/rules  # default = ""
+  rule_path: /tmp/loki/rules  # default = "/rules"
+  alertmanager_url: http://127.0.0.1:9093 # default = ""
+  ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 5s # default = 5s
+    heartbeat_timeout: 1m # default = 1m
+    instance_id: ${HOSTNAME:-"loki-ruler"}
+    instance_port: 9095  # default = 0, defaults to server.grpc-listen-port
+    instance_addr: 127.0.0.1  # default = ""
+    num_tokens: 128  # default = 128
+  enable_api: true
+  query_stats_enabled: true # default = false
+  wal:
+    dir: "/tmp/loki/ruler-wal"  # default = "ruler-wal"
+
+ruler_storage:
+  filesystem:
+    dir: "/tmp/loki/rules"  # default = ""
+
+ingester_client:
+  pool_config:
+    health_check_ingesters: false # default = true
+    remote_timeout: 5s  # default = 1s
+  remote_timeout: 5s # default = 5s
+  grpc_client_config:
+    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory # default = "consul", supported - consul, etcd, inmemory, memberlist, multi
+      heartbeat_timeout: 1m # default = 1m
+      replication_factor: 1 # default = 3
+    num_tokens: 128  # default = 128
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    join_after: 0s # default = 0s
+    min_ready_duration: 15s # default = 15s
+    readiness_check_ring_health: false # default = true
+    address: 127.0.0.1  # default = ""
+    port: 9095  # default = 0
+    id: ${HOSTNAME:-"loki-ingester"} # default = "<hostname>"
+  chunk_retain_period: 0s  # To ease recovery, default = 0s
+  chunk_idle_period: 30m  # Close chunks after no more writes, default = 30m
+  chunk_block_size: 262144  # 256KB, default = 262144
+  chunk_target_size: 1572864  # ~1.5MB target chunk size, default = 1572864
+  chunk_encoding: "snappy"  # default = "gzip"
+  max_chunk_age: 2h # default = 2h
+  autoforget_unhealthy: false # default = false
+  sync_period: 1h # default = 1h
+  query_store_max_look_back_period: 0s # default = 0s
+  wal:
+    dir: /tmp/loki/wal
+
+block_builder:
+  concurrent_flushes: 1 # default = 1
+  concurrent_writers: 1 # default = 1
+  chunk_block_size: 256KB # default = 256KB
+  chunk_target_size: 1536KB # default = 1536KB
+  chunk_encoding: "snappy"  # default = "snappy", none, gzip, lz4-64k, snappy, lz4-256k, lz4-1M, lz4, flate, zstd
+  max_chunk_age: 2h # default = 2h
+  scheduler_address: 127.0.0.1  # default = ""
+  scheduler_grpc_client_config:
+    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+
+block_scheduler:
+  lookback_period: 0s # default = 0s
+
+pattern_ingester:
+  enabled: false  # default = false
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory # default = "consul", supported - consul, etcd, inmemory, memberlist, multi
+      heartbeat_timeout: 1m  # default = 1m
+      replication_factor: 1 # default = 1
+    num_tokens: 128 # default = 128
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    min_ready_duration: 15s # default = 15s
+    address: 127.0.0.1  # default = ""
+    port: 9095  # default = 0
+    id: ${HOSTNAME:-"loki-pattern_ingester"} # default = "<hostname>"
+  client_config:
+    pool_config:
+      health_check_ingesters: false # default = true
+      remote_timeout: 5s # default = 5s
+    remote_timeout: 5s # default = 5s
+    grpc_client_config:
+      grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+      connect_timeout: 5s # default = 5s
+  connection_timeout: 2s # default = 2s
+  max_allowed_line_length: 3000 # default = 3000
+
+index_gateway:
+# - 'simple': an index gateway server instance is responsible for handling,
+#             storing and returning requests for all indices for all tenants.
+# - 'ring': an index gateway server instance is responsible for a subset of
+#           tenants instead of all tenants.
+  mode: "simple"  # default = "simple", supported - ring
+  ring:
+    kvstore:
+      store: inmemory  # default = "consul", supported - consul, etcd, inmemory, memberlist, multi
+    heartbeat_period: 15s # default = 15s
+    heartbeat_timeout: 1m  # default = 1m
+    num_tokens: 128  # default = 128
+    replication_factor: 1  # default = 3
+    instance_id: ${HOSTNAME:-"loki-index_gateway"} # default = "<hostname>"
+    instance_port: 9095 # default = 0
+    instance_addr: 127.0.0.1  # default = ""
+
+bloom_build:
+  enabled: false  # default = false
+  planner:
+    planning_interval: 8h # default = 8h
+    retention:
+      enabled: false # default = false
+  builder:
+    grpc_config:
+      grpc_compression: 'snappy'  # default = ""  (disable compression), 'gzip', 'snappy'
+      connect_timeout: 5s # default = 5s
+    planner_address: 127.0.0.1:3100 # default = ""
+    working_directory: "/tmp/loki/blooms" # default = ""
+
+bloom_gateway:
+  enabled: false  # default = false
+  client:
+    grpc_client_config:
+      grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+      connect_timeout: 5s # default = 5s
+    addresses: "127.0.0.1:3100" # default = ""
+  worker_concurrency: 4 # default = 4, set to 1x -number of CPU cores
+  block_query_concurrency: 8 # default = 8, set to 2x number of CPU cores.
+
+storage_config:
+  filesystem:
+    directory: /tmp/loki/chunks
+  index_cache_validity: 5m # default = 5m
+  congestion_control:
+    enabled: false # default = false
+  object_prefix: ""  # default = "", Example: loki/
+  index_queries_cache_config:
+      embedded_cache:
+        enabled: true # default = false
+  disable_broad_index_queries: false # default = false
+  use_thanos_objstore: false # default = false
+  max_chunk_batch_size: 50 # default = 50
+  tsdb_shipper:
+    active_index_directory: /tmp/loki/tsdb-shipper-active # default = ""
+    cache_location: /tmp/loki/tsdb-shipper-cache # default = ""
+    cache_ttl: 24h  # default = 24h
+    index_gateway_client:
+      grpc_client_config:
+        grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+        connect_timeout: 5s # default = 5s
+      server_address: 127.0.0.1:3100 # default = ""
+    ingestername: ${HOSTNAME:-"loki-storage_config"} # default = ""
+
+  bloom_shipper:
+    working_directory: "/tmp/loki/blooms" # default = "/data/blooms"
+    metas_cache:
+      embedded_cache:
+        enabled: true # default = false
+    metas_lru_cache:
+      enabled: true # default = false
+
+chunk_store_config:
+  chunk_cache_config:
+    default_validity: 1h # default = 1h
+    embedded_cache:
+      enabled: true # default = false
+  chunk_cache_config_l2:
+    default_validity: 1h # default = 1h
+    embedded_cache:
+      enabled: true # default = false
+  # write_dedupe_cache_config:
+  #   default_validity: 1h # default = 1h
+  #   embedded_cache:
+  #     enabled: true # default = false
+
+schema_config:
+  configs:
+  - from: 2022-01-01
+    store: tsdb # default = "", tsdb or boltdb-shipper
+    object_store: filesystem  # aws (alias s3), azure, gcs, alibabacloud, bos, cos, swift, filesystem, or a named_store
+    schema: v13 # default = ""
+    index:
+      path_prefix: "index/"  # default = "index/"
+      prefix: index_  # default = ""
+      period: 24h
+    chunks:
+      prefix: chunks_  # default = ""
+      period: 24h
+
+compactor:
+  working_directory: /tmp/loki/compactor
+  compaction_interval: 10m # default = 10m
+  retention_enabled: true # default = false
+  retention_delete_delay: 2h  # default = 2h
+  delete_request_store: filesystem  # default = ""
+  delete_request_store_key_prefix: index/ # default = "index/"
+  delete_request_store_db_type: "boltdb" # default = "boltdb", Supported types: boltdb, sqlite
+  compactor_ring:
+    kvstore:
+      store: inmemory # default = "consul", supported - consul, etcd, inmemory, memberlist, multi
+    heartbeat_period: 15s # default = 15s
+    heartbeat_timeout: 1m # default = 1m
+    # num_tokens: 128 # default = 128
+    replication_factor: 1 # default = 1
+    instance_id: ${HOSTNAME:-"loki-compactor"} # default = "<hostname>"
+    instance_port: 9095 # default = 0
+    instance_addr: 127.0.0.1 # default = ""
+  tables_to_compact: 2  # default = 0
+  skip_latest_n_tables: 0 # default = 0
+
+compactor_grpc_client:
+  grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+  connect_timeout: 5s # default = 5s
+
+limits_config:
+  ingestion_rate_strategy: global # default = "global", supported - local
+  ingestion_rate_mb: 4  # default = 4
+  ingestion_burst_size_mb: 6  # Burst capability for spikes, default = 6
+  reject_old_samples: true
+  reject_old_samples_max_age: 1w  # 7 days, default = 1w
+  max_line_size: 256KB  # default = 256KB
+  max_line_size_truncate: true # default = false
+  increment_duplicate_timestamp: true # default = false
+  discover_log_levels: true # default = true
+  log_level_from_json_max_depth: 2  # default = 2
+  max_query_length: 30d1h # default = 30d1h
+  max_query_range: 0s # default = 0s
+  tsdb_precompute_chunks: true # default = false
+  max_entries_limit_per_query: 5000  # default = 5000
+  query_timeout: 1m # default = 1m
+  split_queries_by_interval: 1h # default = 1h
+  volume_enabled: true # default = true
+  retention_period: 24h  # default = 0s
+  # retention_stream: <list of StreamRetentions>  # Per-stream retention to apply
+  bloom_gateway_enable_filtering: false  # default = false
+  bloom_creation_enabled: false # default = false
+  bloom_prefetch_blocks: false # default = false
+  # otlp_config:
+  metric_aggregation_enabled: false # default = false, __aggregated_metric__ stream
+
+# The frontend_worker configures the worker - running within the Loki querier -
+# picking up and executing queries enqueued by the query-frontend.
+frontend_worker:
+  frontend_address: "127.0.0.1:3100" # default = ""
+  # scheduler_address: "127.0.0.1:3101" # default = ""
+  query_frontend_grpc_client:
+    grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+  # grpc_client_config:
+  #   grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+  #   connect_timeout: 5s # default = 5s
+  query_scheduler_grpc_client:
+    grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+
+# (deprecated)
+table_manager:
+  retention_deletes_enabled: true # default = false
+  retention_period: 24h  # 24 hours retention
+
+# memberlist:
+
+# kafka_config:
+
+# dataobj:
+
+ingest_limits:
+  enabled: false # default = false
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory # default = "consul", supported - consul, etcd, inmemory, memberlist, multi
+      heartbeat_timeout: 1m # default = 1m
+      replication_factor: 1 # default = 3
+    num_tokens: 128
+    heartbeat_period: 15s # default = 15s ? 5s
+    heartbeat_timeout: 1m # default = 1m
+    readiness_check_ring_health: false
+    address: 127.0.0.1  # default = ""
+    port: 9095  # default = 0
+    id: ${HOSTNAME:-"loki-ingest_limits"} # default = "<hostname>"
+  num_partitions: 64 # default = 64
+
+ingest_limits_frontend:
+  client_config:
+    grpc_client_config:
+      grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
+      connect_timeout: 5s # default = 5s
+    pool_config:
+      health_check_ingest_limits: false  # default = true
+      remote_timeout: 1s  # default = 1s
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory # default = "consul", supported - consul, etcd, inmemory, memberlist, multi
+      heartbeat_timeout: 1m # default = 1m
+      replication_factor: 1 # default = 3
+    num_tokens: 128
+    heartbeat_period: 15s # default = 15s ? 5s
+    heartbeat_timeout: 1m # default = 1m
+    readiness_check_ring_health: false
+    address: 127.0.0.1  # default = ""
+    port: 9095  # default = 0
+    id: ${HOSTNAME:-"loki-ingest_limits_frontend"} # default = "<hostname>"
+  recheck_period: 10s
+
+ingest_limits_frontend_client:
+  grpc_client_config:
+    grpc_compression: 'snappy'  # default = ""  (disable compression), 'gzip', 'snappy'
+    connect_timeout: 5s # default = 5s
+  pool_config:
+      health_check_ingest_limits: false  # default = true
+      remote_timeout: 1s  # default = 1s
+
+# runtime_config:
+
+# operational_config:
+
+tracing:
+  enabled: false
+  profiling_enabled: false
+
+analytics:
+  reporting_enabled: false  # default = true
+
+# profiling:
+
+common:
+  path_prefix: /tmp/loki
+  storage:
+    filesystem:
+      chunks_directory: /tmp/loki/chunks
+      rules_directory: /tmp/loki/rules
+    object_store:
+      filesystem:
+        dir: "/tmp/loki"
+  persist_tokens: true
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+      prefix: "collectors/" # default = "collectors/"
+    heartbeat_period: 15s # default = 15s
+    heartbeat_timeout: 1m # default = 1m
+    num_tokens: 128 # default 128
+    replication_factor: 1
+    instance_id: ${HOSTNAME:-"loki-local-common"}
+    instance_port: 9095 # default = 0
+    instance_addr: 127.0.0.1
+  instance_addr: 127.0.0.1
+  compactor_address: "127.0.0.1:3100" # default = ""
+  compactor_grpc_address: "127.0.0.1:9095" # default = ""
+
+# shutdown_delay:
+
+# metrics_namespace:
