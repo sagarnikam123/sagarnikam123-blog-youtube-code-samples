@@ -78,7 +78,7 @@ query_scheduler:
   grpc_client_config:
     grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
-  use_scheduler_ring: true  # default = false
+  use_scheduler_ring: false  # default = false, disabled for monolithic
   scheduler_ring:
     kvstore:
       store: inmemory  # default = "consul", etcd, inmemory, memberlist, multi
@@ -92,7 +92,7 @@ query_scheduler:
 
 frontend:
   query_stats_enabled: true # default = false
-  scheduler_address: 127.0.0.1 # default = ""
+  # scheduler_address: 127.0.0.1 # default = ""
   grpc_client_config:
     grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
@@ -223,7 +223,7 @@ block_builder:
   chunk_target_size: 1536KB # default = 1536KB
   chunk_encoding: "snappy"  # default = "snappy", none, gzip, lz4-64k, snappy, lz4-256k, lz4-1M, lz4, flate, zstd
   max_chunk_age: 2h # default = 2h
-  scheduler_address: 127.0.0.1  # default = ""
+  # scheduler_address: 127.0.0.1  # default = ""
   scheduler_grpc_client_config:
     grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
@@ -243,6 +243,7 @@ pattern_ingester:
     heartbeat_period: 5s  # default = 5s
     heartbeat_timeout: 1m  # default = 1m
     min_ready_duration: 15s # default = 15s
+    readiness_check_ring_health: false  # default = true
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-pattern_ingester"} # default = "<hostname>"
@@ -284,7 +285,7 @@ bloom_build:
     grpc_config:
       grpc_compression: 'snappy'  # default = ""  (disable compression), 'gzip', 'snappy'
       connect_timeout: 5s # default = 5s
-    planner_address: 127.0.0.1:3100 # default = ""
+    planner_address: 127.0.0.1:9095 # default = ""
     working_directory: "/tmp/loki/blooms" # default = ""
 
 bloom_gateway:
@@ -293,7 +294,7 @@ bloom_gateway:
     grpc_client_config:
       grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
       connect_timeout: 5s # default = 5s
-    addresses: "127.0.0.1:3100" # default = ""
+    addresses: "127.0.0.1:9095" # default = ""
   worker_concurrency: 4 # default = 4, set to 1x -number of CPU cores
   block_query_concurrency: 8 # default = 8, set to 2x number of CPU cores.
 
@@ -318,7 +319,7 @@ storage_config:
       grpc_client_config:
         grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
         connect_timeout: 5s # default = 5s
-      server_address: 127.0.0.1:3100 # default = ""
+      server_address: 127.0.0.1:9095 # default = ""
     ingestername: ${HOSTNAME:-"loki-storage_config"} # default = ""
 
   bloom_shipper:
@@ -383,7 +384,7 @@ compactor_grpc_client:
   connect_timeout: 5s # default = 5s
 
 limits_config:
-  ingestion_rate_strategy: global # default = "global", supported - local
+  ingestion_rate_strategy: local # default = "global", supported - local
   ingestion_rate_mb: 4  # default = 4
   ingestion_burst_size_mb: 6  # Burst capability for spikes, default = 6
   reject_old_samples: true
@@ -411,7 +412,7 @@ limits_config:
 # The frontend_worker configures the worker - running within the Loki querier -
 # picking up and executing queries enqueued by the query-frontend.
 frontend_worker:
-  frontend_address: "127.0.0.1:3100" # default = ""
+  frontend_address: "127.0.0.1:9095" # default = ""
   # scheduler_address: "127.0.0.1:3101" # default = ""
   query_frontend_grpc_client:
     grpc_compression: 'snappy'  # default = "" (disable compression), 'gzip', 'snappy'
@@ -445,7 +446,7 @@ ingest_limits:
     num_tokens: 128
     heartbeat_period: 15s # default = 15s ? 5s
     heartbeat_timeout: 1m # default = 1m
-    readiness_check_ring_health: false
+    readiness_check_ring_health: false  # default = true
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-ingest_limits"} # default = "<hostname>"
@@ -468,7 +469,7 @@ ingest_limits_frontend:
     num_tokens: 128
     heartbeat_period: 15s # default = 15s ? 5s
     heartbeat_timeout: 1m # default = 1m
-    readiness_check_ring_health: false
+    readiness_check_ring_health: false  # default = true
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-ingest_limits_frontend"} # default = "<hostname>"
@@ -504,12 +505,12 @@ common:
     object_store:
       filesystem:
         dir: "/tmp/loki"
-  persist_tokens: true
+  persist_tokens: false  # true = persist tokens to disk, false = in-memory only
   replication_factor: 1
   ring:
     kvstore:
       store: inmemory
-      prefix: "collectors/" # default = "collectors/"
+      # prefix: "collectors/" # default = "collectors/"
     heartbeat_period: 15s # default = 15s
     heartbeat_timeout: 1m # default = 1m
     num_tokens: 128 # default 128
