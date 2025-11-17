@@ -3,30 +3,51 @@
 # =============================================================================
 # CONFIGURATION SUMMARY
 # =============================================================================
-# Purpose: Loki 3.5.x Development Configuration - Local Filesystem Storage
-# Target: Single-node monolithic deployment for development and testing
+# Purpose: Loki 3.5.x Comprehensive Development Configuration - Local Filesystem
+# Target: Single-node monolithic deployment with all components enabled
 #
-# Key Features:
+# Core Features:
 # • Target: all (monolithic mode - all components in single process)
 # • Authentication: disabled (auth_enabled: false)
-# • UI: enabled with debug mode for development
-# • Storage: Local filesystem (/tmp/loki/) - non-persistent for testing
-# • KV Store: inmemory (no external dependencies)
-# • Caching: embedded_cache enabled for all query types
+# • UI: enabled with debug mode and cluster discovery
+# • Storage: Local filesystem (/tmp/loki/) with TSDB shipper
+# • Schema: v13 with TSDB store and 24h index/chunk periods
+# • KV Store: inmemory across all rings (no external dependencies)
+#
+# Performance & Caching:
 # • Compression: snappy for all gRPC clients and query results
 # • Encoding: protobuf for frontend responses
-# • Retention: 24h for logs, 7d for metrics
-# • Performance: Optimized for development (4 concurrent queries, 1h cache)
-# • Rings: All components use inmemory kvstore with replication_factor=1
-# • Bloom Filters: disabled (not needed for development)
-# • Pattern Ingester: disabled (optional feature)
-# • Index Gateway: simple mode (no ring distribution)
+# • Caching: embedded_cache enabled for all query types (1h validity)
+# • Query Performance: 4 concurrent queries, 1h cache validity
+# • Chunk Settings: 256KB blocks, ~1.5MB target size, snappy encoding
+#
+# Components & Rings:
+# • Write Path: distributor, ingester, ruler (5s heartbeat, replication_factor=1)
+# • Read Path: querier, query-frontend (no ring participation)
+# • Storage Path: compactor, index-gateway (15s heartbeat, simple mode)
+# • Query Coordination: query-scheduler (disabled ring, 15s heartbeat)
+# • Block Processing: block-builder, block-scheduler (snappy compression)
+#
+# Advanced Features:
+# • Retention: 24h logs with compactor-based deletion
+# • Pattern Ingester: disabled (optional log pattern analysis)
+# • Bloom Filters: disabled (bloom_build, bloom_gateway)
+# • Ingest Limits: disabled (rate limiting components)
+# • TSDB Shipper: active with cache and index gateway client
+# • WAL: enabled for ingester and ruler
+#
+# Monitoring & Observability:
+# • Analytics: disabled (no usage reporting)
+# • Tracing: disabled (no distributed tracing)
+# • Query Stats: enabled across components
+# • Health Checks: disabled for development simplicity
 #
 # Use Cases:
-# ✓ Local development and testing
-# ✓ Learning Loki configuration
-# ✓ Quick prototyping and demos
-# ✗ Production deployments (use S3/persistent storage configs)
+# ✓ Comprehensive Loki feature testing and learning
+# ✓ Local development with all components active
+# ✓ Configuration validation and experimentation
+# ✓ Performance testing with realistic component setup
+# ✗ Production deployments (use persistent storage configs)
 # ✗ Multi-node clusters (use memberlist/consul configs)
 # =============================================================================
 
