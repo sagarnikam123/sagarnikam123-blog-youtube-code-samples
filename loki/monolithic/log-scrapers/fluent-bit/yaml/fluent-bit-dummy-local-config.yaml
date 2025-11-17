@@ -1,0 +1,17 @@
+service:
+    flush: 5
+    log_level: info # off, error, warn, info, debug and trace
+    http_server: on
+    http_listen: 0.0.0.0
+    http_port: 2020
+    log_file: /Users/sagar/data/fluent-bit/fluent_bit.log
+    sp.convert_from_str_to_num: true # If enabled, Stream processor converts from number string to number type
+    json.convert_nan_to_null: true # If enabled, NaN is converted to null when fluent-bit converts msgpack to json.
+pipeline:
+    inputs:
+        - name: dummy
+          dummy: '{"message": "custom dummy"}'
+    outputs:
+        - name: stdout
+          match: '*'
+          format: json_lines # msgpack, json, json_lines and json_stream.
