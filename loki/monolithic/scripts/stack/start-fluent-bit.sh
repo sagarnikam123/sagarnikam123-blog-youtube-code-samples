@@ -9,7 +9,7 @@ MONOLITHIC_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$MONOLITHIC_DIR"
 
 # 🔧 EDIT THIS VARIABLE TO CHANGE CONFIG:
-FLUENT_BIT_CONFIG="log-scrapers/fluent-bit/conf/fluent-bit-loki-minimal.conf"
+FLUENT_BIT_CONFIG="log-scrapers/fluent-bit/yaml/fluent-bit-loki-minimal.yaml"
 
 # Available options:
 # CONF files (recommended):
@@ -25,7 +25,7 @@ FLUENT_BIT_CONFIG="log-scrapers/fluent-bit/conf/fluent-bit-loki-minimal.conf"
 # log-scrapers/fluent-bit/yaml/fluent-bit-json-parsing.yaml              - JSON log parsing
 # log-scrapers/fluent-bit/yaml/fluent-bit-filesystem-storage.yaml        - Basic filesystem storage
 # log-scrapers/fluent-bit/yaml/fluent-bit-dummy-local-config.yaml        - Dummy data (YAML)
-# log-scrapers/fluent-bit/yaml/fluen-bit-loki-minimal.yaml               - Minimal Loki (YAML)
+# log-scrapers/fluent-bit/yaml/fluent-bit-loki-minimal.yaml              - Minimal Loki (YAML)
 
 echo "🚀 Starting Fluent Bit with: $FLUENT_BIT_CONFIG"
 echo "📊 Metrics available at: http://127.0.0.1:2020/metrics"
