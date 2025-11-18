@@ -5,7 +5,7 @@
 
 # Get script directory and set working directory to monolithic root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MONOLITHIC_DIR="$(dirname "$SCRIPT_DIR")"
+MONOLITHIC_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$MONOLITHIC_DIR"
 
 # Configuration file
@@ -19,7 +19,6 @@ mkdir -p "$PROMETHEUS_DATA_DIR"
 
 echo "🚀 Starting Prometheus..."
 echo "📊 Web UI available at: http://127.0.0.1:9090"
-echo "📁 Working directory: $(pwd)"
 echo "⚙️  Configuration: $PROMETHEUS_CONFIG"
 echo "💾 Data directory: $PROMETHEUS_DATA_DIR"
 echo "🛑 Press Ctrl+C to stop Prometheus"

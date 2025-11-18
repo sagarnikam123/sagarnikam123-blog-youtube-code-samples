@@ -16,7 +16,6 @@ ALLOY_DATA_DIR="${ALLOY_DATA_DIR:-$HOME/data/alloy}"
 mkdir -p "$ALLOY_DATA_DIR"
 
 echo "🚀 Starting Grafana Alloy..."
-echo "📁 Working directory: $(pwd)"
 echo "⚙️  Configuration: $ALLOY_CONFIG"
 echo "💾 Data directory: $ALLOY_DATA_DIR"
 echo "🛑 Press Ctrl+C to stop Alloy"

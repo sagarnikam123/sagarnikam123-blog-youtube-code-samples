@@ -16,7 +16,6 @@ VECTOR_DATA_DIR="${VECTOR_DATA_DIR:-$HOME/data/vector}"
 mkdir -p "$VECTOR_DATA_DIR/buffer" "$VECTOR_DATA_DIR/data"
 
 echo "🚀 Starting Vector..."
-echo "📁 Working directory: $(pwd)"
 echo "⚙️  Configuration: $VECTOR_CONFIG"
 echo "💾 Data directory: $VECTOR_DATA_DIR"
 echo "🌐 API available at: http://127.0.0.1:8686"
