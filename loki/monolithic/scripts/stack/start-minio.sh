@@ -50,6 +50,7 @@ if kill -0 $MINIO_PID 2>/dev/null; then
     echo "🌐 MinIO API: http://127.0.0.1:9000"
     echo "🖥️  MinIO Console: http://127.0.0.1:9001"
     echo "🔑 Credentials: minioadmin/minioadmin"
+    echo ""
 else
     echo "❌ MinIO OSS failed to start"
     echo "📝 Try using Docker version: ./start-minio-oss.sh"
@@ -85,6 +86,7 @@ else
     echo "❌ Failed to install MinIO client"
     echo "   Buckets need to be created manually via web console"
 fi
+echo ""
 
 echo ""
 echo "✅ MinIO setup completed"
