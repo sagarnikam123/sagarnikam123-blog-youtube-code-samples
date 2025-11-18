@@ -42,7 +42,7 @@
 # • Health Checks: enabled for ingester ring health
 #
 # Advanced Features:
-# • Retention: 24h logs with S3-based compactor deletion
+# • Retention: 168h/7days logs with S3-based compactor deletion
 # • Pattern Ingester: disabled (optional log pattern analysis)
 # • Bloom Filters: disabled (bloom_build, bloom_gateway)
 # • Ingest Limits: disabled (rate limiting components)
@@ -62,6 +62,10 @@
 # ✓ MinIO integration and bucket management
 # ✗ True production deployments (use external MinIO/S3)
 # ✗ Multi-node clusters (single-node memberlist configuration)
+#
+# Note:
+# 1. If you have a lifecycle policy configured on the object store, please ensure that it is longer than the retention period.
+#
 # =============================================================================
 
 # Components to run. Default "all" runs Loki in single binary mode.
@@ -114,7 +118,7 @@ querier:
 
 query_scheduler:
   grpc_client_config:
-    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    grpc_compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
   use_scheduler_ring: false  # default = false, disabled for monolithic
   scheduler_ring:
@@ -132,7 +136,7 @@ frontend:
   query_stats_enabled: true # default = false
   # scheduler_address: 127.0.0.1 # default = ""
   grpc_client_config:
-    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    grpc_compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
   address: 127.0.0.1 # default = ""
   port: 9095  # default = 0, defaults to server.grpc-listen-port
@@ -146,7 +150,7 @@ query_range:
       default_validity: 1h # default = 1h
       embedded_cache:
         enabled: true # default = false
-    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
   cache_results: true # default = false
   max_retries: 5  # default = 5
   parallelise_shardable_queries: true # default = true
@@ -156,21 +160,21 @@ query_range:
       default_validity: 1h # default = 1h
       embedded_cache:
         enabled: true # default = false
-    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
   cache_volume_results: true # default = true
   volume_results_cache:
     cache:
       default_validity: 1h # default = 1h
       embedded_cache:
         enabled: true # default = false
-    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
   cache_instant_metric_results: true # default = false
   instant_metric_results_cache:
     cache:
       default_validity: 1h # default = 1h
       embedded_cache:
         enabled: true # default = false
-    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
   instant_metric_query_split_align: true # default = false
   cache_series_results: true # default = true
   series_results_cache:
@@ -178,18 +182,18 @@ query_range:
       default_validity: 1h # default = 1h
       embedded_cache:
         enabled: true # default = false
-    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
   cache_label_results: true # default = true
   label_results_cache:
     cache:
       default_validity: 1h # default = 1h
       embedded_cache:
         enabled: true # default = false
-    compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
 
 ruler:
   ruler_client:
-    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    grpc_compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
   evaluation_interval: 1m # default = 1m, How frequently to evaluate rules
   poll_interval: 1m # default = 1m , How frequently to poll for rule changes
@@ -234,7 +238,7 @@ ingester_client:
     remote_timeout: 5s  # default = 1s
   remote_timeout: 5s # default = 5s
   grpc_client_config:
-    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    grpc_compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
 
 ingester:
@@ -249,15 +253,15 @@ ingester:
     heartbeat_timeout: 1m  # default = 1m
     join_after: 0s # default = 0s
     min_ready_duration: 15s # default = 15s
-    readiness_check_ring_health: false # default = true
+    readiness_check_ring_health: true # default = true
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-ingester"} # default = "<hostname>"
   chunk_retain_period: 0s  # To ease recovery, default = 0s
   chunk_idle_period: 30m  # Close chunks after no more writes, default = 30m
-  chunk_block_size: 262144  # 256KB, default = 262144
+  chunk_block_size: 262144  # default = 262144, 256KB
   chunk_target_size: 1572864  # ~1.5MB target chunk size, default = 1572864
-  chunk_encoding: "snappy"  # default = "gzip"
+  chunk_encoding: 'snappy'  # default = 'gzip'
   max_chunk_age: 2h # default = 2h
   autoforget_unhealthy: false # default = false
   sync_period: 1h # default = 1h
@@ -274,7 +278,7 @@ block_builder:
   max_chunk_age: 2h # default = 2h
   # scheduler_address: 127.0.0.1  # default = ""
   scheduler_grpc_client_config:
-    grpc_compression: 'snappy'  # default = '' (disable compression), 'gzip', 'snappy'
+    grpc_compression: 'snappy'  # default = '' (disable compression), supported: 'gzip', 'snappy'
     connect_timeout: 5s # default = 5s
 
 block_scheduler:
@@ -467,6 +471,7 @@ limits_config:
   increment_duplicate_timestamp: true # default = false
   discover_log_levels: true # default = true
   log_level_from_json_max_depth: 2  # default = 2
+  max_query_lookback: 168h # default = 0s,  less than or equal to what is set in limits_config.retention_period or table_manager.retention_period
   max_query_length: 30d1h # default = 30d1h
   max_query_range: 0s # default = 0s
   tsdb_precompute_chunks: true # default = false
@@ -474,7 +479,8 @@ limits_config:
   query_timeout: 1m # default = 1m
   split_queries_by_interval: 1h # default = 1h
   volume_enabled: true # default = true
-  retention_period: 24h  # default = 0s
+  # retention period must be a multiple of the index and chunks table period, configured in the period_config block
+  retention_period: 168h  # default = 0s, minimum retention period is 24h,
   # retention_stream: <list of StreamRetentions>  # Per-stream retention to apply
   bloom_gateway_enable_filtering: false  # default = false
   bloom_creation_enabled: false # default = false
@@ -498,9 +504,11 @@ frontend_worker:
     connect_timeout: 5s # default = 5s
 
 # (deprecated)
-table_manager:
-  retention_deletes_enabled: true # default = false
-  retention_period: 24h  # 24 hours retention
+# Table manager is only needed if you are using a multi-store backend. If you are using either TSDB (recommended),
+# or BoltDB (deprecated) you do not need the Table Manager.
+# table_manager:
+#   retention_deletes_enabled: true # default = false
+#   retention_period: 168h  # 7 days retention
 
 memberlist:
   node_name: ${HOSTNAME:-"loki-memberlist"} # default = ""
@@ -528,7 +536,7 @@ ingest_limits:
     num_tokens: 128
     heartbeat_period: 15s # default = 15s ? 5s
     heartbeat_timeout: 1m # default = 1m
-    readiness_check_ring_health: false
+    readiness_check_ring_health: true
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-ingest_limits"} # default = "<hostname>"
@@ -551,7 +559,7 @@ ingest_limits_frontend:
     num_tokens: 128
     heartbeat_period: 15s # default = 15s ? 5s
     heartbeat_timeout: 1m # default = 1m
-    readiness_check_ring_health: false
+    readiness_check_ring_health: true
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-ingest_limits_frontend"} # default = "<hostname>"
