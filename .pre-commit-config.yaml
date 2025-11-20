@@ -7,6 +7,7 @@ repos:
       - id: fix-byte-order-marker      # fixes byte order marker
       - id: mixed-line-ending          # ensures consistent line endings
       - id: check-yaml                 # validates YAML syntax
+        args: ['--allow-multiple-documents']
       - id: check-json                 # validates JSON syntax
       - id: check-xml                  # validates XML syntax
       - id: pretty-format-json         # formats JSON files
