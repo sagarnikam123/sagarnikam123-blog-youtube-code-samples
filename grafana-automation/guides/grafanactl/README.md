@@ -385,13 +385,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup grafanactl
         run: |
           wget https://github.com/grafana/grafanactl/releases/latest/download/grafanactl-linux-amd64
           chmod +x grafanactl-linux-amd64
           sudo mv grafanactl-linux-amd64 /usr/local/bin/grafanactl
-      
+
       - name: Deploy to Grafana
         env:
           GRAFANA_SERVER: ${{ secrets.GRAFANA_URL }}
@@ -432,7 +432,7 @@ grafanactl apply -f grafana-backup/
    ```bash
    # Check configuration
    grafanactl config check
-   
+
    # Set required variables
    export GRAFANA_SERVER="http://localhost:3000"
    export GRAFANA_ORG_ID="1"

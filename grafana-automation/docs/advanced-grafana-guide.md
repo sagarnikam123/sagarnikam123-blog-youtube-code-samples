@@ -73,11 +73,11 @@ import json
 class AdvancedDashboardFactory:
     def __init__(self, datasource="Prometheus"):
         self.datasource = datasource
-    
+
     def create_service_dashboard(self, service_name, metrics_config):
         panels = []
         y_pos = 0
-        
+
         # SLI Panels
         for sli_name, sli_config in metrics_config.get('slis', {}).items():
             panel = self._create_sli_panel(
@@ -88,7 +88,7 @@ class AdvancedDashboardFactory:
             )
             panels.append(panel)
             y_pos += 8
-        
+
         # Error Budget Panel
         if 'slo_target' in metrics_config:
             error_budget_panel = self._create_error_budget_panel(
@@ -96,7 +96,7 @@ class AdvancedDashboardFactory:
             )
             panels.append(error_budget_panel)
             y_pos += 8
-        
+
         # Dependency Panels
         for dep_name, dep_config in metrics_config.get('dependencies', {}).items():
             dep_panel = self._create_dependency_panel(
@@ -104,10 +104,10 @@ class AdvancedDashboardFactory:
             )
             panels.append(dep_panel)
             y_pos += 8
-        
+
         # Create template variables
         templates = self._create_service_templates(service_name)
-        
+
         return Dashboard(
             title=f"{service_name} Service Dashboard",
             tags=["service", service_name, "sli", "slo"],
@@ -116,7 +116,7 @@ class AdvancedDashboardFactory:
             time={"from": "now-1h", "to": "now"},
             refresh="30s"
         )
-    
+
     def _create_sli_panel(self, title, expr, threshold=None, y=0):
         panel = Stat(
             title=title,
@@ -124,15 +124,15 @@ class AdvancedDashboardFactory:
             targets=[PrometheusTarget(expr=expr, refId="A")],
             gridPos={"h": 8, "w": 6, "x": 0, "y": y}
         )
-        
+
         if threshold:
             panel.thresholds = [
                 {"color": "green", "value": None},
                 {"color": "red", "value": threshold}
             ]
-        
+
         return panel
-    
+
     def _create_error_budget_panel(self, service_name, slo_target, y):
         return Graph(
             title=f"{service_name} Error Budget",
@@ -149,7 +149,7 @@ class AdvancedDashboardFactory:
                 {"min": 0, "max": 1, "unit": "percentunit"}
             ]
         )
-    
+
     def _create_dependency_panel(self, service_name, dep_name, dep_config, y):
         return Graph(
             title=f"{service_name} -> {dep_name} Dependency",
@@ -168,7 +168,7 @@ class AdvancedDashboardFactory:
             ],
             gridPos={"h": 8, "w": 12, "x": 12, "y": y}
         )
-    
+
     def _create_service_templates(self, service_name):
         return [
             Template(
@@ -233,7 +233,7 @@ class ServiceDashboardGenerator:
             title=f"{service_name} Service Dashboard",
             tags=["service", service_name]
         )
-    
+
     def add_golden_signals(self):
         # Latency
         latency_panel = Panel(
@@ -254,7 +254,7 @@ class ServiceDashboardGenerator:
             y_axes=[{"unit": "s"}]
         )
         self.dash_gen.add_panel(latency_panel)
-        
+
         # Traffic
         traffic_panel = Panel(
             title="Request Rate",
@@ -269,7 +269,7 @@ class ServiceDashboardGenerator:
             y_axes=[{"unit": "reqps"}]
         )
         self.dash_gen.add_panel(traffic_panel)
-        
+
         # Errors
         error_panel = Panel(
             title="Error Rate",
@@ -284,7 +284,7 @@ class ServiceDashboardGenerator:
             colors=["green", "yellow", "red"]
         )
         self.dash_gen.add_panel(error_panel)
-        
+
         # Saturation
         saturation_panel = Panel(
             title="CPU Usage",
@@ -299,7 +299,7 @@ class ServiceDashboardGenerator:
             y_axes=[{"unit": "percent", "max": 1}]
         )
         self.dash_gen.add_panel(saturation_panel)
-    
+
     def add_business_metrics(self, metrics_config):
         for metric_name, metric_config in metrics_config.items():
             panel = Panel(
@@ -314,7 +314,7 @@ class ServiceDashboardGenerator:
                 ]
             )
             self.dash_gen.add_panel(panel)
-    
+
     def generate(self):
         return self.dash_gen.generate()
 
@@ -485,34 +485,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      
+
       - name: Install dependencies
         run: |
           pip install yamllint jsonschema grafanalib
           wget https://github.com/grafana/grafanactl/releases/latest/download/grafanactl-linux-amd64
           chmod +x grafanactl-linux-amd64
           sudo mv grafanactl-linux-amd64 /usr/local/bin/grafanactl
-      
+
       - name: Lint YAML files
         run: yamllint $GRAFANA_CONFIG_DIR/
-      
+
       - name: Validate JSON dashboards
         run: |
           find $GRAFANA_CONFIG_DIR/ -name "*.json" -exec jq . {} \;
-      
+
       - name: Validate Grafana configs
         run: grafanactl validate $GRAFANA_CONFIG_DIR/
-      
+
       - name: Generate dashboards from code
         run: |
           cd $GRAFANA_CONFIG_DIR/generators
           python generate_all_dashboards.py
-      
+
       - name: Upload generated dashboards
         uses: actions/upload-artifact@v3
         with:
@@ -526,13 +526,13 @@ jobs:
     environment: development
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Download generated dashboards
         uses: actions/download-artifact@v3
         with:
           name: generated-dashboards
           path: $GRAFANA_CONFIG_DIR/generated/
-      
+
       - name: Deploy to dev
         env:
           GRAFANA_URL: ${{ secrets.DEV_GRAFANA_URL }}
@@ -548,13 +548,13 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Download generated dashboards
         uses: actions/download-artifact@v3
         with:
           name: generated-dashboards
           path: $GRAFANA_CONFIG_DIR/generated/
-      
+
       - name: Deploy to production
         env:
           GRAFANA_URL: ${{ secrets.PROD_GRAFANA_URL }}
@@ -563,14 +563,14 @@ jobs:
           # Deploy with confirmation
           grafanactl apply -f $GRAFANA_CONFIG_DIR/ --confirm
           grafanactl apply -f $GRAFANA_CONFIG_DIR/generated/ --confirm
-      
+
       - name: Verify deployment
         env:
           GRAFANA_URL: ${{ secrets.PROD_GRAFANA_URL }}
           GRAFANA_TOKEN: ${{ secrets.PROD_GRAFANA_TOKEN }}
         run: |
           python scripts/verify_deployment.py
-      
+
       - name: Notify deployment
         if: always()
         run: |
@@ -704,7 +704,7 @@ create_resource() {
     local resource_file=$2
     local max_retries=3
     local retry_count=0
-    
+
     while [ $retry_count -lt $max_retries ]; do
         if curl -s -X POST "$GRAFANA_URL/api/$resource_type" \
            -H "Authorization: Bearer $GRAFANA_TOKEN" \
@@ -718,7 +718,7 @@ create_resource() {
             sleep 2
         fi
     done
-    
+
     echo "❌ Failed to create $resource_type from $resource_file after $max_retries retries"
     return 1
 }
@@ -829,7 +829,7 @@ class GrafanaDriftDetector:
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
         }
-    
+
     def get_live_dashboard(self, uid):
         response = requests.get(
             f"{self.grafana_url}/api/dashboards/uid/{uid}",
@@ -838,7 +838,7 @@ class GrafanaDriftDetector:
         if response.status_code == 200:
             return response.json()["dashboard"]
         return None
-    
+
     def get_live_datasource(self, name):
         response = requests.get(
             f"{self.grafana_url}/api/datasources/name/{name}",
@@ -847,39 +847,39 @@ class GrafanaDriftDetector:
         if response.status_code == 200:
             return response.json()
         return None
-    
+
     def normalize_dashboard(self, dashboard):
         # Remove fields that change automatically
         ignore_fields = ["id", "version", "meta", "schemaVersion"]
         normalized = dashboard.copy()
-        
+
         for field in ignore_fields:
             normalized.pop(field, None)
-        
+
         # Normalize panel IDs (they can change)
         if "panels" in normalized:
             for i, panel in enumerate(normalized["panels"]):
                 panel["id"] = i + 1
-        
+
         return normalized
-    
+
     def normalize_datasource(self, datasource):
         ignore_fields = ["id", "orgId", "version", "readOnly"]
         normalized = datasource.copy()
-        
+
         for field in ignore_fields:
             normalized.pop(field, None)
-        
+
         return normalized
-    
+
     def detect_dashboard_drift(self, config_dir):
         drift_detected = False
-        
+
         for root, dirs, files in os.walk(f"{config_dir}/dashboards"):
             for file in files:
                 if file.endswith(('.json', '.yaml', '.yml')):
                     filepath = os.path.join(root, file)
-                    
+
                     # Load dashboard from file
                     with open(filepath, 'r') as f:
                         if file.endswith('.json'):
@@ -887,43 +887,43 @@ class GrafanaDriftDetector:
                         else:
                             data = yaml.safe_load(f)
                             code_dashboard = data.get('spec', data)
-                    
+
                     # Get UID from dashboard
                     uid = code_dashboard.get('uid')
                     if not uid:
                         print(f"⚠️  No UID found in {filepath}, skipping")
                         continue
-                    
+
                     # Get live dashboard
                     live_dashboard = self.get_live_dashboard(uid)
                     if not live_dashboard:
                         print(f"❌ Dashboard {uid} not found in Grafana")
                         drift_detected = True
                         continue
-                    
+
                     # Normalize and compare
                     normalized_code = self.normalize_dashboard(code_dashboard)
                     normalized_live = self.normalize_dashboard(live_dashboard)
-                    
+
                     diff = DeepDiff(normalized_code, normalized_live, ignore_order=True)
-                    
+
                     if diff:
                         print(f"⚠️  Configuration drift detected in dashboard {uid} ({filepath})")
                         print(f"   Differences: {diff}")
                         drift_detected = True
                     else:
                         print(f"✅ Dashboard {uid} matches code version")
-        
+
         return drift_detected
-    
+
     def detect_datasource_drift(self, config_dir):
         drift_detected = False
-        
+
         for root, dirs, files in os.walk(f"{config_dir}/datasources"):
             for file in files:
                 if file.endswith(('.json', '.yaml', '.yml')):
                     filepath = os.path.join(root, file)
-                    
+
                     # Load datasource from file
                     with open(filepath, 'r') as f:
                         if file.endswith('.json'):
@@ -931,51 +931,51 @@ class GrafanaDriftDetector:
                         else:
                             data = yaml.safe_load(f)
                             code_datasource = data.get('spec', data)
-                    
+
                     # Get name from datasource
                     name = code_datasource.get('name')
                     if not name:
                         print(f"⚠️  No name found in {filepath}, skipping")
                         continue
-                    
+
                     # Get live datasource
                     live_datasource = self.get_live_datasource(name)
                     if not live_datasource:
                         print(f"❌ Datasource {name} not found in Grafana")
                         drift_detected = True
                         continue
-                    
+
                     # Normalize and compare
                     normalized_code = self.normalize_datasource(code_datasource)
                     normalized_live = self.normalize_datasource(live_datasource)
-                    
+
                     diff = DeepDiff(normalized_code, normalized_live, ignore_order=True)
-                    
+
                     if diff:
                         print(f"⚠️  Configuration drift detected in datasource {name} ({filepath})")
                         print(f"   Differences: {diff}")
                         drift_detected = True
                     else:
                         print(f"✅ Datasource {name} matches code version")
-        
+
         return drift_detected
 
 def main():
     grafana_url = os.environ.get('GRAFANA_URL', 'http://localhost:3000')
     grafana_token = os.environ.get('GRAFANA_TOKEN')
     config_dir = os.environ.get('CONFIG_DIR', './grafana-config')
-    
+
     if not grafana_token:
         print("❌ GRAFANA_TOKEN environment variable is required")
         sys.exit(1)
-    
+
     detector = GrafanaDriftDetector(grafana_url, grafana_token)
-    
+
     print("🔍 Detecting configuration drift...")
-    
+
     dashboard_drift = detector.detect_dashboard_drift(config_dir)
     datasource_drift = detector.detect_datasource_drift(config_dir)
-    
+
     if dashboard_drift or datasource_drift:
         print("💥 Configuration drift detected!")
         sys.exit(1)
@@ -1022,7 +1022,7 @@ from generators.dashboard_factory import AdvancedDashboardFactory
 class TestDashboardGeneration(unittest.TestCase):
     def setUp(self):
         self.factory = AdvancedDashboardFactory()
-    
+
     def test_service_dashboard_generation(self):
         config = {
             'slis': {
@@ -1032,19 +1032,19 @@ class TestDashboardGeneration(unittest.TestCase):
                 }
             }
         }
-        
+
         dashboard = self.factory.create_service_dashboard("test", config)
         dashboard_json = dashboard.to_json_data()
-        
+
         # Validate structure
         self.assertIn('title', dashboard_json)
         self.assertIn('panels', dashboard_json)
         self.assertTrue(len(dashboard_json['panels']) > 0)
-        
+
         # Validate JSON serialization
         json_str = json.dumps(dashboard_json)
         self.assertIsInstance(json_str, str)
-    
+
     def test_template_variables(self):
         templates = self.factory._create_service_templates("test")
         self.assertTrue(len(templates) > 0)
@@ -1064,14 +1064,14 @@ class ParallelDashboardGenerator:
     def __init__(self, max_workers=4):
         self.max_workers = max_workers
         self.lock = threading.Lock()
-    
+
     def generate_service_dashboards(self, services_config):
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
                 executor.submit(self._generate_single_dashboard, service, config): service
                 for service, config in services_config.items()
             }
-            
+
             results = {}
             for future in concurrent.futures.as_completed(futures):
                 service = futures[future]
@@ -1082,9 +1082,9 @@ class ParallelDashboardGenerator:
                         print(f"✅ Generated dashboard for {service}")
                 except Exception as e:
                     print(f"❌ Failed to generate dashboard for {service}: {e}")
-            
+
             return results
-    
+
     def _generate_single_dashboard(self, service, config):
         factory = AdvancedDashboardFactory()
         return factory.create_service_dashboard(service, config)

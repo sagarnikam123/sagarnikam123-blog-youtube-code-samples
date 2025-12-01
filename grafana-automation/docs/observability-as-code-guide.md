@@ -142,10 +142,10 @@ jobs:
     strategy:
       matrix:
         environment: [dev, staging, prod]
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Deploy to ${{ matrix.environment }}
         env:
           GRAFANA_URL: ${{ secrets[format('GRAFANA_URL_{0}', matrix.environment)] }}
@@ -279,7 +279,7 @@ repos:
     hooks:
       - id: yamllint
         args: [-c=.yamllint.yaml]
-  
+
   - repo: local
     hooks:
       - id: grafana-validate
@@ -345,23 +345,23 @@ import sys
 def validate_dashboard(dashboard_data):
     required_fields = ['title', 'panels']
     errors = []
-    
+
     for field in required_fields:
         if field not in dashboard_data:
             errors.append(f"Missing required field: {field}")
-    
+
     if 'panels' in dashboard_data:
         for i, panel in enumerate(dashboard_data['panels']):
             if 'title' not in panel:
                 errors.append(f"Panel {i} missing title")
             if 'targets' not in panel:
                 errors.append(f"Panel {i} missing targets")
-    
+
     return errors
 
 def main():
     errors = []
-    
+
     # Validate YAML dashboards
     for root, dirs, files in os.walk('dashboards'):
         for file in files:
@@ -374,12 +374,12 @@ def main():
                             dashboard_errors = validate_dashboard(data['spec'])
                         else:
                             dashboard_errors = validate_dashboard(data)
-                        
+
                         if dashboard_errors:
                             errors.extend([f"{filepath}: {error}" for error in dashboard_errors])
                     except yaml.YAMLError as e:
                         errors.append(f"{filepath}: YAML parsing error - {e}")
-    
+
     # Validate JSON dashboards
     for root, dirs, files in os.walk('dashboards'):
         for file in files:
@@ -393,7 +393,7 @@ def main():
                             errors.extend([f"{filepath}: {error}" for error in dashboard_errors])
                     except json.JSONDecodeError as e:
                         errors.append(f"{filepath}: JSON parsing error - {e}")
-    
+
     if errors:
         print("Validation errors found:")
         for error in errors:
@@ -589,24 +589,24 @@ def get_live_dashboard(grafana_url, token, uid):
 def compare_dashboards(code_dashboard, live_dashboard):
     # Remove fields that change automatically
     ignore_fields = ["id", "version", "meta"]
-    
+
     for field in ignore_fields:
         live_dashboard.pop(field, None)
-    
+
     return code_dashboard == live_dashboard
 
 def main():
     # Load dashboards from code
     with open("dashboards/api-dashboard.yaml", "r") as f:
         code_dashboard = yaml.safe_load(f)
-    
+
     # Get live dashboard
     live_dashboard = get_live_dashboard(
         "https://grafana.company.com",
         "your-token",
         "api-dashboard-uid"
     )
-    
+
     if not compare_dashboards(code_dashboard, live_dashboard):
         print("⚠️  Configuration drift detected!")
         print("Live dashboard differs from code version")

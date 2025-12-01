@@ -8,7 +8,7 @@
    ```bash
    # Start Grafana
    ./scripts/stack/start-grafana.sh
-   
+
    # Open browser
    open http://localhost:3000
    # Login: admin/admin
@@ -62,7 +62,7 @@
         }
       },
       {
-        "name": "cluster", 
+        "name": "cluster",
         "type": "constant",
         "current": {
           "value": "local",
@@ -71,7 +71,7 @@
       },
       {
         "name": "namespace",
-        "type": "constant", 
+        "type": "constant",
         "current": {
           "value": "default",
           "text": "default"
@@ -94,7 +94,7 @@
 ### **Variable Values for Monolithic**
 - **datasource**: `Prometheus` (your Prometheus datasource name)
 - **cluster**: `local` (constant value)
-- **namespace**: `default` (constant value)  
+- **namespace**: `default` (constant value)
 - **job**: `loki` (or your Loki job name)
 
 ---
@@ -118,7 +118,7 @@ sum(rate(loki_request_duration_seconds_count{job=~"loki.*"}[5m])) by (job)
 # Remove cluster/namespace grouping
 by (cluster, namespace, job) → by (job)
 
-# Simplify job selectors  
+# Simplify job selectors
 {job=~"($namespace)/query-frontend"} → {job=~"loki.*"}
 {job=~"($namespace)/distributor"} → {job=~"loki.*"}
 {job=~"($namespace)/ingester"} → {job=~"loki.*"}
@@ -132,7 +132,7 @@ by (cluster, namespace, job) → by (job)
 ```bash
 # Import these first for basic monitoring
 1. loki-operational.json     # Overall health
-2. loki-reads.json          # Query performance  
+2. loki-reads.json          # Query performance
 3. loki-writes.json         # Ingestion performance
 ```
 
@@ -184,7 +184,7 @@ curl "http://localhost:9090/api/v1/query?query=up{job=~\"loki.*\"}"
 #### **3. Panel query errors**
 ```promql
 # Replace distributed selectors:
-{cluster=~"$cluster",job=~"($namespace)/component"} 
+{cluster=~"$cluster",job=~"($namespace)/component"}
 # With monolithic selectors:
 {job=~"loki.*"}
 ```
@@ -238,7 +238,7 @@ echo "Adapted dashboard saved as: $OUTPUT_FILE"
 
 ### **Panel Validation**:
 - [ ] QPS panels show request rates
-- [ ] Latency panels show response times  
+- [ ] Latency panels show response times
 - [ ] Error rate panels show failure rates
 - [ ] Resource panels show CPU/memory (if node_exporter available)
 

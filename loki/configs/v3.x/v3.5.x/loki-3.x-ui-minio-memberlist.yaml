@@ -2,7 +2,7 @@
 
 # Things to change, cache, compression, grpc_client_config.limit_timeouts, heartbeat_period,
 # kvstore.store, storage_config, schema_config, common.storage, ring.kvstore.store, memberlist settings, compactor settings
-# 
+#
 
 auth_enabled: false
 

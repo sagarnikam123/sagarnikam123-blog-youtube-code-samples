@@ -109,12 +109,12 @@ if curl -s --max-time 5 "http://localhost:$LOKI_HTTP_PORT/ready" >/dev/null 2>&1
     echo "  • Loki Ring Status: http://localhost:$LOKI_HTTP_PORT/ring"
     echo "  • Loki Configuration: http://localhost:$LOKI_HTTP_PORT/config"
     echo "  • Loki Metrics: http://localhost:$LOKI_HTTP_PORT/metrics"
-    
+
     if [[ "$INCLUDE_MINIO" == "true" ]]; then
         echo "  • MinIO Console: http://localhost:$MINIO_CONSOLE_PORT ($MINIO_USER/$MINIO_PASSWORD)"
         echo "  • MinIO API: http://localhost:$MINIO_API_PORT"
     fi
-    
+
     echo ""
     echo "📋 Management Commands:"
     echo "  • View logs: docker-compose logs -f loki"

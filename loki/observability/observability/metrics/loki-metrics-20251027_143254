@@ -2077,10 +2077,10 @@ loki_querier_worker_inflight_queries 0
 # HELP loki_query_frontend_connected_schedulers Number of schedulers this frontend is connected to.
 # TYPE loki_query_frontend_connected_schedulers gauge
 loki_query_frontend_connected_schedulers 1
-# HELP loki_query_frontend_log_result_cache_hit_total 
+# HELP loki_query_frontend_log_result_cache_hit_total
 # TYPE loki_query_frontend_log_result_cache_hit_total counter
 loki_query_frontend_log_result_cache_hit_total 0
-# HELP loki_query_frontend_log_result_cache_miss_total 
+# HELP loki_query_frontend_log_result_cache_miss_total
 # TYPE loki_query_frontend_log_result_cache_miss_total counter
 loki_query_frontend_log_result_cache_miss_total 0
 # HELP loki_query_frontend_partitions Number of time-based partitions (sub-requests) per request

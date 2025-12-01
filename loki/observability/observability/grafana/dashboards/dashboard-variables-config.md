@@ -36,7 +36,7 @@ When importing official dashboards, configure these variables:
         }
       },
       {
-        "name": "namespace", 
+        "name": "namespace",
         "type": "constant",
         "current": {
           "value": "default",
@@ -96,7 +96,7 @@ sum by (route) (rate(loki_request_duration_seconds_count{job="loki"}[5m]))
 # P99 latency
 histogram_quantile(0.99, sum(rate(loki_request_duration_seconds_bucket{job="loki"}[5m])) by (le))
 
-# P95 latency  
+# P95 latency
 histogram_quantile(0.95, sum(rate(loki_request_duration_seconds_bucket{job="loki"}[5m])) by (le))
 
 # Average latency

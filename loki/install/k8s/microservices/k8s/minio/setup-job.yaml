@@ -37,12 +37,12 @@ spec:
         - -c
         - |
           echo "Setting up MinIO alias..."
-          
+
           # Retry logic for MinIO connection
           max_attempts=30
           attempt=1
           connected=false
-          
+
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt/$max_attempts: Connecting to MinIO..."
             if mc alias set minio http://minio:9000 minioadmin minioadmin; then
@@ -55,12 +55,12 @@ spec:
               attempt=$((attempt + 1))
             fi
           done
-          
+
           if [ "$connected" = "false" ]; then
             echo "Failed to connect to MinIO after $max_attempts attempts"
             exit 1
           fi
-          
+
           echo "Creating buckets..."
           mc mb minio/loki-chunks || true
           mc mb minio/loki-ruler || true

@@ -254,10 +254,10 @@ console.log(JSON.stringify(dashboard, null, 2));
 
 ### Advanced Dashboard with Row Panels
 ```typescript
-import { 
-  DashboardBuilder, 
+import {
+  DashboardBuilder,
   RowPanelBuilder,
-  GridPos 
+  GridPos
 } from '@grafana/foundation-sdk/dashboard';
 import { StatPanelBuilder } from '@grafana/foundation-sdk/stat';
 import { TimeseriesPanelBuilder } from '@grafana/foundation-sdk/timeseries';
@@ -340,9 +340,9 @@ console.log(JSON.stringify(dashboard, null, 2));
 
 ### Dashboard with Template Variables
 ```typescript
-import { 
+import {
   DashboardBuilder,
-  VariableBuilder 
+  VariableBuilder
 } from '@grafana/foundation-sdk/dashboard';
 import { TimeseriesPanelBuilder } from '@grafana/foundation-sdk/timeseries';
 import { PrometheusDataqueryBuilder, PrometheusVariableQueryBuilder } from '@grafana/foundation-sdk/prometheus';
@@ -522,7 +522,7 @@ import json
 class DashboardFactory:
     def __init__(self, datasource="Prometheus"):
         self.datasource = datasource
-    
+
     def create_stat_panel(self, title, expr, unit="short", x=0, y=0, w=6, h=8):
         return (StatPanelBuilder()
             .title(title)
@@ -535,7 +535,7 @@ class DashboardFactory:
             ])
             .grid_pos(GridPos(h=h, w=w, x=x, y=y))
             .build())
-    
+
     def create_timeseries_panel(self, title, expr, unit="short", x=0, y=0, w=12, h=8):
         return (TimeseriesPanelBuilder()
             .title(title)
@@ -548,27 +548,27 @@ class DashboardFactory:
             ])
             .grid_pos(GridPos(h=h, w=w, x=x, y=y))
             .build())
-    
+
     def create_system_dashboard(self):
         panels = [
-            self.create_stat_panel("CPU Usage", 
-                "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", 
+            self.create_stat_panel("CPU Usage",
+                "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
                 "percent", 0, 0),
-            self.create_stat_panel("Memory Usage", 
-                "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100", 
+            self.create_stat_panel("Memory Usage",
+                "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
                 "percent", 6, 0),
-            self.create_stat_panel("Disk Usage", 
-                "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100", 
+            self.create_stat_panel("Disk Usage",
+                "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100",
                 "percent", 12, 0),
-            self.create_timeseries_panel("Network Traffic", 
-                "rate(node_network_receive_bytes_total[5m])", 
+            self.create_timeseries_panel("Network Traffic",
+                "rate(node_network_receive_bytes_total[5m])",
                 "Bps", 0, 8)
         ]
-        
+
         dashboard = DashboardBuilder("System Overview")
         for panel in panels:
             dashboard.panel(panel)
-        
+
         return (dashboard
             .tags(["system", "monitoring"])
             .time({"from": "now-1h", "to": "now"})
@@ -688,7 +688,7 @@ func TestDashboardGeneration(t *testing.T) {
     // Validate dashboard structure
     assert.Equal(t, "Test Dashboard", dash.Title)
     assert.Contains(t, dash.Tags, "test")
-    
+
     // Validate JSON serialization
     jsonData, err := json.Marshal(dash)
     assert.NoError(t, err)
@@ -710,17 +710,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
           go-version: '1.21'
-      
+
       - name: Generate Dashboards
         run: |
           cd dashboards
           go run main.go > ../generated-dashboards.json
-      
+
       - name: Deploy to Grafana
         env:
           GRAFANA_URL: ${{ secrets.GRAFANA_URL }}

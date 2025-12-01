@@ -7,7 +7,7 @@ Configuration files for various log scrapers that send logs to Loki.
 ```
 log-scrapers/
 ├── fluent-bit/     # Fluent Bit configurations
-├── vector/         # Vector.dev configurations  
+├── vector/         # Vector.dev configurations
 ├── alloy/          # Grafana Alloy configurations
 └── README.md       # This file
 ```

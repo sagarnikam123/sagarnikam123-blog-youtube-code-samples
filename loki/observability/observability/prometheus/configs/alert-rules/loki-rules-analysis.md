@@ -14,7 +14,7 @@ Downloaded from: https://raw.githubusercontent.com/grafana/loki/refs/heads/main/
 ### **1. Cluster + Job Level Aggregation**
 ```yaml
 cluster_job:loki_request_duration_seconds:99quantile
-cluster_job:loki_request_duration_seconds:50quantile  
+cluster_job:loki_request_duration_seconds:50quantile
 cluster_job:loki_request_duration_seconds:avg
 ```
 
@@ -55,7 +55,7 @@ cluster_namespace_job_route:loki_request_duration_seconds:avg
 
 ### **Rate Aggregations**
 - **Bucket rates**: Pre-computed histogram bucket rates
-- **Sum rates**: Pre-computed duration sum rates  
+- **Sum rates**: Pre-computed duration sum rates
 - **Count rates**: Pre-computed request count rates
 
 ---
@@ -128,7 +128,7 @@ groups:
           description: "Loki P99 latency is {{ $value }}s"
 
       # Request rate alert
-      - alert: LokiHighRequestRate  
+      - alert: LokiHighRequestRate
         expr: sum(rate(loki_request_duration_seconds_count[5m])) > 100
         for: 2m
         labels:
@@ -179,7 +179,7 @@ rate(job:loki_request_duration_seconds_count:sum_rate[5m]) > 50
 ## 📈 Expected Benefits
 
 - **50-80% faster** dashboard loading
-- **Reduced Prometheus load** during peak query times  
+- **Reduced Prometheus load** during peak query times
 - **Consistent metrics** across all dashboards
 - **Efficient alerting** with pre-computed values
 

@@ -11,7 +11,7 @@ discovery.file "local_logs" {
 		},
 		{
 			__path__ = "/var/log/*.log",
-			job      = "system-logs", 
+			job      = "system-logs",
 			env      = "system",
 		},
 	]

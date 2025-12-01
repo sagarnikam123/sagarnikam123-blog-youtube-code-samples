@@ -123,7 +123,7 @@ for: 1h
 # Original (Multi-cluster)
 by (cluster, namespace, job, route)
 
-# Monolithic (Simplified)  
+# Monolithic (Simplified)
 by (job, route)
 ```
 
@@ -156,7 +156,7 @@ by (job, route)
   for: 1m
   severity: critical
 
-# Ingestion failures  
+# Ingestion failures
 - alert: LokiIngestionFailures
   expr: rate(loki_distributor_ingester_append_failures_total[5m]) > 0.1
   for: 5m

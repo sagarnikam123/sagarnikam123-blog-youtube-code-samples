@@ -275,7 +275,7 @@ resource "grafana_dashboard" "system_metrics" {
   config_json = jsonencode({
     title = "System Metrics"
     tags  = ["system", "monitoring"]
-    
+
     panels = [
       {
         id    = 1
@@ -302,12 +302,12 @@ resource "grafana_dashboard" "system_metrics" {
         }
       }
     ]
-    
+
     time = {
       from = "now-1h"
       to   = "now"
     }
-    
+
     refresh = "30s"
   })
 
@@ -323,7 +323,7 @@ locals {
   dashboard_config = {
     title = "Advanced System Dashboard"
     tags  = ["system", "monitoring", "advanced"]
-    
+
     templating = {
       list = [
         {
@@ -353,7 +353,7 @@ locals {
         }
       ]
     }
-    
+
     panels = [
       {
         id    = 1
@@ -406,12 +406,12 @@ locals {
         }
       }
     ]
-    
+
     time = {
       from = "now-6h"
       to   = "now"
     }
-    
+
     refresh = "30s"
   }
 }
@@ -434,7 +434,7 @@ resource "grafana_dashboard" "imported_dashboard" {
 # Multiple dashboards from directory
 resource "grafana_dashboard" "app_dashboards" {
   for_each = fileset("${path.module}/dashboards/apps", "*.json")
-  
+
   config_json = file("${path.module}/dashboards/apps/${each.value}")
   folder      = grafana_folder.applications.id
 }
@@ -454,31 +454,31 @@ resource "grafana_rule_group" "system_alerts" {
   rule {
     name      = "HighCPUUsage"
     condition = "A"
-    
+
     data {
       ref_id = "A"
-      
+
       relative_time_range {
         from = 300
         to   = 0
       }
-      
+
       datasource_uid = grafana_data_source.prometheus.uid
       model = jsonencode({
         expr  = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
         refId = "A"
       })
     }
-    
+
     no_data_state  = "NoData"
     exec_err_state = "Alerting"
     for            = "5m"
-    
+
     annotations = {
       description = "CPU usage is above 80%"
       summary     = "High CPU usage detected"
     }
-    
+
     labels = {
       severity = "warning"
       team     = "infrastructure"
@@ -488,31 +488,31 @@ resource "grafana_rule_group" "system_alerts" {
   rule {
     name      = "HighMemoryUsage"
     condition = "B"
-    
+
     data {
       ref_id = "B"
-      
+
       relative_time_range {
         from = 300
         to   = 0
       }
-      
+
       datasource_uid = grafana_data_source.prometheus.uid
       model = jsonencode({
         expr  = "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100"
         refId = "B"
       })
     }
-    
+
     no_data_state  = "NoData"
     exec_err_state = "Alerting"
     for            = "5m"
-    
+
     annotations = {
       description = "Memory usage is above 85%"
       summary     = "High memory usage detected"
     }
-    
+
     labels = {
       severity = "critical"
       team     = "infrastructure"
@@ -658,28 +658,28 @@ resource "grafana_team_preferences" "devops_preferences" {
 # environments/dev/main.tf
 module "grafana_dev" {
   source = "../../modules/grafana"
-  
+
   environment    = "dev"
   grafana_url    = "http://grafana-dev.company.com"
   grafana_token  = var.dev_grafana_token
-  
+
   prometheus_url = "http://prometheus-dev:9090"
   loki_url      = "http://loki-dev:3100"
-  
+
   alert_enabled = false
 }
 
 # environments/prod/main.tf
 module "grafana_prod" {
   source = "../../modules/grafana"
-  
+
   environment    = "prod"
   grafana_url    = "https://grafana.company.com"
   grafana_token  = var.prod_grafana_token
-  
+
   prometheus_url = "http://prometheus-prod:9090"
   loki_url      = "http://loki-prod:3100"
-  
+
   alert_enabled = true
 }
 ```
@@ -756,12 +756,12 @@ resource "grafana_data_source" "loki" {
 
 resource "grafana_dashboard" "system_overview" {
   count = var.alert_enabled ? 1 : 0
-  
+
   config_json = templatefile("${path.module}/templates/system-dashboard.json.tpl", {
     environment    = var.environment
     prometheus_uid = grafana_data_source.prometheus.uid
   })
-  
+
   folder = grafana_folder.monitoring.id
 }
 ```
@@ -774,7 +774,7 @@ resource "grafana_dashboard" "system_overview" {
 
 locals {
   services = ["api", "database", "cache", "queue"]
-  
+
   service_dashboards = {
     for service in local.services : service => {
       title = "${title(service)} Service Dashboard"
@@ -794,11 +794,11 @@ locals {
 
 resource "grafana_dashboard" "service_dashboards" {
   for_each = local.service_dashboards
-  
+
   config_json = jsonencode({
     title = each.value.title
     tags  = ["service", each.key]
-    
+
     panels = [
       for i, panel in each.value.panels : {
         id    = i + 1
@@ -819,7 +819,7 @@ resource "grafana_dashboard" "service_dashboards" {
       }
     ]
   })
-  
+
   folder = grafana_folder.applications.id
 }
 ```
@@ -830,7 +830,7 @@ resource "grafana_dashboard" "service_dashboards" {
 
 resource "grafana_rule_group" "production_alerts" {
   count = var.environment == "prod" ? 1 : 0
-  
+
   name             = "production-critical-alerts"
   folder_uid       = grafana_folder.monitoring.uid
   interval_seconds = 30
@@ -838,31 +838,31 @@ resource "grafana_rule_group" "production_alerts" {
   rule {
     name      = "ServiceDown"
     condition = "A"
-    
+
     data {
       ref_id = "A"
-      
+
       relative_time_range {
         from = 60
         to   = 0
       }
-      
+
       datasource_uid = grafana_data_source.prometheus.uid
       model = jsonencode({
         expr  = "up{job=\"api\"} == 0"
         refId = "A"
       })
     }
-    
+
     no_data_state  = "Alerting"
     exec_err_state = "Alerting"
     for            = "1m"
-    
+
     annotations = {
       description = "Service is down"
       summary     = "Critical service failure"
     }
-    
+
     labels = {
       severity = "critical"
     }
@@ -885,26 +885,26 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
-      
+
       - name: Terraform Init
         run: terraform init
         working-directory: terraform/grafana
-      
+
       - name: Terraform Plan
         run: terraform plan
         working-directory: terraform/grafana
         env:
           TF_VAR_grafana_token: ${{ secrets.GRAFANA_TOKEN }}
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
-      
+
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve
@@ -972,7 +972,7 @@ terraform {
 ```hcl
 locals {
   name_prefix = "${var.environment}-${var.project}"
-  
+
   common_tags = {
     Environment = var.environment
     Project     = var.project
@@ -1010,7 +1010,7 @@ locals {
 variable "environment" {
   description = "Environment name"
   type        = string
-  
+
   validation {
     condition     = contains(["dev", "staging", "prod"], var.environment)
     error_message = "Environment must be dev, staging, or prod."
@@ -1033,7 +1033,7 @@ variable "environment" {
    ```bash
    # Import existing dashboard
    terraform import grafana_dashboard.existing <dashboard-uid>
-   
+
    # Import existing datasource
    terraform import grafana_data_source.existing <datasource-id>
    ```
@@ -1042,7 +1042,7 @@ variable "environment" {
    ```bash
    # Refresh state
    terraform refresh
-   
+
    # Remove resource from state
    terraform state rm grafana_dashboard.problematic
    ```

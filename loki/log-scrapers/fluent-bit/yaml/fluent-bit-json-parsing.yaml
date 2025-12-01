@@ -30,4 +30,3 @@ pipeline:
       host: 127.0.0.1
       port: 3100
       labels: service_name=fluent-bit,source=fuzzy-train-log,log_type=application,log_format=json
-

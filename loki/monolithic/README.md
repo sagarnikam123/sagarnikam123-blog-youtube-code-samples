@@ -65,7 +65,7 @@ loki/monolithic/
 - Basic Loki setup with essential components
 - Perfect for learning and testing
 
-### Production Configs  
+### Production Configs
 - Full ring configuration with all components
 - Optimized for production workloads
 
@@ -77,7 +77,7 @@ loki/monolithic/
 
 Access the observability stack:
 - **Loki**: http://localhost:3100
-- **Prometheus**: http://localhost:9090  
+- **Prometheus**: http://localhost:9090
 - **Grafana**: http://localhost:3000
 
 ## 🛠️ Scripts

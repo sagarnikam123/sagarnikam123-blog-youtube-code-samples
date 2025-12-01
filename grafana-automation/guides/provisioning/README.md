@@ -378,7 +378,7 @@ policies:
         group_wait: 5s
         group_interval: 2m
         repeat_interval: 1h
-        
+
       # Service-specific routing
       - receiver: database-team
         object_matchers:
@@ -386,7 +386,7 @@ policies:
         group_wait: 15s
         group_interval: 5m
         repeat_interval: 6h
-        
+
       # Time-based routing (business hours)
       - receiver: slack-business-hours
         object_matchers:

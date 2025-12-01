@@ -104,12 +104,12 @@ if curl -s --max-time 5 "http://localhost:3100/ready" >/dev/null 2>&1; then
     echo "  • Loki Ring Status: http://localhost:3100/ring"
     echo "  • Loki Configuration: http://localhost:3100/config"
     echo "  • Loki Metrics: http://localhost:3100/metrics"
-    
+
     if [[ "$INCLUDE_MINIO" == "true" ]]; then
         echo "  • MinIO Console: http://localhost:9001 (minioadmin/minioadmin)"
         echo "  • MinIO API: http://localhost:9000"
     fi
-    
+
     echo ""
     echo "📋 Management Commands:"
     echo "  • View logs: $COMPOSE_CMD logs -f loki"

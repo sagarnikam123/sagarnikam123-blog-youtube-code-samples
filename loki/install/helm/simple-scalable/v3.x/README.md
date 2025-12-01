@@ -5,7 +5,7 @@ Latest Loki 3.x simple scalable configurations with enhanced features.
 ## Available Configurations
 
 - `loki-3.x.x-read-config.yaml` - Read service (query-frontend, querier)
-- `loki-3.x.x-write-config.yaml` - Write service (distributor, ingester)  
+- `loki-3.x.x-write-config.yaml` - Write service (distributor, ingester)
 - `loki-3.x.x-backend-config.yaml` - Backend service (compactor, ruler, index-gateway, query-scheduler)
 
 ## New Features
@@ -34,7 +34,7 @@ target: read
 # Write service
 target: write
 
-# Backend service  
+# Backend service
 target: backend
 ```
 

@@ -14,11 +14,11 @@ check_endpoint() {
     local component=$1
     local endpoint=$2
     local description=$3
-    
+
     echo
     echo "📡 $description ($component$endpoint)"
     echo "----------------------------------------"
-    
+
     kubectl -n $NAMESPACE exec deployment/loki-$component -- wget -q -O - http://localhost:3100$endpoint 2>/dev/null || echo "❌ Failed to fetch endpoint"
 }
 
@@ -27,11 +27,11 @@ check_statefulset_endpoint() {
     local component=$1
     local endpoint=$2
     local description=$3
-    
+
     echo
     echo "📡 $description ($component$endpoint)"
     echo "----------------------------------------"
-    
+
     kubectl -n $NAMESPACE exec statefulset/loki-$component -- wget -q -O - http://localhost:3100$endpoint 2>/dev/null || echo "❌ Failed to fetch endpoint"
 }
 

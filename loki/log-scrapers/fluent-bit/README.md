@@ -27,7 +27,7 @@ Installation is OS-dependent and highly customizable. The installation guide cov
 ### 3. `fluent-bit-tail-logs-filesystem-buffering.conf`
 **Purpose**: Production-ready config with filesystem buffering
 - **Input**: Tail logs with filesystem storage type
-- **Features**: 
+- **Features**:
   - Filesystem buffering for reliability
   - Storage metrics enabled
   - Retry logic with high retry limit
@@ -38,7 +38,7 @@ Installation is OS-dependent and highly customizable. The installation guide cov
 **Purpose**: Loki Canary log collection
 - **Input**: Tail Loki Canary generated logs
 - **Path**: `/Users/sagar/data/loki-canary/*.log`
-- **Features**: 
+- **Features**:
   - Optimized for canary logs
   - Drops single key for clean output
   - Specific labels for canary identification

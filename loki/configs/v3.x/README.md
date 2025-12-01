@@ -5,7 +5,7 @@ Latest Loki 3.x monolithic configurations with new features.
 ## Available Configurations
 
 - `loki-3.x.x-filesystem-inmemory-config.yaml` - Filesystem storage with in-memory components
-- `loki-3.x.x-s3-inmemory-config.yaml` - S3 storage with in-memory components  
+- `loki-3.x.x-s3-inmemory-config.yaml` - S3 storage with in-memory components
 - `loki-3.x.x-ui-minimal-config.yaml` - Minimal UI configuration
 
 ## New Features

@@ -1,6 +1,6 @@
 # Fluent Bit Configuration - Filesystem Buffering with Loki
 # Provides persistent buffering with filesystem storage for backpressure handling
-# 
+#
 # Features:
 # - Filesystem buffering for data integrity
 # - Performance optimizations (batching, buffer sizes)

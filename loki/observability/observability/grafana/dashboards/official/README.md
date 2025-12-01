@@ -18,14 +18,14 @@ Downloaded from: https://github.com/grafana/loki/tree/main/production/loki-mixin
 - **Best For**: Primary monitoring dashboard
 - **Monolithic Relevance**: ⭐⭐⭐⭐⭐ Essential
 
-#### **2. loki-reads.json** (134KB) 
+#### **2. loki-reads.json** (134KB)
 - **Purpose**: Query performance and read path monitoring
 - **Key Metrics**: Query latency, QPS, cache hit rates, query errors
 - **Best For**: Query performance optimization
 - **Monolithic Relevance**: ⭐⭐⭐⭐⭐ Essential
 
 #### **3. loki-writes.json** (78KB)
-- **Purpose**: Ingestion performance and write path monitoring  
+- **Purpose**: Ingestion performance and write path monitoring
 - **Key Metrics**: Ingestion rates, distributor performance, ingester health
 - **Best For**: Ingestion troubleshooting
 - **Monolithic Relevance**: ⭐⭐⭐⭐⭐ Essential
@@ -54,7 +54,7 @@ Downloaded from: https://github.com/grafana/loki/tree/main/production/loki-mixin
 
 #### **7. loki-writes-resources.json** (32KB)
 - **Purpose**: Resource usage for write components (distributor, ingester)
-- **Key Metrics**: CPU, memory, network usage for write path  
+- **Key Metrics**: CPU, memory, network usage for write path
 - **Best For**: Capacity planning for ingestion
 - **Monolithic Relevance**: ⭐⭐⭐ Useful
 
@@ -104,7 +104,7 @@ Downloaded from: https://github.com/grafana/loki/tree/main/production/loki-mixin
 
 ### **Phase 1: Essential (Start Here)**
 1. **loki-operational.json** - Overall health
-2. **loki-reads.json** - Query performance  
+2. **loki-reads.json** - Query performance
 3. **loki-writes.json** - Ingestion performance
 4. **loki-chunks.json** - Storage efficiency
 
@@ -140,7 +140,7 @@ Downloaded from: https://github.com/grafana/loki/tree/main/production/loki-mixin
 ### **2. Variable Configuration**
 Most dashboards use these variables that need configuration:
 - `$cluster` - Set to your cluster name (e.g., "local")
-- `$namespace` - Set to your namespace (e.g., "default") 
+- `$namespace` - Set to your namespace (e.g., "default")
 - `$datasource` - Set to your Prometheus datasource
 
 ### **3. Label Adaptation**
@@ -197,7 +197,7 @@ Dashboards expect distributed Loki labels. For monolithic, you may need to:
 ## 💡 Benefits
 
 ✅ **Production-Ready**: Battle-tested in production environments
-✅ **Comprehensive**: Covers all Loki components and use cases  
+✅ **Comprehensive**: Covers all Loki components and use cases
 ✅ **Best Practices**: Follows Grafana dashboard design principles
 ✅ **Maintained**: Kept up-to-date with latest Loki features
 ✅ **Professional**: High-quality visualizations and layouts

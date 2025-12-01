@@ -10,7 +10,7 @@ services:
     volumes:
       - ../configs:/etc/loki/configs:ro
       - loki-data:/tmp/loki
-    command: 
+    command:
       - -config.file=/etc/loki/configs/v3.x/v3.5.x/loki-3.5.x-ui-filesystem-inmemory.yaml
       - -config.expand-env=true
     environment:

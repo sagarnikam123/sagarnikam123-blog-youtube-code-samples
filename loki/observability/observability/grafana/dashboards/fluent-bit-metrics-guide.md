@@ -30,7 +30,7 @@ fluentbit_input_files_opened_total{name="tail.0"} 4
 
 **📈 Suggested Graphs:**
 - **Input Rate**: `rate(fluentbit_input_records_total[5m])` - **Time Series** (Records per second)
-- **Input Throughput**: `rate(fluentbit_input_bytes_total[5m])` - **Time Series** (Bytes per second)  
+- **Input Throughput**: `rate(fluentbit_input_bytes_total[5m])` - **Time Series** (Bytes per second)
 - **Files Monitored**: `fluentbit_input_files_opened_total` - **Stat Panel** (Number of log files)
 - **Average Record Size**: `fluentbit_input_bytes_total / fluentbit_input_records_total` - **Gauge** (Bytes per record)
 

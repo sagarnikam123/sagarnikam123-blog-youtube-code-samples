@@ -6,7 +6,7 @@ Simple scalable Loki configurations for medium-scale deployments with horizontal
 
 Simple scalable mode groups Loki components into three services for easier scaling:
 - **Read** - Handles queries (query-frontend, querier)
-- **Write** - Handles ingestion (distributor, ingester)  
+- **Write** - Handles ingestion (distributor, ingester)
 - **Backend** - Handles processing (compactor, ruler, index-gateway, query-scheduler)
 
 ## When to Use Simple Scalable Mode
@@ -31,7 +31,7 @@ Simple scalable mode groups Loki components into three services for easier scali
 target: read
 # Components: query-frontend, querier
 
-# Write path - handles ingestion  
+# Write path - handles ingestion
 target: write
 # Components: distributor, ingester
 
@@ -63,7 +63,7 @@ Simple scalable mode uses three targets:
 # Read service
 target: read
 
-# Write service  
+# Write service
 target: write
 
 # Backend service
@@ -91,7 +91,7 @@ wget https://github.com/grafana/loki/releases/download/v3.0.0/loki-linux-amd64.z
 # Start read service
 ./loki -config.file=v3.x/loki-3.x.x-read-config.yaml
 
-# Start write service  
+# Start write service
 ./loki -config.file=v3.x/loki-3.x.x-write-config.yaml
 
 # Start backend service
@@ -104,7 +104,7 @@ wget https://github.com/grafana/loki/releases/download/v3.0.0/loki-linux-amd64.z
 # Scale read components for query performance
 # Run multiple read instances behind load balancer
 
-# Scale write components for ingestion throughput  
+# Scale write components for ingestion throughput
 # Run multiple write instances with consistent hashing
 
 # Scale backend components for processing
