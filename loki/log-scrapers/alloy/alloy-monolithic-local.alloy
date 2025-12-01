@@ -1,0 +1,113 @@
+# Grafana Alloy Configuration for Loki Monolithic
+# Scrapes local log files and sends to local Loki instance
+
+# File discovery for local log files
+discovery.file "local_logs" {
+	path_targets = [
+		{
+			__path__ = "/tmp/loki/logs/*.log",
+			job      = "local-logs",
+			env      = "development",
+		},
+		{
+			__path__ = "/var/log/*.log",
+			job      = "system-logs", 
+			env      = "system",
+		},
+	]
+}
+
+# Relabeling rules for better log organization
+discovery.relabel "local_logs" {
+	targets = discovery.file.local_logs.targets
+
+	rule {
+		source_labels = ["__path__"]
+		regex         = ".*/(.*)\\.log"
+		target_label  = "filename"
+	}
+
+	rule {
+		source_labels = ["job"]
+		target_label  = "service_name"
+	}
+}
+
+# Loki source for file scraping
+loki.source.file "local_logs" {
+	targets    = discovery.file.local_logs.targets
+	forward_to = [loki.process.add_labels.receiver]
+}
+
+# Process logs to add structured labels
+loki.process "add_labels" {
+	forward_to = [loki.write.local_loki.receiver]
+
+	stage.static_labels {
+		values = {
+			log_format = "text",
+			source     = "alloy",
+		}
+	}
+
+	stage.regex {
+		expression = "(?P<timestamp>\\d{4}-\\d{2}-\\d{2}\\s\\d{2}:\\d{2}:\\d{2})\\s+(?P<level>\\w+)\\s+(?P<message>.*)"
+	}
+
+	stage.labels {
+		values = {
+			level = "",
+		}
+	}
+}
+
+# Write to local Loki instance
+loki.write "local_loki" {
+	endpoint {
+		url = "http://127.0.0.1:3100/loki/api/v1/push"
+	}
+	external_labels = {
+		cluster = "monolithic",
+		region  = "local",
+	}
+}
+
+# Optional: Docker container discovery (if Docker is available)
+discovery.docker "containers" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "10s"
+}
+
+discovery.relabel "containers" {
+	targets = discovery.docker.containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_image"]
+		target_label  = "image"
+	}
+}
+
+loki.source.docker "containers" {
+	host             = "unix:///var/run/docker.sock"
+	targets          = discovery.docker.containers.targets
+	forward_to       = [loki.process.docker_logs.receiver]
+	relabel_rules    = discovery.relabel.containers.rules
+	refresh_interval = "10s"
+}
+
+loki.process "docker_logs" {
+	forward_to = [loki.write.local_loki.receiver]
+
+	stage.static_labels {
+		values = {
+			log_format = "docker",
+			source     = "alloy-docker",
+		}
+	}
+}

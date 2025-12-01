@@ -1,0 +1,218 @@
+# Loki Alerting Rules - Adapted for Monolithic Setup
+# Based on official Grafana Loki alerts + enhanced coverage
+# Optimized for single-instance deployment
+
+groups:
+  - name: loki_critical_alerts
+    rules:
+      # Service availability - Most critical
+      - alert: LokiDown
+        annotations:
+          description: "Loki service is down on {{ $labels.instance }}"
+          summary: "Loki service is not responding"
+          runbook_url: "https://grafana.com/docs/loki/latest/operations/troubleshooting/"
+        expr: up{job=~"loki.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: loki
+
+      # Request errors (adapted from official)
+      - alert: LokiRequestErrors
+        annotations:
+          description: "Loki {{ $labels.job }} {{ $labels.route }} is experiencing {{ printf \"%.2f\" $value }}% errors"
+          summary: "Loki request error rate is high"
+        expr: |
+          100 * sum(rate(loki_request_duration_seconds_count{status_code=~"5.."}[2m])) by (job, route)
+            /
+          sum(rate(loki_request_duration_seconds_count[2m])) by (job, route)
+            > 5
+        for: 10m
+        labels:
+          severity: critical
+          component: loki
+
+      # Request panics (adapted from official)
+      - alert: LokiRequestPanics
+        annotations:
+          description: "Loki {{ $labels.job }} is experiencing panics: {{ $value }} in last 10m"
+          summary: "Loki requests are causing code panics"
+        expr: sum(increase(loki_panic_total[10m])) by (job) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: loki
+
+      # High latency (adapted from official, using monolithic recording rule)
+      - alert: LokiRequestLatency
+        annotations:
+          description: "Loki {{ $labels.job }} {{ $labels.route }} P99 latency is {{ printf \"%.2f\" $value }}s"
+          summary: "Loki request latency is high"
+        expr: |
+          job_route:loki_request_duration_seconds:99quantile{route!~"(?i).*tail.*|/schedulerpb.SchedulerForQuerier/QuerierLoop"} > 2
+        for: 10m
+        labels:
+          severity: critical
+          component: loki
+
+      # Ingestion failures
+      - alert: LokiIngestionFailures
+        annotations:
+          description: "Loki ingestion failing at {{ printf \"%.2f\" $value }} failures/sec"
+          summary: "Loki ingestion is experiencing failures"
+        expr: rate(loki_distributor_ingester_append_failures_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: distributor
+
+  - name: loki_warning_alerts
+    rules:
+      # Compactor issues (adapted from official)
+      - alert: LokiCompactorNotRunning
+        annotations:
+          description: "Loki compactor has not run successfully in {{ printf \"%.1f\" $value }} hours"
+          summary: "Loki compaction has not run recently"
+        expr: |
+          (time() - loki_boltdb_shipper_compact_tables_operation_last_successful_run_timestamp_seconds) / 3600 > 6
+        for: 30m
+        labels:
+          severity: warning
+          component: compactor
+
+      # High ingestion rate (capacity planning)
+      - alert: LokiHighIngestionRate
+        annotations:
+          description: "Loki ingesting {{ printf \"%.0f\" $value }} lines/sec (high load)"
+          summary: "Loki ingestion rate is high"
+        expr: sum(rate(loki_distributor_lines_received_total[5m])) > 1000
+        for: 15m
+        labels:
+          severity: warning
+          component: distributor
+
+      # Low cache hit rate
+      - alert: LokiLowCacheHitRate
+        annotations:
+          description: "Loki cache {{ $labels.name }} hit rate is {{ printf \"%.1f\" $value }}%"
+          summary: "Loki cache performance is degraded"
+        expr: |
+          (rate(loki_cache_hits[5m]) / rate(loki_cache_fetched_keys[5m])) * 100 < 80
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+
+      # High query load
+      - alert: LokiHighQueryLoad
+        annotations:
+          description: "Loki processing {{ printf \"%.1f\" $value }} queries/sec (high load)"
+          summary: "Loki query load is high"
+        expr: sum(rate(loki_query_frontend_queries_total[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: query-frontend
+
+      # Storage efficiency
+      - alert: LokiHighChunksPerQuery
+        annotations:
+          description: "Loki queries accessing {{ printf \"%.0f\" $value }} chunks on average"
+          summary: "Loki queries are inefficient (too many chunks)"
+        expr: |
+          loki_chunk_store_chunks_per_query_sum / loki_chunk_store_chunks_per_query_count > 100
+        for: 15m
+        labels:
+          severity: warning
+          component: chunk-store
+
+  - name: loki_resource_alerts
+    rules:
+      # Memory usage (if node_exporter available)
+      - alert: LokiHighMemoryUsage
+        annotations:
+          description: "Loki memory usage is {{ printf \"%.1f\" $value }}%"
+          summary: "Loki memory usage is high"
+        expr: |
+          (process_resident_memory_bytes{job=~"loki.*"} / on(instance) node_memory_MemTotal_bytes) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+
+      # Disk space (if node_exporter available)
+      - alert: LokiDiskSpaceLow
+        annotations:
+          description: "Loki disk space is {{ printf \"%.1f\" $value }}% full"
+          summary: "Loki disk space is running low"
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+
+  - name: loki_performance_alerts
+    rules:
+      # Ingestion success rate
+      - alert: LokiLowIngestionSuccessRate
+        annotations:
+          description: "Loki ingestion success rate is {{ printf \"%.2f\" $value }}%"
+          summary: "Loki ingestion success rate is low"
+        expr: |
+          (
+            sum(rate(loki_distributor_ingester_appends_total[5m])) /
+            (sum(rate(loki_distributor_ingester_appends_total[5m])) + sum(rate(loki_distributor_ingester_append_failures_total[5m])))
+          ) * 100 < 99
+        for: 10m
+        labels:
+          severity: warning
+          component: distributor
+
+      # Query latency P95
+      - alert: LokiHighQueryLatencyP95
+        annotations:
+          description: "Loki P95 query latency is {{ printf \"%.2f\" $value }}s"
+          summary: "Loki query latency P95 is high"
+        expr: job:loki_request_duration_seconds:95quantile > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: query-frontend
+
+      # Log line size anomaly
+      - alert: LokiAbnormalLogLineSize
+        annotations:
+          description: "Loki average log line size is {{ printf \"%.0f\" $value }} bytes"
+          summary: "Loki log line size is abnormal"
+        expr: |
+          loki_bytes_per_line_sum / loki_bytes_per_line_count > 1000
+        for: 15m
+        labels:
+          severity: info
+          component: ingestion
+
+  - name: loki_business_alerts
+    rules:
+      # No logs received (business impact)
+      - alert: LokiNoLogsReceived
+        annotations:
+          description: "Loki has not received any logs in the last 10 minutes"
+          summary: "Loki is not receiving any logs"
+        expr: |
+          rate(loki_distributor_lines_received_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: distributor
+
+      # Compactor completely stopped
+      - alert: LokiCompactorStopped
+        annotations:
+          description: "Loki compactor is not running"
+          summary: "Loki compactor service is stopped"
+        expr: loki_boltdb_shipper_compactor_running == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: compactor

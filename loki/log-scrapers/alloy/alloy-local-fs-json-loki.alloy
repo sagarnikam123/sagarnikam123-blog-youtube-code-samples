@@ -1,0 +1,20 @@
+livedebugging {
+  enabled = true
+}
+
+local.file_match "local_files" {
+    path_targets = [{"__path__" = "/Users/snikam/data/log/logger/*.log", "job" = "alloy", "hostname" = constants.hostname}]
+    sync_period  = "5s"
+}
+
+loki.source.file "log_scrape" {
+    targets    = local.file_match.local_files.targets
+    forward_to = [loki.write.local_loki.receiver]
+    tail_from_end = true
+}
+
+loki.write "local_loki" {
+  endpoint {
+    url = "http://127.0.0.1:3100/loki/api/v1/push"
+  }
+}

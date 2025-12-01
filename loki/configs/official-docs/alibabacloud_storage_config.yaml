@@ -1,0 +1,23 @@
+# Name of OSS bucket.
+# CLI flag: -<prefix>.oss.bucketname
+[bucket: <string> | default = ""]
+
+# oss Endpoint to connect to.
+# CLI flag: -<prefix>.oss.endpoint
+[endpoint: <string> | default = ""]
+
+# alibabacloud Access Key ID
+# CLI flag: -<prefix>.oss.access-key-id
+[access_key_id: <string> | default = ""]
+
+# alibabacloud Secret Access Key
+# CLI flag: -<prefix>.oss.secret-access-key
+[secret_access_key: <string> | default = ""]
+
+# Connection timeout in seconds
+# CLI flag: -<prefix>.oss.conn-timeout-sec
+[conn_timeout_sec: <int> | default = 30]
+
+# Read/Write timeout in seconds
+# CLI flag: -<prefix>.oss.read-write-timeout-sec
+[read_write_timeout_sec: <int> | default = 60]

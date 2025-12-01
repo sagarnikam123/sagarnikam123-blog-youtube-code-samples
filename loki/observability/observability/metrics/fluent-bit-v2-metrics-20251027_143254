@@ -1,0 +1,119 @@
+# HELP fluentbit_uptime Number of seconds that Fluent Bit has been running.
+# TYPE fluentbit_uptime counter
+fluentbit_uptime{hostname="spiralDuct"} 2557
+# HELP fluentbit_logger_logs_total Total number of logs
+# TYPE fluentbit_logger_logs_total counter
+fluentbit_logger_logs_total{message_type="error"} 0
+fluentbit_logger_logs_total{message_type="warn"} 0
+fluentbit_logger_logs_total{message_type="info"} 11
+fluentbit_logger_logs_total{message_type="debug"} 0
+fluentbit_logger_logs_total{message_type="trace"} 0
+# HELP fluentbit_input_bytes_total Number of input bytes.
+# TYPE fluentbit_input_bytes_total counter
+fluentbit_input_bytes_total{name="tail.0"} 5467916
+# HELP fluentbit_input_records_total Number of input records.
+# TYPE fluentbit_input_records_total counter
+fluentbit_input_records_total{name="tail.0"} 26526
+# HELP fluentbit_input_ring_buffer_writes_total Number of ring buffer writes.
+# TYPE fluentbit_input_ring_buffer_writes_total counter
+fluentbit_input_ring_buffer_writes_total{name="tail.0"} 0
+# HELP fluentbit_input_ring_buffer_retries_total Number of ring buffer retries.
+# TYPE fluentbit_input_ring_buffer_retries_total counter
+fluentbit_input_ring_buffer_retries_total{name="tail.0"} 0
+# HELP fluentbit_input_ring_buffer_retry_failures_total Number of ring buffer retry failures.
+# TYPE fluentbit_input_ring_buffer_retry_failures_total counter
+fluentbit_input_ring_buffer_retry_failures_total{name="tail.0"} 0
+# HELP fluentbit_input_files_opened_total Total number of opened files
+# TYPE fluentbit_input_files_opened_total counter
+fluentbit_input_files_opened_total{name="tail.0"} 4
+# HELP fluentbit_output_proc_records_total Number of processed output records.
+# TYPE fluentbit_output_proc_records_total counter
+fluentbit_output_proc_records_total{name="loki.0"} 26515
+# HELP fluentbit_output_proc_bytes_total Number of processed output bytes.
+# TYPE fluentbit_output_proc_bytes_total counter
+fluentbit_output_proc_bytes_total{name="loki.0"} 5465634
+# HELP fluentbit_output_errors_total Number of output errors.
+# TYPE fluentbit_output_errors_total counter
+fluentbit_output_errors_total{name="loki.0"} 0
+# HELP fluentbit_output_retries_total Number of output retries.
+# TYPE fluentbit_output_retries_total counter
+fluentbit_output_retries_total{name="loki.0"} 0
+# HELP fluentbit_output_retries_failed_total Number of abandoned batches because the maximum number of re-tries was reached.
+# TYPE fluentbit_output_retries_failed_total counter
+fluentbit_output_retries_failed_total{name="loki.0"} 0
+# HELP fluentbit_output_dropped_records_total Number of dropped records.
+# TYPE fluentbit_output_dropped_records_total counter
+fluentbit_output_dropped_records_total{name="loki.0"} 0
+# HELP fluentbit_output_retried_records_total Number of retried records.
+# TYPE fluentbit_output_retried_records_total counter
+fluentbit_output_retried_records_total{name="loki.0"} 0
+# HELP fluentbit_process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE fluentbit_process_start_time_seconds gauge
+fluentbit_process_start_time_seconds{hostname="spiralDuct"} 1761553217
+# HELP fluentbit_build_info Build version information.
+# TYPE fluentbit_build_info gauge
+fluentbit_build_info{hostname="spiralDuct",version="4.1.1",os="macos"} 1761553217
+# HELP fluentbit_hot_reloaded_times Collect the count of hot reloaded times.
+# TYPE fluentbit_hot_reloaded_times gauge
+fluentbit_hot_reloaded_times{hostname="spiralDuct"} 0
+# HELP fluentbit_storage_chunks Total number of chunks in the storage layer.
+# TYPE fluentbit_storage_chunks gauge
+fluentbit_storage_chunks 1
+# HELP fluentbit_storage_mem_chunks Total number of memory chunks.
+# TYPE fluentbit_storage_mem_chunks gauge
+fluentbit_storage_mem_chunks 1
+# HELP fluentbit_storage_fs_chunks Total number of filesystem chunks.
+# TYPE fluentbit_storage_fs_chunks gauge
+fluentbit_storage_fs_chunks 0
+# HELP fluentbit_storage_fs_chunks_up Total number of filesystem chunks up in memory.
+# TYPE fluentbit_storage_fs_chunks_up gauge
+fluentbit_storage_fs_chunks_up 0
+# HELP fluentbit_storage_fs_chunks_down Total number of filesystem chunks down.
+# TYPE fluentbit_storage_fs_chunks_down gauge
+fluentbit_storage_fs_chunks_down 0
+# HELP fluentbit_input_ingestion_paused Is the input paused or not?
+# TYPE fluentbit_input_ingestion_paused gauge
+fluentbit_input_ingestion_paused{name="tail.0"} 0
+# HELP fluentbit_input_storage_overlimit Is the input memory usage overlimit ?.
+# TYPE fluentbit_input_storage_overlimit gauge
+fluentbit_input_storage_overlimit{name="tail.0"} 0
+# HELP fluentbit_input_storage_memory_bytes Memory bytes used by the chunks.
+# TYPE fluentbit_input_storage_memory_bytes gauge
+fluentbit_input_storage_memory_bytes{name="tail.0"} 2045
+# HELP fluentbit_input_storage_chunks Total number of chunks.
+# TYPE fluentbit_input_storage_chunks gauge
+fluentbit_input_storage_chunks{name="tail.0"} 1
+# HELP fluentbit_input_storage_chunks_up Total number of chunks up in memory.
+# TYPE fluentbit_input_storage_chunks_up gauge
+fluentbit_input_storage_chunks_up{name="tail.0"} 1
+# HELP fluentbit_input_storage_chunks_down Total number of chunks down.
+# TYPE fluentbit_input_storage_chunks_down gauge
+fluentbit_input_storage_chunks_down{name="tail.0"} 0
+# HELP fluentbit_input_storage_chunks_busy Total number of chunks in a busy state.
+# TYPE fluentbit_input_storage_chunks_busy gauge
+fluentbit_input_storage_chunks_busy{name="tail.0"} 0
+# HELP fluentbit_input_storage_chunks_busy_bytes Total number of bytes used by chunks in a busy state.
+# TYPE fluentbit_input_storage_chunks_busy_bytes gauge
+fluentbit_input_storage_chunks_busy_bytes{name="tail.0"} 0
+# HELP fluentbit_output_upstream_total_connections Total Connection count.
+# TYPE fluentbit_output_upstream_total_connections gauge
+fluentbit_output_upstream_total_connections{name="loki.0"} 1
+# HELP fluentbit_output_upstream_busy_connections Busy Connection count.
+# TYPE fluentbit_output_upstream_busy_connections gauge
+fluentbit_output_upstream_busy_connections{name="loki.0"} 0
+# HELP fluentbit_output_chunk_available_capacity_percent Available chunk capacity (percent)
+# TYPE fluentbit_output_chunk_available_capacity_percent gauge
+fluentbit_output_chunk_available_capacity_percent{name="loki.0"} 100
+# HELP fluentbit_output_latency_seconds End-to-end latency in seconds
+# TYPE fluentbit_output_latency_seconds histogram
+fluentbit_output_latency_seconds_bucket{le="0.5",input="tail.0",output="loki.0"} 0
+fluentbit_output_latency_seconds_bucket{le="1.0",input="tail.0",output="loki.0"} 1757
+fluentbit_output_latency_seconds_bucket{le="1.5",input="tail.0",output="loki.0"} 2556
+fluentbit_output_latency_seconds_bucket{le="2.5",input="tail.0",output="loki.0"} 2556
+fluentbit_output_latency_seconds_bucket{le="5.0",input="tail.0",output="loki.0"} 2556
+fluentbit_output_latency_seconds_bucket{le="10.0",input="tail.0",output="loki.0"} 2556
+fluentbit_output_latency_seconds_bucket{le="20.0",input="tail.0",output="loki.0"} 2556
+fluentbit_output_latency_seconds_bucket{le="30.0",input="tail.0",output="loki.0"} 2556
+fluentbit_output_latency_seconds_bucket{le="+Inf",input="tail.0",output="loki.0"} 0
+fluentbit_output_latency_seconds_sum{input="tail.0",output="loki.0"} 2551.5215134620667
+fluentbit_output_latency_seconds_count{input="tail.0",output="loki.0"} 2556

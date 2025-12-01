@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  loki:
+    image: grafana/loki:3.5.8
+    container_name: loki-monolithic
+    ports:
+      - "3100:3100"
+      - "9095:9095"
+    volumes:
+      - ../configs:/etc/loki/configs:ro
+      - loki-data:/tmp/loki
+    command: 
+      - -config.file=/etc/loki/configs/v3.x/v3.5.x/loki-3.5.x-ui-filesystem-inmemory.yaml
+      - -config.expand-env=true
+    environment:
+      - HOSTNAME=loki-docker
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: MinIO for S3-compatible storage (if needed for other configs)
+  minio:
+    image: minio/minio:latest
+    container_name: loki-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    profiles:
+      - s3-storage
+
+volumes:
+  loki-data:
+    driver: local
+  minio-data:
+    driver: local
+
+networks:
+  default:
+    name: loki-network

@@ -1,0 +1,106 @@
+# Loki Recording Rules - Adapted for Monolithic Setup
+# Based on official Grafana Loki mixin rules
+# Optimized for single-instance deployment
+
+groups:
+  - name: loki_recording_rules
+    interval: 30s
+    rules:
+      # Job-level aggregations (simplified from cluster_job)
+      - expr: histogram_quantile(0.99, sum(rate(loki_request_duration_seconds_bucket[1m])) by (le, job))
+        record: job:loki_request_duration_seconds:99quantile
+        
+      - expr: histogram_quantile(0.95, sum(rate(loki_request_duration_seconds_bucket[1m])) by (le, job))
+        record: job:loki_request_duration_seconds:95quantile
+        
+      - expr: histogram_quantile(0.50, sum(rate(loki_request_duration_seconds_bucket[1m])) by (le, job))
+        record: job:loki_request_duration_seconds:50quantile
+        
+      - expr: sum(rate(loki_request_duration_seconds_sum[1m])) by (job) / sum(rate(loki_request_duration_seconds_count[1m])) by (job)
+        record: job:loki_request_duration_seconds:avg
+        
+      - expr: sum(rate(loki_request_duration_seconds_count[1m])) by (job)
+        record: job:loki_request_duration_seconds_count:sum_rate
+
+      # Route-level aggregations for API performance
+      - expr: histogram_quantile(0.99, sum(rate(loki_request_duration_seconds_bucket[1m])) by (le, job, route))
+        record: job_route:loki_request_duration_seconds:99quantile
+        
+      - expr: histogram_quantile(0.95, sum(rate(loki_request_duration_seconds_bucket[1m])) by (le, job, route))
+        record: job_route:loki_request_duration_seconds:95quantile
+        
+      - expr: histogram_quantile(0.50, sum(rate(loki_request_duration_seconds_bucket[1m])) by (le, job, route))
+        record: job_route:loki_request_duration_seconds:50quantile
+        
+      - expr: sum(rate(loki_request_duration_seconds_sum[1m])) by (job, route) / sum(rate(loki_request_duration_seconds_count[1m])) by (job, route)
+        record: job_route:loki_request_duration_seconds:avg
+        
+      - expr: sum(rate(loki_request_duration_seconds_count[1m])) by (job, route)
+        record: job_route:loki_request_duration_seconds_count:sum_rate
+
+      # Status code aggregations
+      - expr: sum(rate(loki_request_duration_seconds_count[1m])) by (job, status_code)
+        record: job_status:loki_request_duration_seconds_count:sum_rate
+
+      # Method-based aggregations  
+      - expr: sum(rate(loki_request_duration_seconds_count[1m])) by (job, method)
+        record: job_method:loki_request_duration_seconds_count:sum_rate
+
+  - name: loki_ingestion_rules
+    interval: 30s
+    rules:
+      # Ingestion performance (when distributor metrics are available)
+      - expr: sum(rate(loki_distributor_lines_received_total[1m])) by (job)
+        record: job:loki_distributor_lines_received:rate
+        
+      - expr: sum(rate(loki_distributor_bytes_received_total[1m])) by (job)
+        record: job:loki_distributor_bytes_received:rate
+        
+      - expr: sum(rate(loki_distributor_ingester_appends_total[1m])) by (job)
+        record: job:loki_distributor_ingester_appends:rate
+        
+      - expr: sum(rate(loki_distributor_ingester_append_failures_total[1m])) by (job)
+        record: job:loki_distributor_ingester_append_failures:rate
+
+      # Success rate calculation
+      - expr: |
+          (
+            sum(rate(loki_distributor_ingester_appends_total[1m])) by (job) /
+            (
+              sum(rate(loki_distributor_ingester_appends_total[1m])) by (job) +
+              sum(rate(loki_distributor_ingester_append_failures_total[1m])) by (job)
+            )
+          ) * 100
+        record: job:loki_distributor_append_success_rate:percent
+
+  - name: loki_storage_rules
+    interval: 60s
+    rules:
+      # Storage and chunk metrics
+      - expr: sum(rate(loki_chunk_store_chunks_per_query_sum[5m])) by (job) / sum(rate(loki_chunk_store_chunks_per_query_count[5m])) by (job)
+        record: job:loki_chunk_store_chunks_per_query:avg
+        
+      - expr: histogram_quantile(0.95, sum(rate(loki_chunk_store_chunks_per_query_bucket[5m])) by (le, job))
+        record: job:loki_chunk_store_chunks_per_query:95quantile
+
+      # Cache performance
+      - expr: sum(rate(loki_cache_hits[1m])) by (job, name) / sum(rate(loki_cache_fetched_keys[1m])) by (job, name) * 100
+        record: job_cache:loki_cache_hit_rate:percent
+        
+      - expr: sum(rate(loki_cache_fetched_keys[1m])) by (job, name)
+        record: job_cache:loki_cache_requests:rate
+
+  - name: loki_health_rules
+    interval: 30s
+    rules:
+      # Overall health indicators
+      - expr: up{job=~"loki.*"}
+        record: job:loki_up
+        
+      # Compactor health
+      - expr: loki_boltdb_shipper_compactor_running
+        record: job:loki_compactor_running
+        
+      # Time since last successful compaction (in hours)
+      - expr: (time() - loki_boltdb_shipper_compact_tables_operation_last_successful_run_timestamp_seconds) / 3600
+        record: job:loki_compactor_last_success_hours

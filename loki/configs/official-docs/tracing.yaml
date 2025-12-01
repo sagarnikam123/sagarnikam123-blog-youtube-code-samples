@@ -1,0 +1,3 @@
+# Set to false to disable tracing.
+# CLI flag: -tracing.enabled
+[enabled: <boolean> | default = true]

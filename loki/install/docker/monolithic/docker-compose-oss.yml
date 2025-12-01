@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  loki:
+    image: grafana/loki:3.5.0
+    container_name: loki-monolithic
+    ports:
+      - "3100:3100"
+      - "9095:9095"
+    volumes:
+      - ../configs:/etc/loki/configs:ro
+      - loki-data:/tmp/loki
+    command: 
+      - -config.file=/etc/loki/configs/v3.x/v3.5.x/loki-3.5.x-ui-filesystem-inmemory.yaml
+      - -config.expand-env=true
+    environment:
+      - HOSTNAME=loki-docker
+    restart: unless-stopped
+    depends_on:
+      - minio-oss
+
+  # OSS MinIO - Always free, no license required
+  minio-oss:
+    image: minio/minio:latest
+    container_name: minio-oss
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  loki-data:
+    driver: local
+  minio-data:
+    driver: local
+
+networks:
+  default:
+    name: loki-oss-network

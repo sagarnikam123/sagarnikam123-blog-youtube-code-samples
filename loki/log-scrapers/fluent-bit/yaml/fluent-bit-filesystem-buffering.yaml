@@ -1,0 +1,56 @@
+# Fluent Bit Configuration - Filesystem Buffering with Loki
+# Provides persistent buffering with filesystem storage for backpressure handling
+# 
+# Features:
+# - Filesystem buffering for data integrity
+# - Performance optimizations (batching, buffer sizes)
+# - Retry mechanisms with exponential backoff
+# - TCP keepalive for connection stability
+# - Graceful shutdown with data preservation
+
+service:
+  flush: 5                                          # Flush interval in seconds (higher = better performance)
+  grace: 30                                         # Graceful shutdown timeout (increased for data integrity)
+  daemon: off                                       # Run in foreground mode
+  log_level: info                                   # Logging verbosity level
+  http_server: on                                   # Enable HTTP monitoring server
+  http_listen: 0.0.0.0                            # HTTP server bind address
+  http_port: 2020                                  # HTTP server port for metrics
+  storage.path: ${HOME}/data/fluent-bit/flb-storage # Filesystem buffer directory
+  storage.sync: normal                             # Filesystem sync mode
+  storage.checksum: off                            # Disable chunk checksums for performance
+  storage.max_chunks_up: 128                       # Max chunks in memory before disk spill
+  storage.backlog.mem_limit: 50M                   # Total memory limit before filesystem buffering
+  storage.total_limit_size: 1G                     # Global max disk usage for all buffering
+  workers: 1                                       # Number of worker threads (1 for single-threaded performance)
+  scheduler.cap: 2000                              # Max number of retries in scheduler queue
+  scheduler.base: 5                                # Base wait time for retries in seconds
+
+pipeline:
+  inputs:
+    - name: tail                                    # Tail input plugin
+      path: ${HOME}/data/log/logger/*.log          # Log files to monitor
+      read_from_head: false                        # Start from end of file
+      refresh_interval: 10                         # File discovery interval in seconds
+      tag: local.*                                 # Tag prefix for routing
+      storage.type: filesystem                     # Enable persistent buffering for input
+      db: ${HOME}/data/fluent-bit/flb_kube.db     # Database for file position tracking
+      buffer_chunk_size: 32k                      # Initial buffer chunk size for performance
+      buffer_max_size: 64k                        # Max buffer chunk size for performance
+      skip_long_lines: on                         # Skip lines longer than buffer_max_size
+      skip_empty_lines: on                        # Skip empty lines for efficiency
+
+  outputs:
+    - name: loki                                    # Loki output plugin
+      match: '*'                                   # Match all tags
+      host: 127.0.0.1                            # Loki server host
+      port: 3100                                  # Loki server port
+      labels: job=fluentbit,source=local          # Static labels for all logs
+      storage.type: filesystem                     # Enable persistent buffering for output
+      mem_buf_limit: 5M                           # Output buffer size before backpressure
+      retry_limit: 5                              # Max retries for failed sends (increased for reliability)
+      workers: 1                                  # Number of workers for this output
+      net.keepalive: on                           # Enable TCP keepalive for connection stability
+      net.keepalive_idle_timeout: 30              # Keepalive idle timeout in seconds
+      net.connect_timeout: 10                     # Connection timeout in seconds
+      net.source_address: 127.0.0.1              # Source address for connections

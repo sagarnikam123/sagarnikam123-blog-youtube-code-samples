@@ -1,0 +1,67 @@
+# Loki Alert Rules for Prometheus
+# Basic alerting rules for Loki monolithic deployment
+
+groups:
+  - name: loki.rules
+    rules:
+      # Loki is down
+      - alert: LokiDown
+        expr: up{job="loki"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Loki is down"
+          description: "Loki has been down for more than 5 minutes."
+
+      # High ingestion rate
+      - alert: LokiHighIngestionRate
+        expr: rate(loki_distributor_ingester_append_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki high ingestion failure rate"
+          description: "Loki ingestion failure rate is {{ $value }} per second."
+
+      # High memory usage
+      - alert: LokiHighMemoryUsage
+        expr: process_resident_memory_bytes{job="loki"} > 1e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki high memory usage"
+          description: "Loki memory usage is {{ $value | humanize }}B."
+
+      # Ring unhealthy
+      - alert: LokiRingUnhealthy
+        expr: loki_ring_members{state="Unhealthy"} > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki ring has unhealthy members"
+          description: "Loki ring has {{ $value }} unhealthy members."
+
+  - name: fluent-bit.rules
+    rules:
+      # Fluent Bit is down
+      - alert: FluentBitDown
+        expr: up{job="fluent-bit"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fluent Bit is down"
+          description: "Fluent Bit has been down for more than 5 minutes."
+
+      # High error rate
+      - alert: FluentBitHighErrorRate
+        expr: rate(fluentbit_output_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fluent Bit high error rate"
+          description: "Fluent Bit error rate is {{ $value }} per second."

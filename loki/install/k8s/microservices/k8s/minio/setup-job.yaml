@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-setup
+  namespace: loki
+  labels:
+    app.kubernetes.io/name: minio-setup
+    app.kubernetes.io/component: storage-setup
+    app.kubernetes.io/version: "2025-09-07"
+    app.kubernetes.io/instance: loki-dev
+    app.kubernetes.io/part-of: logging-stack
+    app.kubernetes.io/managed-by: kubectl
+    environment: development
+spec:
+  ttlSecondsAfterFinished: 300  # Delete job 5 minutes after completion
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-minio
+        image: busybox:1.35
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for MinIO to be ready..."
+          until nc -z minio 9000; do
+            echo "MinIO not ready, waiting 5 seconds..."
+            sleep 5
+          done
+          echo "MinIO is ready!"
+      containers:
+      - name: mc
+        image: minio/mc:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Setting up MinIO alias..."
+          
+          # Retry logic for MinIO connection
+          max_attempts=30
+          attempt=1
+          connected=false
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt/$max_attempts: Connecting to MinIO..."
+            if mc alias set minio http://minio:9000 minioadmin minioadmin; then
+              echo "Successfully connected to MinIO!"
+              connected=true
+              break
+            else
+              echo "Failed to connect, waiting 10 seconds..."
+              sleep 10
+              attempt=$((attempt + 1))
+            fi
+          done
+          
+          if [ "$connected" = "false" ]; then
+            echo "Failed to connect to MinIO after $max_attempts attempts"
+            exit 1
+          fi
+          
+          echo "Creating buckets..."
+          mc mb minio/loki-chunks || true
+          mc mb minio/loki-ruler || true
+          mc mb minio/loki-admin || true
+          echo "Bucket setup completed successfully!"
+          mc ls minio/
+          exit 0
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
