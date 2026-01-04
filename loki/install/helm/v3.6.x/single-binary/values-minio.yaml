@@ -1,0 +1,120 @@
+# Loki SingleBinary - MinIO Storage with Thanos Objstore
+#
+# Install:
+#   helm install loki grafana/loki -n loki --create-namespace \
+#     --version 6.49.0 \
+#     -f values-base.yaml -f values-minio.yaml
+#
+# For Minikube with MinIO:
+#   helm install loki grafana/loki -n loki --create-namespace \
+#     --version 6.49.0 \
+#     -f values-base.yaml -f values-minio.yaml -f values-minikube.yaml
+#
+# Prerequisites:
+#   - MinIO deployed in cluster or accessible endpoint
+#   - Bucket 'loki-chunks' created in MinIO
+#
+# Default MinIO credentials (change in production!):
+#   - Access Key: minioadmin
+#   - Secret Key: minioadmin
+#   - Endpoint: loki-minio.loki.svc.cluster.local:9000 (built-in MinIO)
+#
+# Thanos Objstore:
+#   This config uses Thanos object store client (use_thanos_objstore: true)
+#   which is the recommended approach for Loki 3.x and will become default
+#   in future releases. Benefits:
+#   - Unified storage client across Grafana ecosystem
+#   - Better retry and backoff handling
+#   - Improved connection pooling
+
+loki:
+  # Enable Thanos object store client (recommended for Loki 3.x)
+  storage:
+    use_thanos_objstore: true
+    bucketNames:
+      chunks: loki-chunks
+      ruler: loki-chunks
+    # Thanos object store configuration
+    object_store:
+      type: s3
+      s3:
+        endpoint: loki-minio.loki.svc.cluster.local:9000
+        access_key_id: minioadmin
+        secret_access_key: minioadmin
+        insecure: true
+        bucket_lookup_type: auto
+
+  # Schema config for S3 storage
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  # Storage config with Thanos objstore enabled
+  storage_config:
+    use_thanos_objstore: true
+    object_store:
+      s3:
+        endpoint: loki-minio.loki.svc.cluster.local:9000
+        bucket_name: loki-chunks
+        access_key_id: minioadmin
+        secret_access_key: minioadmin
+        insecure: true
+        bucket_lookup_type: auto
+    tsdb_shipper:
+      active_index_directory: /var/loki/tsdb-shipper-active
+      cache_location: /var/loki/tsdb-shipper-cache
+      cache_ttl: 24h
+
+  # Compactor config for retention
+  compactor:
+    working_directory: /var/loki/compactor
+    compaction_interval: 10m
+    retention_enabled: true
+    retention_delete_delay: 2h
+    delete_request_store: s3
+
+  # Limits with retention
+  limits_config:
+    allow_structured_metadata: true
+    volume_enabled: true
+    retention_period: 168h  # 7 days
+
+# SingleBinary persistence (still needed for WAL and cache)
+singleBinary:
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Enable built-in MinIO for testing (optional)
+# Set to false if using external MinIO
+minio:
+  enabled: true
+  mode: standalone
+  replicas: 1
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  buckets:
+    - name: loki-chunks
+      policy: none
+      purge: false
+  # Security context for Minikube/local environments
+  securityContext:
+    enabled: true
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
+  makeBucketJob:
+    securityContext:
+      enabled: false
