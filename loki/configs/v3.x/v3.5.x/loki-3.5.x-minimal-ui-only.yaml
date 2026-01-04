@@ -1,5 +1,6 @@
 # Loki 3.5.x Minimal Official Github + UI block only
 # https://github.com/grafana/loki/blob/main/cmd/loki/loki-local-config.yaml
+# https://github.com/grafana/loki/blob/v3.5.9/cmd/loki/loki-local-config.yaml
 
 auth_enabled: false
 
@@ -39,7 +40,6 @@ query_range:
 
 limits_config:
   metric_aggregation_enabled: true
-  enable_multi_variant_queries: true
 
 schema_config:
   configs:
@@ -61,6 +61,10 @@ ruler:
 
 frontend:
   encoding: protobuf
+
+querier:
+  engine:
+    enable_multi_variant_queries: true
 
 
 # By default, Loki will send anonymous, but uniquely-identifiable usage and configuration
