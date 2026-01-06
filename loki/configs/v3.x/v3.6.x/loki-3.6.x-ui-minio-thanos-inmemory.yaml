@@ -1,0 +1,396 @@
+# Loki 3.6.x + MinIO (Thanos Object Store) + inmemory
+#
+# =============================================================================
+# CONFIGURATION SUMMARY
+# =============================================================================
+# Purpose: Single-node config with Thanos object store backend
+# Target: Single-node with inmemory KV store (no clustering overhead)
+#
+# Core Features:
+# • Target: all (monolithic mode)
+# • Authentication: disabled
+# • UI: enabled with debug mode
+# • Storage: MinIO via Thanos object store (use_thanos_objstore: true)
+# • Schema: v13 with TSDB store
+# • KV Store: inmemory (optimized for single-node)
+#
+# Key Difference from loki-3.6.x-ui-minio-thanos-memberlist.yaml:
+# • Uses inmemory KV store instead of memberlist
+# • No gossip protocol overhead
+# • Faster startup, simpler operation
+# • heartbeat_timeout: 1m (still needed for ring health tracking)
+#
+# Prerequisites:
+# • MinIO running on 127.0.0.1:9000
+# • Bucket: loki-chunks (create before starting)
+#
+# Use Cases:
+# ✓ Local development with Thanos object store
+# ✓ Single-node deployments
+# ✓ Testing Thanos object store configuration
+# ✗ Multi-node clusters (use memberlist variant)
+# =============================================================================
+
+auth_enabled: false  # default = true
+
+server:
+  http_listen_address: 127.0.0.1  # default = "" (all interfaces)
+  http_listen_port: 3100  # default = 3100
+  grpc_listen_address: 127.0.0.1  # default = "" (all interfaces)
+  grpc_listen_port: 9095  # default = 9095
+  http_server_read_timeout: 10m  # default = 30s
+  http_server_write_timeout: 10m  # default = 30s
+  http_server_idle_timeout: 5m  # default = 2m
+  grpc_server_max_recv_msg_size: 16777216  # default = 4MB, 16MB for large logs
+  grpc_server_max_send_msg_size: 16777216  # default = 4MB, 16MB for large responses
+  grpc_server_max_concurrent_streams: 0  # default = 100, 0 = unlimited
+  grpc_server_keepalive_time: 30s  # default = 2h
+  grpc_server_keepalive_timeout: 5s  # default = 20s
+  report_grpc_codes_in_instrumentation_label_enabled: true  # default = false
+  log_format: logfmt  # default = logfmt, options: logfmt, json
+  log_level: warn  # default = info, options: debug, info, warn, error
+
+ui:
+  enabled: true  # default = false
+  debug: true  # default = false
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory  # default = consul, options: consul, etcd, inmemory, memberlist
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    instance_id: ${HOSTNAME:-"loki-distributor"}  # default = hostname
+    instance_port: 9095  # default = 0 (auto)
+    instance_addr: 127.0.0.1  # default = "" (auto-detect)
+
+querier:
+  tail_max_duration: 1h  # default = 1h
+  query_ingesters_within: 3h  # default = 3h
+  max_concurrent: 4  # default = 4
+
+query_scheduler:
+  grpc_client_config:
+    grpc_compression: snappy  # default = "", options: gzip, snappy
+    connect_timeout: 5s  # default = 5s
+  use_scheduler_ring: false  # default = false
+
+frontend:
+  query_stats_enabled: true  # default = false
+  grpc_client_config:
+    grpc_compression: snappy  # default = ""
+    connect_timeout: 5s  # default = 5s
+  address: 127.0.0.1  # default = ""
+  port: 9095  # default = 9095
+  encoding: protobuf  # default = protobuf, options: json, protobuf
+  compress_responses: true  # default = false
+
+query_range:
+  align_queries_with_step: true  # default = false
+  parallelise_shardable_queries: false  # default = true
+  results_cache:
+    cache:
+      default_validity: 1h  # default = 1h
+      embedded_cache:
+        enabled: true  # default = false
+        max_size_mb: 100  # default = 100
+        ttl: 1h  # default = 1h
+    compression: snappy  # default = "", options: snappy
+  cache_results: true  # default = false
+  max_retries: 5  # default = 5
+  cache_index_stats_results: true  # default = false
+  index_stats_results_cache:
+    cache:
+      default_validity: 1h
+      embedded_cache:
+        enabled: true
+        max_size_mb: 50
+        ttl: 1h
+    compression: snappy
+  cache_volume_results: true  # default = false
+  volume_results_cache:
+    cache:
+      default_validity: 1h
+      embedded_cache:
+        enabled: true
+        max_size_mb: 50
+        ttl: 1h
+    compression: snappy
+  cache_instant_metric_results: true  # default = false
+  instant_metric_results_cache:
+    cache:
+      default_validity: 1h
+      embedded_cache:
+        enabled: true
+        max_size_mb: 50
+        ttl: 1h
+    compression: snappy
+  cache_series_results: true  # default = false
+  series_results_cache:
+    cache:
+      default_validity: 1h
+      embedded_cache:
+        enabled: true
+        max_size_mb: 50
+        ttl: 1h
+    compression: snappy
+  cache_label_results: true  # default = false
+  label_results_cache:
+    cache:
+      default_validity: 1h
+      embedded_cache:
+        enabled: true
+        max_size_mb: 50
+        ttl: 1h
+    compression: snappy
+
+ruler:
+  ruler_client:
+    grpc_compression: snappy  # default = ""
+    connect_timeout: 5s  # default = 5s
+  evaluation_interval: 1m  # default = 1m
+  poll_interval: 1m  # default = 1m
+  rule_path: /tmp/loki/rules  # default = /rules
+  alertmanager_url: http://127.0.0.1:9093  # default = ""
+  ring:
+    kvstore:
+      store: inmemory  # default = consul
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    instance_id: ${HOSTNAME:-"loki-ruler"}  # default = hostname
+    instance_port: 9095  # default = 0
+    instance_addr: 127.0.0.1  # default = ""
+    num_tokens: 128  # default = 128
+  enable_api: true  # default = true
+  query_stats_enabled: true  # default = false
+  wal:
+    dir: /tmp/loki/ruler-wal  # default = ruler-wal
+
+ruler_storage:
+  s3:
+    endpoint: 127.0.0.1:9000
+    bucket_name: loki-chunks
+    secret_access_key: minioadmin
+    access_key_id: minioadmin
+    insecure: true  # default = false
+    bucket_lookup_type: auto  # default = auto, options: auto, virtual-hosted, path
+  backend: s3  # default = filesystem, options: s3, gcs, azure, swift, filesystem
+
+ingester_client:
+  pool_config:
+    health_check_ingesters: true  # default = true
+    remote_timeout: 5s  # default = 1s
+  remote_timeout: 5s  # default = 5s
+  grpc_client_config:
+    grpc_compression: snappy  # default = ""
+    connect_timeout: 5s  # default = 5s
+
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory  # default = consul
+      heartbeat_timeout: 1m  # default = 1m
+      replication_factor: 1  # default = 3
+    num_tokens: 128  # default = 128
+    heartbeat_period: 5s  # default = 5s
+    heartbeat_timeout: 1m  # default = 1m
+    join_after: 0s  # default = 0s
+    min_ready_duration: 15s  # default = 15s
+    readiness_check_ring_health: false  # default = true, false for single-node
+    address: 127.0.0.1  # default = ""
+    port: 9095  # default = 0
+    id: ${HOSTNAME:-"loki-ingester"}  # default = hostname
+  concurrent_flushes: 4  # default = 32
+  flush_check_period: 30s  # default = 30s
+  chunk_retain_period: 0s  # default = 0s
+  chunk_idle_period: 30m  # default = 30m
+  chunk_block_size: 262144  # default = 262144 (256KB)
+  chunk_target_size: 1572864  # default = 1572864 (1.5MB)
+  chunk_encoding: snappy  # default = gzip, options: none, gzip, lz4-64k, snappy, lz4-256k, lz4-1M, lz4, flate, zstd
+  max_chunk_age: 2h  # default = 2h
+  autoforget_unhealthy: false  # default = false
+  sync_period: 1h  # default = 1h
+  wal:
+    enabled: true  # default = true
+    dir: /tmp/loki/wal  # default = wal
+
+pattern_ingester:
+  enabled: false  # default = false
+
+index_gateway:
+  mode: simple  # default = simple, options: simple, ring
+  ring:
+    kvstore:
+      store: inmemory  # default = consul
+    heartbeat_period: 15s  # default = 15s
+    heartbeat_timeout: 1m  # default = 1m
+    num_tokens: 128  # default = 128
+    replication_factor: 1  # default = 3
+    instance_id: ${HOSTNAME:-"loki-index_gateway"}  # default = hostname
+    instance_port: 9095  # default = 0
+    instance_addr: 127.0.0.1  # default = ""
+
+bloom_build:
+  enabled: false  # default = false
+
+bloom_gateway:
+  enabled: false  # default = false
+
+# Thanos object store configuration
+storage_config:
+  index_cache_validity: 5m  # default = 5m
+  use_thanos_objstore: true  # default = false, opt-in for Loki 3.6.x
+  object_store:
+    s3:
+      endpoint: 127.0.0.1:9000
+      bucket_name: loki-chunks
+      secret_access_key: minioadmin
+      access_key_id: minioadmin
+      insecure: true  # default = false
+      bucket_lookup_type: auto  # default = auto
+  index_queries_cache_config:
+    embedded_cache:
+      enabled: true  # default = false
+      max_size_mb: 100  # default = 100
+      ttl: 1h  # default = 1h
+  max_chunk_batch_size: 50  # default = 50
+  tsdb_shipper:
+    active_index_directory: /tmp/loki/tsdb-shipper-active  # default = ""
+    cache_location: /tmp/loki/tsdb-shipper-cache  # default = ""
+    cache_ttl: 24h  # default = 24h
+    index_gateway_client:
+      grpc_client_config:
+        grpc_compression: snappy  # default = ""
+        connect_timeout: 5s  # default = 5s
+      server_address: 127.0.0.1:9095  # default = ""
+  bloom_shipper:
+    working_directory: /tmp/loki/blooms  # default = ""
+    metas_cache:
+      embedded_cache:
+        enabled: true  # default = false
+    metas_lru_cache:
+      enabled: true  # default = false
+
+chunk_store_config:
+  chunk_cache_config:
+    default_validity: 1h  # default = 0 (no expiry)
+    embedded_cache:
+      enabled: true  # default = false
+      max_size_mb: 100  # default = 100
+      ttl: 1h  # default = 1h
+  chunk_cache_config_l2:
+    default_validity: 1h
+    embedded_cache:
+      enabled: true
+      max_size_mb: 100
+      ttl: 1h
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb  # options: tsdb (recommended for v13)
+      object_store: s3  # options: s3, gcs, azure, swift, filesystem
+      schema: v13  # latest schema version
+      index:
+        path_prefix: index/
+        prefix: index_
+        period: 24h  # default = 24h
+      chunks:
+        prefix: chunks_
+        period: 24h  # default = 24h
+
+compactor:
+  working_directory: /tmp/loki/compactor  # default = ""
+  compaction_interval: 10m  # default = 10m
+  retention_enabled: true  # default = false
+  retention_delete_delay: 2h  # default = 2h
+  delete_request_store: s3  # default = "", options: s3, gcs, azure, swift, filesystem
+  delete_request_store_key_prefix: index/  # default = ""
+  delete_request_store_db_type: boltdb  # default = boltdb
+  compactor_ring:
+    kvstore:
+      store: inmemory  # default = consul
+    heartbeat_period: 15s  # default = 15s
+    heartbeat_timeout: 10m  # default = 1m, increased for single-node to avoid unhealthy marking
+    replication_factor: 1  # default = 3
+    instance_id: ${HOSTNAME:-"loki-compactor"}  # default = hostname
+    instance_port: 9095  # default = 0
+    instance_addr: 127.0.0.1  # default = ""
+  tables_to_compact: 0  # default = 0 (all)
+  skip_latest_n_tables: 0  # default = 0
+
+compactor_grpc_client:
+  grpc_compression: snappy  # default = ""
+  connect_timeout: 5s  # default = 5s
+
+limits_config:
+  ingestion_rate_strategy: local  # default = global, options: local, global
+  ingestion_rate_mb: 10  # default = 4
+  ingestion_burst_size_mb: 20  # default = 6
+  per_stream_rate_limit: 3MB  # default = 3MB
+  per_stream_rate_limit_burst: 15MB  # default = 15MB
+  reject_old_samples: true  # default = true
+  reject_old_samples_max_age: 1w  # default = 1w
+  unordered_writes: true  # default = true
+  max_line_size: 256KB  # default = 256KB
+  max_line_size_truncate: true  # default = false
+  increment_duplicate_timestamp: true  # default = false
+  discover_log_levels: true  # default = true
+  max_query_lookback: 168h  # default = 0 (no limit)
+  max_query_length: 30d1h  # default = 721h (30d1h)
+  max_cache_freshness_per_query: 10m  # default = 10m
+  tsdb_precompute_chunks: true  # default = false
+  max_entries_limit_per_query: 5000  # default = 5000
+  query_timeout: 1m  # default = 1m
+  split_queries_by_interval: 1h  # default = 1h
+  volume_enabled: true  # default = true
+  retention_period: 168h  # default = 0 (disabled)
+  allow_structured_metadata: true  # default = true
+  bloom_gateway_enable_filtering: false  # default = false
+  bloom_creation_enabled: false  # default = false
+
+frontend_worker:
+  frontend_address: 127.0.0.1:9095  # default = ""
+  query_frontend_grpc_client:
+    grpc_compression: snappy  # default = ""
+    connect_timeout: 5s  # default = 5s
+  query_scheduler_grpc_client:
+    grpc_compression: snappy  # default = ""
+    connect_timeout: 5s  # default = 5s
+
+ingest_limits:
+  enabled: false  # default = false
+
+tracing:
+  enabled: false  # default = true
+
+analytics:
+  reporting_enabled: false  # default = true
+
+common:
+  path_prefix: /tmp/loki  # default = ""
+  storage:
+    object_store:
+      s3:
+        endpoint: 127.0.0.1:9000
+        bucket_name: loki-chunks
+        secret_access_key: minioadmin
+        access_key_id: minioadmin
+        insecure: true  # default = false
+        bucket_lookup_type: auto  # default = auto
+  persist_tokens: false  # default = false
+  replication_factor: 1  # default = 3
+  ring:
+    kvstore:
+      store: inmemory  # default = consul
+    heartbeat_period: 15s  # default = 15s
+    heartbeat_timeout: 10m  # default = 1m, increased for single-node to avoid unhealthy marking
+    num_tokens: 128  # default = 128
+    replication_factor: 1  # default = 3
+    instance_id: ${HOSTNAME:-"loki-common"}  # default = hostname
+    instance_port: 9095  # default = 0
+    instance_addr: 127.0.0.1  # default = ""
+  instance_addr: 127.0.0.1  # default = ""
+  compactor_address: 127.0.0.1:3100  # default = ""
+  compactor_grpc_address: 127.0.0.1:9095  # default = ""
