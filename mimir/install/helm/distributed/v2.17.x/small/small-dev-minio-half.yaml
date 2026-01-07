@@ -1,0 +1,183 @@
+# These values configure the Grafana Mimir cluster with HALF resources compared to small-dev-minio.yaml
+# Suitable for resource-constrained local development and testing environments.
+# MinIO is enabled for local object storage.
+
+alertmanager:
+  persistentVolume:
+    enabled: true
+  replicas: 2
+  resources:
+    limits:
+      memory: 700Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+  statefulSet:
+    enabled: true
+
+compactor:
+  persistentVolume:
+    size: 20Gi
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+distributor:
+  replicas: 2
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+ingester:
+  persistentVolume:
+    size: 50Gi
+  replicas: 3
+  resources:
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 50m
+      memory: 512Mi
+  topologySpreadConstraints: {}
+  affinity: {}
+  zoneAwareReplication:
+    enabled: false
+
+admin-cache:
+  enabled: true
+  replicas: 3
+
+chunks-cache:
+  enabled: true
+  replicas: 3
+
+index-cache:
+  enabled: true
+  replicas: 3
+
+metadata-cache:
+  enabled: true
+  replicas: 3
+
+results-cache:
+  enabled: true
+  replicas: 3
+
+minio:
+  enabled: true
+  replicas: 1
+  persistence:
+    size: 50Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+overrides_exporter:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+querier:
+  replicas: 1
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+query_frontend:
+  replicas: 1
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+ruler:
+  replicas: 1
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+store_gateway:
+  persistentVolume:
+    size: 10Gi
+  replicas: 3
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+  topologySpreadConstraints: {}
+  affinity: {}
+  zoneAwareReplication:
+    enabled: false
+
+nginx:
+  replicas: 1
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+# Grafana Enterprise Metrics feature related
+admin_api:
+  replicas: 1
+  resources:
+    limits:
+      memory: 64Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+gateway:
+  replicas: 1
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+
+
+# Continuous test for automated validation
+continuous_test:
+  enabled: true
+  replicas: 1
+  auth:
+    type: tenantId
+    tenant: "mimir-continuous-test"
+  numSeries: 1000
+  maxQueryAge: "48h"
+  runInterval: "5m"
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]

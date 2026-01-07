@@ -1,0 +1,266 @@
+# These values configure the Grafana Mimir cluster with HALF resources compared to small-dev-s3.yaml
+# Suitable for resource-constrained environments while maintaining high availability with same replica counts.
+# Total resources: ~14 CPU, ~25.5 GB (vs ~28 CPU, ~51 GB in small-dev-s3.yaml)
+#
+# This configuration maintains:
+# - Same replica counts for high availability
+# - Pod anti-affinity rules for ingesters and store-gateways
+# - Zone-aware replication
+# - S3 backend storage
+
+# Global tolerations for tainted nodes
+global:
+  tolerations:
+    - key: app-support
+      operator: Equal
+      value: multi-platform-all
+      effect: NoSchedule
+
+alertmanager:
+  persistentVolume:
+    enabled: true
+    storageClass: efs-sc  # Change to 'standard' for Minikube
+  replicas: 2
+  resources:
+    limits:
+      memory: 700Mi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  statefulSet:
+    enabled: true
+
+compactor:
+  persistentVolume:
+    size: 20Gi
+    storageClass: efs-sc  # Change to 'standard' for Minikube
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 768Mi
+
+distributor:
+  replicas: 2
+  resources:
+    limits:
+      memory: 2.8Gi
+    requests:
+      cpu: 1
+      memory: 2Gi
+
+ingester:
+  persistentVolume:
+    size: 50Gi
+    storageClass: efs-sc  # Change to 'standard' for Minikube
+  replicas: 3
+  resources:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 1750m
+      memory: 4Gi
+  topologySpreadConstraints: {}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: target # support for enterprise.legacyLabels
+                operator: In
+                values:
+                  - ingester
+          topologyKey: 'kubernetes.io/hostname'
+
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - ingester
+          topologyKey: 'kubernetes.io/hostname'
+
+  zoneAwareReplication:
+    topologyKey: 'kubernetes.io/hostname'
+
+admin-cache:
+  enabled: true
+  replicas: 3
+
+chunks-cache:
+  enabled: true
+  replicas: 3
+
+index-cache:
+  enabled: true
+  replicas: 3
+
+metadata-cache:
+  enabled: true
+  replicas: 3
+
+results-cache:
+  enabled: true
+  replicas: 3
+
+minio:
+  enabled: false
+
+mimir:
+  structuredConfig:
+    server:
+      log_level: warn
+    common:
+      storage:
+        backend: s3
+        s3:
+          endpoint: s3.ap-south-1.amazonaws.com
+          bucket_name: scnx-global-dev-aps1-metrics
+          region: ap-south-1
+    alertmanager_storage:
+      backend: s3
+      storage_prefix: alertmanager
+      s3:
+        endpoint: s3.ap-south-1.amazonaws.com
+        bucket_name: scnx-global-dev-aps1-metrics
+        region: ap-south-1
+    ruler_storage:
+      backend: s3
+      storage_prefix: ruler
+      s3:
+        endpoint: s3.ap-south-1.amazonaws.com
+        bucket_name: scnx-global-dev-aps1-metrics
+        region: ap-south-1
+    # Data retention: Delete blocks older than 7 days
+    limits:
+      compactor_blocks_retention_period: 7d
+
+overrides_exporter:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+querier:
+  replicas: 1
+  resources:
+    limits:
+      memory: 2.8Gi
+    requests:
+      cpu: 1
+      memory: 2Gi
+
+query_frontend:
+  replicas: 1
+  resources:
+    limits:
+      memory: 1.4Gi
+    requests:
+      cpu: 1
+      memory: 1Gi
+
+ruler:
+  replicas: 1
+  resources:
+    limits:
+      memory: 1.4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+store_gateway:
+  persistentVolume:
+    size: 10Gi
+    storageClass: efs-sc  # Change to 'standard' for Minikube
+  replicas: 3
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 768Mi
+  topologySpreadConstraints: {}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: target # support for enterprise.legacyLabels
+                operator: In
+                values:
+                  - store-gateway
+          topologyKey: 'kubernetes.io/hostname'
+
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - store-gateway
+          topologyKey: 'kubernetes.io/hostname'
+  zoneAwareReplication:
+    topologyKey: 'kubernetes.io/hostname'
+
+nginx:
+  replicas: 1
+  resources:
+    limits:
+      memory: 365Mi
+    requests:
+      cpu: 500m
+      memory: 256Mi
+
+# Grafana Enterprise Metrics feature related
+admin_api:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+gateway:
+  replicas: 1
+  resources:
+    limits:
+      memory: 365Mi
+    requests:
+      cpu: 500m
+      memory: 256Mi
+
+# Rollout operator configuration
+rollout_operator:
+  enabled: true
+  # Disable OpenTelemetry tracing to fix connection refused errors
+  env:
+    - name: OTEL_SDK_DISABLED
+      value: "true"
+
+# Continuous test for automated validation
+continuous_test:
+  enabled: true
+  replicas: 1
+  extraArgs:
+    log.level: info
+  auth:
+    type: tenantId
+    tenant: "mimir-continuous-test"
+  numSeries: 1000
+  maxQueryAge: "48h"
+  runInterval: "5m"
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]

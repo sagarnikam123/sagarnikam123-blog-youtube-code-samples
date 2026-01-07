@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: efs.csi.aws.com
+    volume.kubernetes.io/storage-provisioner: efs.csi.aws.com
+  creationTimestamp: "2025-12-02T03:56:27Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  labels:
+    app.kubernetes.io/component: compactor
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/name: mimir
+  name: storage-mimir-compactor-0
+  namespace: mimir-test
+  resourceVersion: "548570593"
+  uid: 1b65bc5e-b329-4b54-9297-061513f37f1f
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: efs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-1b65bc5e-b329-4b54-9297-061513f37f1f
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 20Gi
+  phase: Bound

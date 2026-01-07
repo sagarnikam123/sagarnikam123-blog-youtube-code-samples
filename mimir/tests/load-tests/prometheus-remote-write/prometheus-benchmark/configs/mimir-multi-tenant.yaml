@@ -1,0 +1,37 @@
+# Multi-Tenant Mimir Load Test
+# 3 Prometheus instances, each writing to different tenant
+
+prometheus:
+  replicaCount: 3
+
+  # Each replica writes to different tenant
+  remoteWrite:
+    - url: http://mimir-gateway.mimir-test.svc.cluster.local/api/v1/push
+      headers:
+        X-Scope-OrgID: tenant-{{ .Values.prometheus.replicaIndex | default "1" }}
+      queueConfig:
+        capacity: 20000
+        maxShards: 20
+        minShards: 2
+        maxSamplesPerSend: 2000
+        batchSendDeadline: 5s
+
+  scrapeInterval: 30s
+  scrapeTimeout: 10s
+
+# More metric generators per tenant
+nodeExporter:
+  enabled: true
+  replicaCount: 30  # 10 per Prometheus
+
+cadvisor:
+  enabled: true
+  replicaCount: 15  # 5 per Prometheus
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

@@ -1,0 +1,30 @@
+# Loki SingleBinary - Azure AKS Overrides
+#
+# Install:
+#   helm install loki grafana/loki -n loki --create-namespace \
+#     --version 6.49.0 \
+#     -f values-base.yaml -f values-aks.yaml
+#
+# Prerequisites:
+#   - AKS cluster with Azure Disk CSI driver
+#   - StorageClass 'managed-premium' or 'managed-csi' available
+
+# Use Azure managed disk storage class
+singleBinary:
+  persistence:
+    storageClass: managed-csi
+
+# Standard security context for AKS
+loki:
+  podSecurityContext:
+    fsGroup: 10001
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+
+# LoadBalancer for external access (creates Azure LB)
+gateway:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"

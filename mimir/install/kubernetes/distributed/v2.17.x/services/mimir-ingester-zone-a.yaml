@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: mimir
+    meta.helm.sh/release-namespace: mimir-test
+  creationTimestamp: "2025-12-02T03:55:37Z"
+  labels:
+    app.kubernetes.io/component: ingester
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mimir
+    app.kubernetes.io/part-of: memberlist
+    app.kubernetes.io/version: 2.17.0
+    helm.sh/chart: mimir-distributed-5.8.0
+    name: ingester-zone-a
+    rollout-group: ingester
+    zone: zone-a
+  name: mimir-ingester-zone-a
+  namespace: mimir-test
+  resourceVersion: "548569544"
+  uid: 651bf96b-dd83-4c75-b152-ff759fa287cb
+spec:
+  clusterIP: 172.20.175.158
+  clusterIPs:
+  - 172.20.175.158
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http-metrics
+    port: 8080
+    protocol: TCP
+    targetPort: http-metrics
+  - name: grpc
+    port: 9095
+    protocol: TCP
+    targetPort: grpc
+  selector:
+    app.kubernetes.io/component: ingester
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/name: mimir
+    rollout-group: ingester
+    zone: zone-a
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

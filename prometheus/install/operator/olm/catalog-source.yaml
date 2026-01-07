@@ -1,0 +1,22 @@
+# Prometheus Operator Catalog Source for OLM (vanilla Kubernetes)
+#
+# Prerequisites:
+#   Install OLM first:
+#   curl -sL https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.28.0/install.sh | bash -s v0.28.0
+#
+# Apply:
+#   kubectl apply -f catalog-source.yaml
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: prometheus-operator-catalog
+  namespace: olm
+spec:
+  sourceType: grpc
+  image: quay.io/operatorhubio/catalog:latest
+  displayName: Community Operators
+  publisher: OperatorHub.io
+  updateStrategy:
+    registryPoll:
+      interval: 30m

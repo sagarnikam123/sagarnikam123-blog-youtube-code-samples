@@ -1,0 +1,46 @@
+# LokiStack - Small Size
+# For small production workloads
+# Ingestion: ~500GB/day
+#
+# Prerequisites:
+#   1. Loki Operator installed
+#   2. Storage secret created (see storage-secret.yaml)
+#
+# Apply:
+#   kubectl apply -f lokistack-small.yaml
+
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: lokistack-small
+  namespace: loki
+spec:
+  size: 1x.small
+  storage:
+    schemas:
+      - version: v13
+        effectiveDate: "2024-04-01"
+    secret:
+      name: lokistack-storage
+      type: s3
+  storageClassName: gp3  # Adjust for your cluster
+  tenants:
+    mode: static
+    authentication:
+      - tenantName: application
+        tenantId: application
+      - tenantName: infrastructure
+        tenantId: infrastructure
+  limits:
+    global:
+      retention:
+        days: 30
+    tenants:
+      application:
+        ingestion:
+          ingestionRate: 10
+          ingestionBurstSize: 20
+      infrastructure:
+        ingestion:
+          ingestionRate: 5
+          ingestionBurstSize: 10

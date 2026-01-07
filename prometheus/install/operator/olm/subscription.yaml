@@ -1,0 +1,28 @@
+# Prometheus Operator Subscription for OLM (vanilla Kubernetes)
+#
+# Prerequisites:
+#   1. OLM installed
+#   2. Catalog source applied (catalog-source.yaml)
+#
+# Apply:
+#   kubectl apply -f subscription.yaml
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: prometheus-operator
+  namespace: operators
+spec:
+  channel: beta
+  installPlanApproval: Automatic
+  name: prometheus
+  source: prometheus-operator-catalog
+  sourceNamespace: olm
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: prometheus-operator-group
+  namespace: operators
+spec:
+  targetNamespaces: []  # Watch all namespaces

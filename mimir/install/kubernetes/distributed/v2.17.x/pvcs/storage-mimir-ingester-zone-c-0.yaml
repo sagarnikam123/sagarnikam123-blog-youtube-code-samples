@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: efs.csi.aws.com
+    volume.kubernetes.io/storage-provisioner: efs.csi.aws.com
+  creationTimestamp: "2025-12-02T03:56:32Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  labels:
+    app.kubernetes.io/component: ingester
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/name: mimir
+    rollout-group: ingester
+    zone: zone-c
+  name: storage-mimir-ingester-zone-c-0
+  namespace: mimir-test
+  resourceVersion: "548570771"
+  uid: e3ea980d-df45-4a52-aee6-a4f24287f00b
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: efs-sc
+  volumeMode: Filesystem
+  volumeName: pvc-e3ea980d-df45-4a52-aee6-a4f24287f00b
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 50Gi
+  phase: Bound

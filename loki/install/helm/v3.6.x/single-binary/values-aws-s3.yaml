@@ -1,0 +1,64 @@
+# Loki SingleBinary - AWS S3 Storage
+#
+# Install (with EKS):
+#   helm install loki grafana/loki -n loki --create-namespace \
+#     --version 6.49.0 \
+#     -f values-base.yaml -f values-aws-s3.yaml -f values-eks.yaml
+#
+# Prerequisites:
+#   - S3 bucket created (e.g., my-loki-chunks)
+#   - IAM role/credentials with S3 access
+#   - Update bucket name and region below
+#
+# Authentication options:
+#   1. IAM Role for Service Account (IRSA) - recommended for EKS
+#   2. Access key/secret (set below)
+#   3. Instance profile (EC2)
+
+loki:
+  storage:
+    type: s3
+    bucketNames:
+      chunks: my-loki-chunks      # Change to your bucket name
+      ruler: my-loki-chunks
+    s3:
+      endpoint: null              # Leave null for AWS S3
+      region: us-east-1           # Change to your region
+      accessKeyId: null           # Set if not using IRSA
+      secretAccessKey: null       # Set if not using IRSA
+      s3ForcePathStyle: false
+      insecure: false
+
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  storage_config:
+    tsdb_shipper:
+      active_index_directory: /var/loki/tsdb-shipper-active
+      cache_location: /var/loki/tsdb-shipper-cache
+      cache_ttl: 24h
+
+  compactor:
+    working_directory: /var/loki/compactor
+    retention_enabled: true
+    delete_request_store: s3
+
+  limits_config:
+    retention_period: 168h  # 7 days
+
+# Persistence still needed for WAL and cache
+singleBinary:
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Disable built-in MinIO
+minio:
+  enabled: false

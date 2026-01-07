@@ -1,0 +1,43 @@
+// Load testing configuration
+// Scrapes multiple targets for high-volume testing
+
+// Scrape Avalanche metric generator
+prometheus.scrape "avalanche" {
+  targets = [
+    {"__address__" = "avalanche:9001", "job" = "avalanche"},
+  ]
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+}
+
+// Scrape multiple node-exporters
+prometheus.scrape "node_exporter" {
+  targets = [
+    {"__address__" = "node-exporter-1:9100", "instance" = "node-1"},
+    {"__address__" = "node-exporter-2:9100", "instance" = "node-2"},
+    {"__address__" = "node-exporter-3:9100", "instance" = "node-3"},
+  ]
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+}
+
+// Remote write with high throughput settings
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir-gateway.mimir-test.svc.cluster.local/api/v1/push"
+
+    headers = {
+      "X-Scope-OrgID" = "load-test",
+    }
+
+    queue_config {
+      capacity             = 50000
+      max_shards           = 50
+      min_shards           = 5
+      max_samples_per_send = 5000
+      batch_send_deadline  = "3s"
+      max_backoff          = "30s"
+    }
+  }
+}

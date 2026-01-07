@@ -1,0 +1,120 @@
+---
+# Pre-provision PVCs for Mimir components
+# Apply before helm install: kubectl apply -f pre-provision-pvcs.yaml
+
+# Kafka PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-data-mimir-kafka-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Alertmanager PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-alertmanager-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Compactor PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-compactor-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Ingester Zone-A PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-ingester-zone-a-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Ingester Zone-B PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-ingester-zone-b-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Ingester Zone-C PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-ingester-zone-c-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Store-Gateway Zone-A PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-store-gateway-zone-a-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Store-Gateway Zone-B PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-store-gateway-zone-b-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Store-Gateway Zone-C PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-mimir-store-gateway-zone-c-0
+  namespace: mimir-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

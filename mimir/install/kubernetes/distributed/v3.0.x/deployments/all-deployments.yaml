@@ -1,0 +1,1119 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: continuous-test
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+    name: mimir-continuous-test
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: continuous-test
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: continuous-test
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+        namespace: mimir-test
+      spec:
+        containers:
+        - args:
+          - -target=continuous-test
+          - -config.expand-env=true
+          - -config.file=/etc/mimir/mimir.yaml
+          - -activity-tracker.filepath=
+          - -server.http-listen-port=8080
+          - -tests.write-read-series-test.num-series=1000
+          - -tests.write-read-series-test.max-query-age=48h
+          - -tests.write-endpoint=http://mimir-gateway.mimir-test.svc:80
+          - -tests.read-endpoint=http://mimir-gateway.mimir-test.svc:80/prometheus
+          - -tests.run-interval=5m
+          - -tests.tenant-id=mimir-continuous-test
+          image: grafana/mimir:r368-547a06a0
+          imagePullPolicy: IfNotPresent
+          name: continuous-test
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/mimir
+            name: config
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: distributor
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+      app.kubernetes.io/part-of: memberlist
+    name: mimir-distributor
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: distributor
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 15%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: distributor
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+          app.kubernetes.io/part-of: memberlist
+        namespace: mimir-test
+      spec:
+        containers:
+        - args:
+          - -target=distributor
+          - -config.expand-env=true
+          - -config.file=/etc/mimir/mimir.yaml
+          - -server.grpc.keepalive.max-connection-age=60s
+          - -server.grpc.keepalive.max-connection-age-grace=5m
+          - -server.grpc.keepalive.max-connection-idle=1m
+          - -shutdown-delay=90s
+          env:
+          - name: GOMAXPROCS
+            value: "8"
+          image: grafana/mimir:r368-547a06a0
+          imagePullPolicy: IfNotPresent
+          name: distributor
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          - containerPort: 9095
+            name: grpc
+            protocol: TCP
+          - containerPort: 7946
+            name: memberlist
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/mimir
+            name: config
+          - mountPath: /var/mimir
+            name: runtime-config
+          - mountPath: /data
+            name: storage
+          - mountPath: /active-query-tracker
+            name: active-queries
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 100
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: distributor
+              app.kubernetes.io/instance: mimir
+              app.kubernetes.io/name: mimir
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: mimir-runtime
+          name: runtime-config
+        - emptyDir: {}
+          name: storage
+        - emptyDir: {}
+          name: active-queries
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: gateway
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+    name: mimir-gateway
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 15%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: gateway
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+        namespace: mimir-test
+      spec:
+        containers:
+        - image: docker.io/nginxinc/nginx-unprivileged:1.29-alpine
+          imagePullPolicy: IfNotPresent
+          name: gateway
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/nginx/nginx.conf
+            name: nginx-config
+            subPath: nginx.conf
+          - mountPath: /tmp
+            name: tmp
+          - mountPath: /docker-entrypoint.d
+            name: docker-entrypoint-d-override
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 30
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: gateway
+              app.kubernetes.io/instance: mimir
+              app.kubernetes.io/name: mimir
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: mimir-runtime
+          name: runtime-config
+        - configMap:
+            defaultMode: 420
+            name: mimir-gateway-nginx
+          name: nginx-config
+        - emptyDir: {}
+          name: docker-entrypoint-d-override
+        - emptyDir: {}
+          name: tmp
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app: minio
+    name: mimir-minio
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: minio
+    strategy:
+      rollingUpdate:
+        maxSurge: 100%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app: minio
+        name: mimir-minio
+      spec:
+        containers:
+        - command:
+          - /bin/sh
+          - -ce
+          - /usr/bin/docker-entrypoint.sh minio server /export -S /etc/minio/certs/
+            --address :9000 --console-address :9001
+          env:
+          - name: MINIO_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                key: rootUser
+                name: mimir-minio
+          - name: MINIO_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: rootPassword
+                name: mimir-minio
+          - name: MINIO_PROMETHEUS_AUTH_TYPE
+            value: public
+          image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+          imagePullPolicy: IfNotPresent
+          name: minio
+          ports:
+          - containerPort: 9000
+            name: http
+            protocol: TCP
+          - containerPort: 9001
+            name: http-console
+            protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp/credentials
+            name: minio-user
+            readOnly: true
+          - mountPath: /export
+            name: export
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 0
+          fsGroupChangePolicy: OnRootMismatch
+          runAsGroup: 0
+          runAsUser: 0
+        serviceAccount: minio-sa
+        serviceAccountName: minio-sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: export
+          persistentVolumeClaim:
+            claimName: mimir-minio
+        - name: minio-user
+          secret:
+            defaultMode: 420
+            secretName: mimir-minio
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: overrides-exporter
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+    name: mimir-overrides-exporter
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: overrides-exporter
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 15%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: overrides-exporter
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+        namespace: mimir-test
+      spec:
+        containers:
+        - args:
+          - -target=overrides-exporter
+          - -config.expand-env=true
+          - -config.file=/etc/mimir/mimir.yaml
+          image: grafana/mimir:r368-547a06a0
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: overrides-exporter
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          - containerPort: 9095
+            name: grpc
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/mimir
+            name: config
+          - mountPath: /var/mimir
+            name: runtime-config
+          - mountPath: /data
+            name: storage
+          - mountPath: /active-query-tracker
+            name: active-queries
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: mimir-runtime
+          name: runtime-config
+        - emptyDir: {}
+          name: storage
+        - emptyDir: {}
+          name: active-queries
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: querier
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+      app.kubernetes.io/part-of: memberlist
+    name: mimir-querier
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 2
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: querier
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 15%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: querier
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+          app.kubernetes.io/part-of: memberlist
+      spec:
+        containers:
+        - args:
+          - -target=querier
+          - -config.expand-env=true
+          - -config.file=/etc/mimir/mimir.yaml
+          - -querier.store-gateway-client.grpc-max-recv-msg-size=209715200
+          env:
+          - name: GOMAXPROCS
+            value: "5"
+          image: grafana/mimir:r368-547a06a0
+          imagePullPolicy: IfNotPresent
+          name: querier
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          - containerPort: 9095
+            name: grpc
+            protocol: TCP
+          - containerPort: 7946
+            name: memberlist
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/mimir
+            name: config
+          - mountPath: /var/mimir
+            name: runtime-config
+          - mountPath: /data
+            name: storage
+          - mountPath: /active-query-tracker
+            name: active-queries
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 180
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: querier
+              app.kubernetes.io/instance: mimir
+              app.kubernetes.io/name: mimir
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: mimir-runtime
+          name: runtime-config
+        - emptyDir: {}
+          name: storage
+        - emptyDir: {}
+          name: active-queries
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: query-frontend
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+    name: mimir-query-frontend
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: query-frontend
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 15%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: query-frontend
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+        namespace: mimir-test
+      spec:
+        containers:
+        - args:
+          - -target=query-frontend
+          - -config.expand-env=true
+          - -config.file=/etc/mimir/mimir.yaml
+          - -server.grpc.keepalive.max-connection-age=30s
+          - -shutdown-delay=90s
+          image: grafana/mimir:r368-547a06a0
+          imagePullPolicy: IfNotPresent
+          name: query-frontend
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          - containerPort: 9095
+            name: grpc
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/mimir
+            name: runtime-config
+          - mountPath: /etc/mimir
+            name: config
+          - mountPath: /data
+            name: storage
+          - mountPath: /active-query-tracker
+            name: active-queries
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 390
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: query-frontend
+              app.kubernetes.io/instance: mimir
+              app.kubernetes.io/name: mimir
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: mimir-runtime
+          name: runtime-config
+        - emptyDir: {}
+          name: storage
+        - emptyDir: {}
+          name: active-queries
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: query-scheduler
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+    name: mimir-query-scheduler
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 2
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: query-scheduler
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: query-scheduler
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+      spec:
+        containers:
+        - args:
+          - -target=query-scheduler
+          - -config.expand-env=true
+          - -config.file=/etc/mimir/mimir.yaml
+          image: grafana/mimir:r368-547a06a0
+          imagePullPolicy: IfNotPresent
+          name: query-scheduler
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          - containerPort: 9095
+            name: grpc
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/mimir
+            name: runtime-config
+          - mountPath: /etc/mimir
+            name: config
+          - mountPath: /data
+            name: storage
+          - mountPath: /active-query-tracker
+            name: active-queries
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 180
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: query-scheduler
+              app.kubernetes.io/instance: mimir
+              app.kubernetes.io/name: mimir
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: mimir-runtime
+          name: runtime-config
+        - emptyDir: {}
+          name: storage
+        - emptyDir: {}
+          name: active-queries
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: rollout-operator
+    name: mimir-rollout-operator
+    namespace: mimir-test
+  spec:
+    minReadySeconds: 10
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: rollout-operator
+    strategy:
+      rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: rollout-operator
+        namespace: mimir-test
+      spec:
+        containers:
+        - args:
+          - -kubernetes.namespace=mimir-test
+          - -server-tls.enabled=true
+          - -server-tls.self-signed-cert.secret-name=certificate
+          - -server-tls.self-signed-cert.dns-name=mimir-rollout-operator.mimir-test.svc
+          image: grafana/rollout-operator:v0.32.0
+          imagePullPolicy: IfNotPresent
+          name: rollout-operator
+          ports:
+          - containerPort: 8001
+            name: http-metrics
+            protocol: TCP
+          - containerPort: 8443
+            name: https
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir-rollout-operator
+        serviceAccountName: mimir-rollout-operator
+        terminationGracePeriodSeconds: 30
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    labels:
+      app.kubernetes.io/component: ruler
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+      app.kubernetes.io/part-of: memberlist
+    name: mimir-ruler
+    namespace: mimir-test
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: ruler
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/name: mimir
+    strategy:
+      rollingUpdate:
+        maxSurge: 50%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+        labels:
+          app.kubernetes.io/component: ruler
+          app.kubernetes.io/instance: mimir
+          app.kubernetes.io/name: mimir
+          app.kubernetes.io/part-of: memberlist
+        namespace: mimir-test
+      spec:
+        containers:
+        - args:
+          - -target=ruler
+          - -config.expand-env=true
+          - -config.file=/etc/mimir/mimir.yaml
+          - -distributor.remote-timeout=10s
+          image: grafana/mimir:r368-547a06a0
+          imagePullPolicy: IfNotPresent
+          name: ruler
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+            protocol: TCP
+          - containerPort: 9095
+            name: grpc
+            protocol: TCP
+          - containerPort: 7946
+            name: memberlist
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: http-metrics
+              scheme: HTTP
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/mimir
+            name: config
+          - mountPath: /var/mimir
+            name: runtime-config
+          - mountPath: /data
+            name: storage
+          - mountPath: /active-query-tracker
+            name: active-queries
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: mimir
+        serviceAccountName: mimir
+        terminationGracePeriodSeconds: 600
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: ruler
+              app.kubernetes.io/instance: mimir
+              app.kubernetes.io/name: mimir
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: mimir.yaml
+              path: mimir.yaml
+            name: mimir-config
+          name: config
+        - configMap:
+            defaultMode: 420
+            name: mimir-runtime
+          name: runtime-config
+        - emptyDir: {}
+          name: storage
+        - emptyDir: {}
+          name: active-queries
+kind: List
+metadata: {}

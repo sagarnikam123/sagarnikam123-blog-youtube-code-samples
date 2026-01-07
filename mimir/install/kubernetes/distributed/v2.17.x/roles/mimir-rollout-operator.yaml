@@ -1,0 +1,42 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    meta.helm.sh/release-name: mimir
+    meta.helm.sh/release-namespace: mimir-test
+  creationTimestamp: "2025-12-01T14:51:35Z"
+  labels:
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: rollout-operator
+    app.kubernetes.io/version: v0.28.0
+    helm.sh/chart: rollout-operator-0.30.0
+  name: mimir-rollout-operator
+  namespace: mimir-test
+  resourceVersion: "547917266"
+  uid: 0bbd506c-67e6-4193-977a-b63e5b334fea
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+  - get
+  - watch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - list
+  - get
+  - watch
+  - patch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets/status
+  verbs:
+  - update

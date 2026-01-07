@@ -1,0 +1,33 @@
+# LokiStack - Demo Size
+# For development and testing only
+# Ingestion: ~20GB/day
+#
+# Prerequisites:
+#   1. Loki Operator installed
+#   2. Storage secret created:
+#      kubectl create secret generic lokistack-storage -n loki \
+#        --from-literal=endpoint=http://minio:9000 \
+#        --from-literal=bucketnames=loki-chunks \
+#        --from-literal=access_key_id=loki \
+#        --from-literal=access_key_secret=supersecret
+#
+# Apply:
+#   kubectl apply -f lokistack-demo.yaml
+
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: lokistack-demo
+  namespace: loki
+spec:
+  size: 1x.demo
+  storage:
+    schemas:
+      - version: v13
+        effectiveDate: "2024-04-01"
+    secret:
+      name: lokistack-storage
+      type: s3
+  storageClassName: standard
+  tenants:
+    mode: openshift-logging  # or 'static' for vanilla K8s

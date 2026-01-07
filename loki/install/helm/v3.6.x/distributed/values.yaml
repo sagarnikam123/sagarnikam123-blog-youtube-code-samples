@@ -1,0 +1,110 @@
+# Loki v3.6.x - Distributed (Microservices) Mode
+# Use with: helm install loki grafana/loki -f default-values.yaml -f distributed/values.yaml
+#
+# Best for: Large production workloads (>1TB/day)
+# Components: 10+ individual microservices for maximum scalability
+
+# Global configuration for memberlist fix
+global:
+  extraEnv:
+    - name: MY_POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+  extraArgs:
+    - "-config.expand-env=true"
+
+deploymentMode: Distributed
+
+loki:
+  auth_enabled: false
+  ui:
+    enabled: true
+  server:
+    log_level: warn
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  ingester:
+    chunk_encoding: snappy
+  querier:
+    max_concurrent: 4
+  pattern_ingester:
+    enabled: true
+  limits_config:
+    allow_structured_metadata: true
+    volume_enabled: true
+  # Memberlist configuration to fix ring instability
+  memberlist:
+    bind_addr:
+      - ${MY_POD_IP}
+    abort_if_cluster_join_fails: false
+    compression_enabled: false
+
+# Distributed mode components
+ingester:
+  replicas: 3
+  zoneAwareReplication:
+    enabled: false
+distributor:
+  replicas: 3
+  maxUnavailable: 2
+querier:
+  replicas: 3
+  maxUnavailable: 2
+queryFrontend:
+  replicas: 2
+  maxUnavailable: 1
+queryScheduler:
+  replicas: 2
+compactor:
+  replicas: 1
+indexGateway:
+  replicas: 2
+  maxUnavailable: 1
+ruler:
+  enabled: true
+  replicas: 0
+
+# Disable bloom components (optional feature)
+bloomPlanner:
+  replicas: 0
+bloomBuilder:
+  replicas: 0
+bloomGateway:
+  replicas: 0
+
+# Disable SimpleScalable components
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# Disable SingleBinary
+singleBinary:
+  replicas: 0
+
+# Gateway for external access
+gateway:
+  service:
+    type: LoadBalancer
+
+# Enable MinIO for object storage
+minio:
+  enabled: true
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
+    fsGroupChangePolicy: "OnRootMismatch"
+  persistence:
+    enabled: true
+    size: 5Gi

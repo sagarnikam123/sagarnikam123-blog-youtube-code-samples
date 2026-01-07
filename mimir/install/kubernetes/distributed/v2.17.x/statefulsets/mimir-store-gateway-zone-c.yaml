@@ -1,0 +1,198 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    grafana.com/prepare-downscale-http-path: store-gateway/prepare-shutdown
+    grafana.com/prepare-downscale-http-port: "8080"
+    grafana.com/rollout-downscale-leader: mimir-store-gateway-zone-b
+    meta.helm.sh/release-name: mimir
+    meta.helm.sh/release-namespace: mimir-test
+    rollout-max-unavailable: "50"
+  creationTimestamp: "2025-12-02T03:56:41Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/component: store-gateway
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mimir
+    app.kubernetes.io/part-of: memberlist
+    app.kubernetes.io/version: 2.17.0
+    grafana.com/min-time-between-zones-downscale: 30m
+    grafana.com/prepare-downscale: "true"
+    helm.sh/chart: mimir-distributed-5.8.0
+    name: store-gateway-zone-c
+    rollout-group: store-gateway
+    zone: zone-c
+  name: mimir-store-gateway-zone-c
+  namespace: mimir-test
+  resourceVersion: "548575677"
+  uid: f585a303-be7d-4d27-a0f5-80e0af6eccfc
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: store-gateway
+      app.kubernetes.io/instance: mimir
+      app.kubernetes.io/name: mimir
+      rollout-group: store-gateway
+      zone: zone-c
+  serviceName: mimir-store-gateway-headless
+  template:
+    metadata:
+      annotations:
+        checksum/config: e3c9c077c6eea9cc262f85d8c79f1157bcee27d1e1026ee21f16495061faef1b
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/component: store-gateway
+        app.kubernetes.io/instance: mimir
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: mimir
+        app.kubernetes.io/part-of: memberlist
+        app.kubernetes.io/version: 2.17.0
+        helm.sh/chart: mimir-distributed-5.8.0
+        name: store-gateway-zone-c
+        rollout-group: store-gateway
+        zone: zone-c
+      namespace: mimir-test
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: rollout-group
+                operator: In
+                values:
+                - store-gateway
+              - key: zone
+                operator: NotIn
+                values:
+                - zone-c
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - args:
+        - -target=store-gateway
+        - -config.expand-env=true
+        - -config.file=/etc/mimir/mimir.yaml
+        - -store-gateway.sharding-ring.instance-availability-zone=zone-c
+        - -server.grpc-max-send-msg-size-bytes=209715200
+        env:
+        - name: GOMAXPROCS
+          value: "5"
+        - name: GOMEMLIMIT
+          value: "805306368"
+        image: grafana/mimir:2.17.0
+        imagePullPolicy: IfNotPresent
+        name: store-gateway
+        ports:
+        - containerPort: 8080
+          name: http-metrics
+          protocol: TCP
+        - containerPort: 9095
+          name: grpc
+          protocol: TCP
+        - containerPort: 7946
+          name: memberlist
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ready
+            port: http-metrics
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 768Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/mimir
+          name: config
+        - mountPath: /var/mimir
+          name: runtime-config
+        - mountPath: /data
+          name: storage
+        - mountPath: /active-query-tracker
+          name: active-queries
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: mimir
+      serviceAccountName: mimir
+      terminationGracePeriodSeconds: 120
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: store-gateway
+            app.kubernetes.io/instance: mimir
+            app.kubernetes.io/name: mimir
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: mimir.yaml
+            path: mimir.yaml
+          name: mimir-config
+        name: config
+      - configMap:
+          defaultMode: 420
+          name: mimir-runtime
+        name: runtime-config
+      - emptyDir: {}
+        name: active-queries
+  updateStrategy:
+    type: OnDelete
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      creationTimestamp: null
+      name: storage
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: efs-sc
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: mimir-store-gateway-zone-c-586f7ff9fd
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: mimir-store-gateway-zone-c-586f7ff9fd
+  updatedReplicas: 1

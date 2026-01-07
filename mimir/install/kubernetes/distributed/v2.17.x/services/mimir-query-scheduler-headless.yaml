@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: mimir
+    meta.helm.sh/release-namespace: mimir-test
+  creationTimestamp: "2025-12-02T03:55:55Z"
+  labels:
+    app.kubernetes.io/component: query-scheduler
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mimir
+    app.kubernetes.io/version: 2.17.0
+    helm.sh/chart: mimir-distributed-5.8.0
+    prometheus.io/service-monitor: "false"
+  name: mimir-query-scheduler-headless
+  namespace: mimir-test
+  resourceVersion: "548569871"
+  uid: 6809f18c-26ab-4a98-a172-fd5c1e5f7174
+spec:
+  clusterIP: None
+  clusterIPs:
+  - None
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http-metrics
+    port: 8080
+    protocol: TCP
+    targetPort: http-metrics
+  - name: grpc
+    port: 9095
+    protocol: TCP
+    targetPort: grpc
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: query-scheduler
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/name: mimir
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

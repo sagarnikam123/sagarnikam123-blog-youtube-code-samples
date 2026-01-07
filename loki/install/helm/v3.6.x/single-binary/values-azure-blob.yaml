@@ -1,0 +1,64 @@
+# Loki SingleBinary - Azure Blob Storage
+#
+# Install (with AKS):
+#   helm install loki grafana/loki -n loki --create-namespace \
+#     --version 6.49.0 \
+#     -f values-base.yaml -f values-azure-blob.yaml -f values-aks.yaml
+#
+# Prerequisites:
+#   - Azure Storage Account created
+#   - Container 'loki-chunks' created in storage account
+#   - Update account name and key below
+#
+# Authentication options:
+#   1. Managed Identity (recommended for AKS)
+#   2. Account key (set below)
+#   3. Connection string
+
+loki:
+  storage:
+    type: azure
+    bucketNames:
+      chunks: loki-chunks         # Container name
+      ruler: loki-chunks
+    azure:
+      accountName: mystorageaccount    # Change to your storage account
+      accountKey: null                  # Set if not using Managed Identity
+      connectionString: null            # Alternative to accountKey
+      useManagedIdentity: false         # Set true for AKS with Managed Identity
+      userAssignedId: null              # For user-assigned managed identity
+      endpointSuffix: blob.core.windows.net
+
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: azure
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  storage_config:
+    tsdb_shipper:
+      active_index_directory: /var/loki/tsdb-shipper-active
+      cache_location: /var/loki/tsdb-shipper-cache
+      cache_ttl: 24h
+
+  compactor:
+    working_directory: /var/loki/compactor
+    retention_enabled: true
+    delete_request_store: azure
+
+  limits_config:
+    retention_period: 168h  # 7 days
+
+# Persistence still needed for WAL and cache
+singleBinary:
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Disable built-in MinIO
+minio:
+  enabled: false

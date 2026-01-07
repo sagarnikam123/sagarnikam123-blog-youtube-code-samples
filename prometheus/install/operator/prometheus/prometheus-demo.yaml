@@ -1,0 +1,46 @@
+# Prometheus - Demo Size
+# For development and testing only
+# Retention: 24h, Replicas: 1
+#
+# Prerequisites:
+#   1. Prometheus Operator installed
+#   2. RBAC created:
+#      kubectl apply -f rbac.yaml
+#
+# Apply:
+#   kubectl apply -f prometheus-demo.yaml
+
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus-demo
+  namespace: monitoring
+spec:
+  replicas: 1
+  version: v2.54.1
+  serviceAccountName: prometheus
+  serviceMonitorSelector: {}
+  serviceMonitorNamespaceSelector: {}
+  podMonitorSelector: {}
+  podMonitorNamespaceSelector: {}
+  retention: 24h
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  securityContext:
+    fsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi

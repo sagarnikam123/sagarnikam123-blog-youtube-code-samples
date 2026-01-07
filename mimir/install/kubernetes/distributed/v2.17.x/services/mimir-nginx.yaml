@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: mimir
+    meta.helm.sh/release-namespace: mimir-test
+  creationTimestamp: "2025-12-02T03:55:46Z"
+  labels:
+    app.kubernetes.io/component: nginx
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mimir
+    app.kubernetes.io/version: 2.17.0
+    helm.sh/chart: mimir-distributed-5.8.0
+  name: mimir-nginx
+  namespace: mimir-test
+  resourceVersion: "548569777"
+  uid: 2735742b-0485-4e0a-a1e6-136a03b76d5e
+spec:
+  clusterIP: 172.20.147.76
+  clusterIPs:
+  - 172.20.147.76
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http-metric
+    port: 80
+    protocol: TCP
+    targetPort: http-metric
+  selector:
+    app.kubernetes.io/component: nginx
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/name: mimir
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

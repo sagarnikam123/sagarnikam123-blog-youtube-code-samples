@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: mimir
+    meta.helm.sh/release-namespace: mimir-test
+  creationTimestamp: "2025-12-02T03:56:08Z"
+  labels:
+    app.kubernetes.io/component: store-gateway
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mimir
+    app.kubernetes.io/part-of: memberlist
+    app.kubernetes.io/version: 2.17.0
+    helm.sh/chart: mimir-distributed-5.8.0
+    name: store-gateway-zone-b
+    rollout-group: store-gateway
+    zone: zone-b
+  name: mimir-store-gateway-zone-b
+  namespace: mimir-test
+  resourceVersion: "548570039"
+  uid: 39d6b970-9836-4c81-9e67-21efeae4d495
+spec:
+  clusterIP: 172.20.134.10
+  clusterIPs:
+  - 172.20.134.10
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http-metrics
+    port: 8080
+    protocol: TCP
+    targetPort: http-metrics
+  - name: grpc
+    port: 9095
+    protocol: TCP
+    targetPort: grpc
+  selector:
+    app.kubernetes.io/component: store-gateway
+    app.kubernetes.io/instance: mimir
+    app.kubernetes.io/name: mimir
+    rollout-group: store-gateway
+    zone: zone-b
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

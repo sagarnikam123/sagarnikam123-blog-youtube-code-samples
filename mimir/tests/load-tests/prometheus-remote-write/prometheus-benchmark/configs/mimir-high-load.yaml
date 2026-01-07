@@ -1,0 +1,38 @@
+# High Load Mimir Test
+# 5 Prometheus instances, 100 targets, aggressive scraping
+
+prometheus:
+  replicaCount: 5
+
+  remoteWrite:
+    - url: http://mimir-gateway.mimir-test.svc.cluster.local/api/v1/push
+      headers:
+        X-Scope-OrgID: load-test
+      queueConfig:
+        capacity: 50000
+        maxShards: 50
+        minShards: 5
+        maxSamplesPerSend: 5000
+        batchSendDeadline: 3s
+        maxBackoff: 30s
+
+  scrapeInterval: 15s  # Aggressive scraping
+  scrapeTimeout: 10s
+
+# High target count
+nodeExporter:
+  enabled: true
+  replicaCount: 100  # 20 per Prometheus
+
+cadvisor:
+  enabled: true
+  replicaCount: 50   # 10 per Prometheus
+
+# Higher resources for load generation
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 2Gi

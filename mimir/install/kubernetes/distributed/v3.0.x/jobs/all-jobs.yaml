@@ -1,0 +1,60 @@
+apiVersion: v1
+items:
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    labels:
+      app: mimir-distributed-make-bucket-job
+    name: mimir-make-minio-buckets
+    namespace: mimir-test
+  spec:
+    backoffLimit: 6
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app: mimir-distributed-job
+          batch.kubernetes.io/job-name: mimir-make-minio-buckets
+          job-name: mimir-make-minio-buckets
+      spec:
+        containers:
+        - command:
+          - /bin/sh
+          - /config/initialize
+          env:
+          - name: MINIO_ENDPOINT
+            value: mimir-minio
+          - name: MINIO_PORT
+            value: "9000"
+          image: quay.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
+          imagePullPolicy: IfNotPresent
+          name: minio-mc
+          resources:
+            requests:
+              memory: 128Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /config
+            name: minio-configuration
+        dnsPolicy: ClusterFirst
+        restartPolicy: OnFailure
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: minio-configuration
+          projected:
+            defaultMode: 420
+            sources:
+            - configMap:
+                name: mimir-minio
+            - secret:
+                name: mimir-minio
+kind: List
+metadata: {}

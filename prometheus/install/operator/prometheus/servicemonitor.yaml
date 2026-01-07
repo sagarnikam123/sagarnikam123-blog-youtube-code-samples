@@ -1,0 +1,46 @@
+# Example ServiceMonitor for Prometheus Operator
+#
+# ServiceMonitors define how Prometheus discovers and scrapes targets
+#
+# Apply:
+#   kubectl apply -f servicemonitor.yaml
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: example-app
+  namespace: monitoring
+  labels:
+    team: frontend
+spec:
+  selector:
+    matchLabels:
+      app: example-app
+  namespaceSelector:
+    matchNames:
+      - default
+      - production
+  endpoints:
+    - port: web
+      interval: 30s
+      path: /metrics
+      scheme: http
+---
+# ServiceMonitor for Prometheus self-monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: prometheus-self
+  namespace: monitoring
+  labels:
+    team: frontend
+spec:
+  selector:
+    matchLabels:
+      operated-prometheus: "true"
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  endpoints:
+    - port: web
+      interval: 30s

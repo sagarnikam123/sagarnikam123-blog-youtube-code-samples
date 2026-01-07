@@ -1,0 +1,23 @@
+# Prometheus Operator Subscription for OpenShift
+#
+# Note: OpenShift includes built-in monitoring. This is for additional Prometheus instances.
+#
+# Install via OperatorHub:
+#   1. OpenShift Console > Operators > OperatorHub
+#   2. Search "Prometheus Operator"
+#   3. Install
+#
+# Or apply this file:
+#   oc apply -f subscription.yaml
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: prometheus-operator
+  namespace: openshift-operators
+spec:
+  channel: beta
+  installPlanApproval: Automatic
+  name: prometheus
+  source: community-operators
+  sourceNamespace: openshift-marketplace

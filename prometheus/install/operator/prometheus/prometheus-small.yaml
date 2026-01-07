@@ -1,0 +1,66 @@
+# Prometheus - Small Size
+# For small production workloads
+# Retention: 15d, Replicas: 2
+#
+# Prerequisites:
+#   1. Prometheus Operator installed
+#   2. RBAC created (see rbac.yaml)
+#
+# Apply:
+#   kubectl apply -f prometheus-small.yaml
+
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus-small
+  namespace: monitoring
+spec:
+  replicas: 2
+  version: v2.54.1
+  serviceAccountName: prometheus
+  serviceMonitorSelector:
+    matchLabels:
+      team: frontend
+  serviceMonitorNamespaceSelector: {}
+  podMonitorSelector: {}
+  podMonitorNamespaceSelector: {}
+  retention: 15d
+  retentionSize: 45GB
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  securityContext:
+    fsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: gp3  # Adjust for your cluster
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+  alerting:
+    alertmanagers:
+      - namespace: monitoring
+        name: alertmanager-main
+        port: web
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+  ruleNamespaceSelector: {}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: prometheus
+            topologyKey: kubernetes.io/hostname
