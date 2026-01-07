@@ -2,16 +2,16 @@ version: '3.8'
 
 services:
   loki:
-    image: grafana/loki:3.5.8
+    image: grafana/loki:3.6.3
     container_name: loki-monolithic
     ports:
       - "3100:3100"
       - "9095:9095"
     volumes:
-      - ../configs:/etc/loki/configs:ro
-      - loki-data:/tmp/loki
+      - ../../configs/v3.x/v3.6.x/loki-docker-filesystem.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
     command:
-      - -config.file=/etc/loki/configs/v3.x/v3.5.x/loki-3.5.x-ui-filesystem-inmemory.yaml
+      - -config.file=/etc/loki/config.yaml
       - -config.expand-env=true
     environment:
       - HOSTNAME=loki-docker
