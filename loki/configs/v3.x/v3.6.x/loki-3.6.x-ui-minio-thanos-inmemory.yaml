@@ -38,9 +38,9 @@ server:
   http_listen_port: 3100  # default = 3100
   grpc_listen_address: 127.0.0.1  # default = "" (all interfaces)
   grpc_listen_port: 9095  # default = 9095
-  http_server_read_timeout: 10m  # default = 30s
-  http_server_write_timeout: 10m  # default = 30s
-  http_server_idle_timeout: 5m  # default = 2m
+  http_server_read_timeout: 10m  # default = 30s, increased for large queries
+  http_server_write_timeout: 10m  # default = 30s, increased for large queries
+  http_server_idle_timeout: 5m  # default = 2m, increased for long connections
   grpc_server_max_recv_msg_size: 16777216  # default = 4MB, 16MB for large logs
   grpc_server_max_send_msg_size: 16777216  # default = 4MB, 16MB for large responses
   grpc_server_max_concurrent_streams: 0  # default = 100, 0 = unlimited
@@ -201,7 +201,7 @@ ingester:
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-ingester"}  # default = hostname
-  concurrent_flushes: 4  # default = 32
+  concurrent_flushes: 4  # default = 32, reduced for single-node
   flush_check_period: 30s  # default = 30s
   chunk_retain_period: 0s  # default = 0s
   chunk_idle_period: 30m  # default = 30m
@@ -326,8 +326,8 @@ compactor_grpc_client:
 
 limits_config:
   ingestion_rate_strategy: local  # default = global, options: local, global
-  ingestion_rate_mb: 10  # default = 4
-  ingestion_burst_size_mb: 20  # default = 6
+  ingestion_rate_mb: 10  # default = 4, increased for higher throughput
+  ingestion_burst_size_mb: 20  # default = 6, increased for burst handling
   per_stream_rate_limit: 3MB  # default = 3MB
   per_stream_rate_limit_burst: 15MB  # default = 15MB
   reject_old_samples: true  # default = true
@@ -337,7 +337,7 @@ limits_config:
   max_line_size_truncate: true  # default = false
   increment_duplicate_timestamp: true  # default = false
   discover_log_levels: true  # default = true
-  max_query_lookback: 168h  # default = 0 (no limit)
+  max_query_lookback: 168h  # default = 0s (no limit), set to 7 days
   max_query_length: 30d1h  # default = 721h (30d1h)
   max_cache_freshness_per_query: 10m  # default = 10m
   tsdb_precompute_chunks: true  # default = false
