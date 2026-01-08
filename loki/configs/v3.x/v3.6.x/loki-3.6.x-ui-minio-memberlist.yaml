@@ -315,7 +315,7 @@ limits_config:
   ingestion_burst_size_mb: 1000
   max_label_name_length: 1024
   max_label_value_length: 5120
-  reject_old_samples: true
+  reject_old_samples: false  # disabled to allow out-of-order logs
   reject_old_samples_max_age: 168h
   max_line_size: 16MB
   max_global_streams_per_user: 100000

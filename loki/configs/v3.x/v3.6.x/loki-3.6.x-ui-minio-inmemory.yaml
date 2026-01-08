@@ -220,7 +220,7 @@ limits_config:
   ingestion_burst_size_mb: 20
   per_stream_rate_limit: 3MB
   per_stream_rate_limit_burst: 15MB
-  reject_old_samples: true
+  reject_old_samples: false  # disabled to allow out-of-order logs
   reject_old_samples_max_age: 1w
   unordered_writes: true
   max_line_size: 256KB
