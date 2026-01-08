@@ -352,7 +352,7 @@ limits_config:
   ingestion_burst_size_mb: 20  # default = 6, increased for burst handling
   per_stream_rate_limit: 3MB  # default = 3MB
   per_stream_rate_limit_burst: 15MB  # default = 15MB
-  reject_old_samples: true  # default = true
+  reject_old_samples: false  # default = true, disabled to allow out-of-order logs
   reject_old_samples_max_age: 1w  # default = 1w
   unordered_writes: true  # default = true
   max_line_size: 256KB  # default = 256KB
