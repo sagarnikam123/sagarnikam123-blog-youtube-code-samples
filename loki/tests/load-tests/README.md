@@ -7,27 +7,33 @@ Verify system handles normal and peak log ingestion with acceptable performance.
 
 ## Test Scenarios
 
-### 1. Fluent Bit
+### 1. k6 with xk6-loki (Recommended)
+- Professional load testing tool from Grafana Labs
+- Push and query path testing
+- Multi-tenant support
+- Detailed metrics and thresholds
+
+### 2. Fluent Bit
 - High-performance log forwarding to Loki
 - Target: 1K-10K lines/sec
 - Multiple parsers (JSON, logfmt, Apache)
 
-### 2. Promtail
+### 3. Promtail
 - Native Loki log shipper
 - File tailing with position tracking
 - Label extraction and relabeling
 
-### 3. Grafana Alloy
+### 4. Grafana Alloy
 - Multi-tenant log ingestion
 - OpenTelemetry support
 - Service discovery
 
-### 4. flog
+### 5. flog
 - Fake log generator
 - Configurable formats (JSON, Apache, Common)
 - Rate-controlled output
 
-### 5. logcli
+### 6. logcli
 - Query performance testing
 - LogQL validation
 - Tail functionality
@@ -36,6 +42,7 @@ Verify system handles normal and peak log ingestion with acceptable performance.
 
 | Tool | Purpose | Use Case |
 |------|---------|----------|
+| **k6 + xk6-loki** | Load testing | Professional write/read path testing |
 | **Fluent Bit** | Log forwarding | High-throughput ingestion |
 | **Promtail** | Log collection | Native Loki integration |
 | **Grafana Alloy** | Multi-tenant | Production-like scenarios |
@@ -53,6 +60,27 @@ Verify system handles normal and peak log ingestion with acceptable performance.
 - ✅ Resource usage within limits
 
 ## Quick Start
+
+### k6 Load Testing (Recommended)
+
+```bash
+# Build k6 with xk6-loki extension
+xk6 build --with github.com/grafana/xk6-loki@latest
+
+# Run push test
+./k6 run k6/push-test.js
+
+# Run query test
+./k6 run k6/query-test.js
+
+# Run combined write + read test
+./k6 run k6/combined-test.js
+
+# Run with custom VUs and duration
+./k6 run --vus 20 --duration 10m k6/push-test.js
+```
+
+### Other Tools
 
 ```bash
 # Generate fake logs with flog
@@ -90,3 +118,25 @@ histogram_quantile(0.99, rate(loki_request_duration_seconds_bucket{route="loki_a
 # Query latency
 histogram_quantile(0.99, rate(loki_request_duration_seconds_bucket{route=~"loki_api_v1_query.*"}[5m]))
 ```
+
+## k6 Metrics (xk6-loki)
+
+### Push Metrics
+| Metric | Description |
+|--------|-------------|
+| `loki_client_lines` | Total lines pushed |
+| `loki_client_uncompressed_bytes` | Total uncompressed bytes pushed |
+
+### Query Metrics
+| Metric | Description |
+|--------|-------------|
+| `loki_bytes_processed_total` | Total bytes processed by queries |
+| `loki_lines_processed_total` | Total lines processed by queries |
+| `loki_bytes_processed_per_second` | Query throughput (bytes/sec) |
+| `loki_lines_processed_per_second` | Query throughput (lines/sec) |
+
+## Reference
+
+- [Grafana Blog: Load Testing Loki with k6](https://grafana.com/blog/a-quick-guide-to-load-testing-grafana-loki-with-grafana-k6/)
+- [xk6-loki GitHub](https://github.com/grafana/xk6-loki)
+- [k6 Documentation](https://k6.io/docs/)
