@@ -18,7 +18,7 @@
 # • Uses inmemory KV store instead of memberlist
 # • No gossip protocol overhead
 # • Faster startup, simpler operation
-# • heartbeat_timeout: 10m (needed for ring health stability)
+# • readiness_check_ring_health: false (for single-node)
 #
 # Prerequisites:
 # • AWS S3 bucket created
@@ -42,8 +42,8 @@ server:
   http_server_read_timeout: 10m  # default = 30s, increased for large queries
   http_server_write_timeout: 10m  # default = 30s, increased for large queries
   http_server_idle_timeout: 5m  # default = 2m, increased for long connections
-  grpc_server_max_recv_msg_size: 16777216  # default = 4MB, 16MB for large logs
-  grpc_server_max_send_msg_size: 16777216  # default = 4MB, 16MB for large responses
+  grpc_server_max_recv_msg_size: 41943040  # default = 4MB, 40MB for large logs
+  grpc_server_max_send_msg_size: 41943040  # default = 4MB, 40MB for large responses
   grpc_server_max_concurrent_streams: 0  # default = 100, 0 = unlimited
   grpc_server_keepalive_time: 30s  # default = 2h
   grpc_server_keepalive_timeout: 5s  # default = 20s
@@ -64,21 +64,29 @@ distributor:
     instance_id: ${HOSTNAME:-"loki-distributor"}  # default = hostname
     instance_port: 9095  # default = 0 (auto)
     instance_addr: 127.0.0.1  # default = "" (auto-detect)
+  push_worker_count: 512  # default = 256, increased for high throughput
 
 querier:
-  tail_max_duration: 1h  # default = 1h
+  tail_max_duration: 12h  # default = 1h, increased for long tails
   query_ingesters_within: 3h  # default = 3h
   max_concurrent: 4  # default = 4
 
 query_scheduler:
+  max_outstanding_requests_per_tenant: 64000  # default = 32000
   grpc_client_config:
+    max_recv_msg_size: 209715200  # default = 4MB, 200MB for large responses
+    max_send_msg_size: 209715200  # default = 4MB, 200MB for large requests
     grpc_compression: snappy  # default = "", options: gzip, snappy
     connect_timeout: 5s  # default = 5s
-  use_scheduler_ring: false  # default = false
+  use_scheduler_ring: false  # default = false, disabled for single-node
 
 frontend:
+  log_queries_longer_than: 60s  # default = 0, log slow queries
   query_stats_enabled: true  # default = false
+  max_outstanding_per_tenant: 8192  # default = 2048
   grpc_client_config:
+    max_recv_msg_size: 209715200  # default = 4MB, 200MB for large responses
+    max_send_msg_size: 209715200  # default = 4MB, 200MB for large requests
     grpc_compression: snappy  # default = ""
     connect_timeout: 5s  # default = 5s
   address: 127.0.0.1  # default = ""
@@ -94,27 +102,27 @@ query_range:
       default_validity: 1h  # default = 1h
       embedded_cache:
         enabled: true  # default = false
-        max_size_mb: 100  # default = 100
+        max_size_mb: 300  # default = 100, increased for production
         ttl: 1h  # default = 1h
     compression: snappy  # default = "", options: snappy
   cache_results: true  # default = false
-  max_retries: 5  # default = 5
-  cache_index_stats_results: true  # default = false
+  max_retries: 15  # default = 5, increased for reliability
+  cache_index_stats_results: true  # default = true
   index_stats_results_cache:
     cache:
       default_validity: 1h
       embedded_cache:
         enabled: true
-        max_size_mb: 50
+        max_size_mb: 300
         ttl: 1h
     compression: snappy
-  cache_volume_results: true  # default = false
+  cache_volume_results: true  # default = true
   volume_results_cache:
     cache:
       default_validity: 1h
       embedded_cache:
         enabled: true
-        max_size_mb: 50
+        max_size_mb: 300
         ttl: 1h
     compression: snappy
   cache_instant_metric_results: true  # default = false
@@ -123,25 +131,25 @@ query_range:
       default_validity: 1h
       embedded_cache:
         enabled: true
-        max_size_mb: 50
+        max_size_mb: 300
         ttl: 1h
     compression: snappy
-  cache_series_results: true  # default = false
+  cache_series_results: true  # default = true
   series_results_cache:
     cache:
       default_validity: 1h
       embedded_cache:
         enabled: true
-        max_size_mb: 50
+        max_size_mb: 300
         ttl: 1h
     compression: snappy
-  cache_label_results: true  # default = false
+  cache_label_results: true  # default = true
   label_results_cache:
     cache:
       default_validity: 1h
       embedded_cache:
         enabled: true
-        max_size_mb: 50
+        max_size_mb: 300
         ttl: 1h
     compression: snappy
 
@@ -151,7 +159,11 @@ ruler:
     connect_timeout: 5s  # default = 5s
   evaluation_interval: 1m  # default = 1m
   poll_interval: 1m  # default = 1m
-  rule_path: /tmp/loki/rules  # default = /rules
+  storage:
+    type: local
+    local:
+      directory: /data/loki/rules
+  rule_path: /data/loki/rules  # default = /rules
   alertmanager_url: http://127.0.0.1:9093  # default = ""
   ring:
     kvstore:
@@ -165,25 +177,17 @@ ruler:
   enable_api: true  # default = true
   query_stats_enabled: true  # default = false
   wal:
-    dir: /tmp/loki/ruler-wal  # default = ruler-wal
-
-ruler_storage:
-  s3:
-    endpoint: s3.us-east-1.amazonaws.com  # Change to your region
-    region: us-east-1  # Change to your region
-    bucket_name: my-loki-bucket  # Change to your bucket
-    access_key_id: ""  # Set or use IAM role
-    secret_access_key: ""  # Set or use IAM role
-    insecure: false  # default = false, use HTTPS for AWS S3
-    bucket_lookup_type: auto  # default = auto, options: auto, virtual-hosted, path
-  backend: s3  # default = filesystem, options: s3, gcs, azure, swift, filesystem
+    dir: /data/loki/ruler-wal  # default = ruler-wal
 
 ingester_client:
   pool_config:
+    client_cleanup_period: 20s  # default = 15s
     health_check_ingesters: true  # default = true
     remote_timeout: 5s  # default = 1s
-  remote_timeout: 5s  # default = 5s
+  remote_timeout: 10s  # default = 5s, increased for reliability
   grpc_client_config:
+    max_recv_msg_size: 209715200  # default = 4MB, 200MB for large responses
+    max_send_msg_size: 209715200  # default = 4MB, 200MB for large requests
     grpc_compression: snappy  # default = ""
     connect_timeout: 5s  # default = 5s
 
@@ -192,21 +196,22 @@ ingester:
     ring:
       kvstore:
         store: inmemory  # default = consul
-      heartbeat_timeout: 10m  # default = 1m, increased for single-node stability
+      heartbeat_timeout: 10m  # default = 1m, increased for stability
       replication_factor: 1  # default = 3
     num_tokens: 128  # default = 128
     heartbeat_period: 5s  # default = 5s
-    heartbeat_timeout: 10m  # default = 1m, increased for single-node stability
+    heartbeat_timeout: 10m  # default = 1m, increased for stability
+    final_sleep: 0s  # default = 0s
     join_after: 0s  # default = 0s
     min_ready_duration: 15s  # default = 15s
-    readiness_check_ring_health: false  # default = true, false for single-node
+    readiness_check_ring_health: false  # default = true, false for single-node inmemory
     address: 127.0.0.1  # default = ""
     port: 9095  # default = 0
     id: ${HOSTNAME:-"loki-ingester"}  # default = hostname
-  concurrent_flushes: 4  # default = 32, reduced for single-node
+  concurrent_flushes: 64  # default = 32, increased for production
   flush_check_period: 30s  # default = 30s
-  chunk_retain_period: 0s  # default = 0s
-  chunk_idle_period: 30m  # default = 30m
+  chunk_retain_period: 30s  # default = 0s
+  chunk_idle_period: 30s  # default = 30m, reduced for faster flushing
   chunk_block_size: 262144  # default = 262144 (256KB)
   chunk_target_size: 1572864  # default = 1572864 (1.5MB)
   chunk_encoding: snappy  # default = gzip, options: none, gzip, lz4-64k, snappy, lz4-256k, lz4-1M, lz4, flate, zstd
@@ -215,7 +220,7 @@ ingester:
   sync_period: 1h  # default = 1h
   wal:
     enabled: true  # default = true
-    dir: /tmp/loki/wal  # default = wal
+    dir: /data/loki/wal  # default = wal
 
 pattern_ingester:
   enabled: false  # default = false
@@ -245,30 +250,31 @@ storage_config:
   use_thanos_objstore: true  # default = false, opt-in for Loki 3.6.x
   object_store:
     s3:
-      endpoint: s3.us-east-1.amazonaws.com  # Change to your region
-      region: us-east-1  # Change to your region
-      bucket_name: my-loki-bucket  # Change to your bucket
-      access_key_id: ""  # Set or use IAM role
-      secret_access_key: ""  # Set or use IAM role
-      insecure: false  # default = false, use HTTPS for AWS S3
-      bucket_lookup_type: auto  # default = auto
+      endpoint: s3.ap-south-1.amazonaws.com  # default = "", Change to your region
+      region: ap-south-1  # default = "", Change to your region
+      bucket_name: <s3-bucketname>  # default = "", Change to your bucket
+      # access_key_id: ${AWS_ACCESS_KEY_ID}  # default = "", Set or use IAM role
+      # secret_access_key: ${AWS_SECRET_ACCESS_KEY}  # default = "", Set or use IAM role
+      # session_token: ${AWS_SESSION_TOKEN}  # default = "", Set or use IAM role
+      insecure: false  # default = false, use HTTPS for AWS
   index_queries_cache_config:
     embedded_cache:
       enabled: true  # default = false
-      max_size_mb: 100  # default = 100
+      max_size_mb: 300  # default = 100, increased for production
       ttl: 1h  # default = 1h
   max_chunk_batch_size: 50  # default = 50
   tsdb_shipper:
-    active_index_directory: /tmp/loki/tsdb-shipper-active  # default = ""
-    cache_location: /tmp/loki/tsdb-shipper-cache  # default = ""
+    active_index_directory: /data/loki/tsdb-shipper-active  # default = ""
+    cache_location: /data/loki/tsdb-shipper-cache  # default = ""
     cache_ttl: 24h  # default = 24h
     index_gateway_client:
       grpc_client_config:
         grpc_compression: snappy  # default = ""
         connect_timeout: 5s  # default = 5s
       server_address: 127.0.0.1:9095  # default = ""
+    ingestername: ${HOSTNAME:-"loki-storage_config"}  # default = hostname
   bloom_shipper:
-    working_directory: /tmp/loki/blooms  # default = ""
+    working_directory: /data/loki/blooms  # default = ""
     metas_cache:
       embedded_cache:
         enabled: true  # default = false
@@ -280,13 +286,13 @@ chunk_store_config:
     default_validity: 1h  # default = 0 (no expiry)
     embedded_cache:
       enabled: true  # default = false
-      max_size_mb: 100  # default = 100
+      max_size_mb: 300  # default = 100, increased for production
       ttl: 1h  # default = 1h
   chunk_cache_config_l2:
     default_validity: 1h
     embedded_cache:
       enabled: true
-      max_size_mb: 100
+      max_size_mb: 300
       ttl: 1h
 
 schema_config:
@@ -296,26 +302,29 @@ schema_config:
       object_store: s3  # options: s3, gcs, azure, swift, filesystem
       schema: v13  # latest schema version
       index:
-        path_prefix: index/
+        path_prefix: dev-aps1/index/  # EKS cluster prefix for multi-instance segregation
         prefix: index_
         period: 24h  # default = 24h
       chunks:
-        prefix: chunks_
+        prefix: dev-aps1/chunks_  # EKS cluster prefix for multi-instance segregation
         period: 24h  # default = 24h
 
 compactor:
-  working_directory: /tmp/loki/compactor  # default = ""
-  compaction_interval: 10m  # default = 10m
+  working_directory: /data/loki/compactor  # default = ""
+  compaction_interval: 5m  # default = 10m, faster for production
   retention_enabled: true  # default = false
-  retention_delete_delay: 2h  # default = 2h
+  retention_delete_delay: 1h  # default = 2h
+  retention_delete_worker_count: 150  # default = 150
   delete_request_store: s3  # default = "", options: s3, gcs, azure, swift, filesystem
-  delete_request_store_key_prefix: index/  # default = ""
+  delete_request_store_key_prefix: dev-aps1/index/  # EKS cluster prefix for multi-instance segregation
   delete_request_store_db_type: boltdb  # default = boltdb
+  delete_batch_size: 100  # default = 70
+  max_compaction_parallelism: 2  # default = 1
   compactor_ring:
     kvstore:
       store: inmemory  # default = consul
     heartbeat_period: 15s  # default = 15s
-    heartbeat_timeout: 10m  # default = 1m, increased for single-node to avoid unhealthy marking
+    heartbeat_timeout: 10m  # default = 1m, increased for stability
     replication_factor: 1  # default = 3
     instance_id: ${HOSTNAME:-"loki-compactor"}  # default = hostname
     instance_port: 9095  # default = 0
@@ -324,29 +333,34 @@ compactor:
   skip_latest_n_tables: 0  # default = 0
 
 compactor_grpc_client:
+  max_recv_msg_size: 209715200  # default = 4MB, 200MB for large responses
+  max_send_msg_size: 209715200  # default = 4MB, 200MB for large requests
   grpc_compression: snappy  # default = ""
   connect_timeout: 5s  # default = 5s
 
 limits_config:
   ingestion_rate_strategy: local  # default = global, options: local, global
-  ingestion_rate_mb: 10  # default = 4, increased for higher throughput
-  ingestion_burst_size_mb: 20  # default = 6, increased for burst handling
-  per_stream_rate_limit: 3MB  # default = 3MB
-  per_stream_rate_limit_burst: 15MB  # default = 15MB
+  ingestion_rate_mb: 500  # default = 4, high for production
+  ingestion_burst_size_mb: 1000  # default = 6, high for production
+  per_stream_rate_limit: 20MB  # default = 3MB, increased for production
+  per_stream_rate_limit_burst: 40MB  # default = 15MB, increased for production
   reject_old_samples: false  # default = true, disabled to allow out-of-order logs
-  reject_old_samples_max_age: 1w  # default = 1w
+  reject_old_samples_max_age: 168h  # default = 1w
   unordered_writes: true  # default = true
-  max_line_size: 256KB  # default = 256KB
+  max_line_size: 16MB  # default = 256KB, increased for production
   max_line_size_truncate: true  # default = false
   increment_duplicate_timestamp: true  # default = false
   discover_log_levels: true  # default = true
+  max_global_streams_per_user: 100000  # default = 5000, increased for production
   max_query_lookback: 168h  # default = 0s (no limit), set to 7 days
   max_query_length: 30d1h  # default = 721h (30d1h)
+  max_query_parallelism: 64  # default = 32, increased for production
+  tsdb_max_query_parallelism: 32  # default = 128
   max_cache_freshness_per_query: 10m  # default = 10m
   tsdb_precompute_chunks: true  # default = false
-  max_entries_limit_per_query: 5000  # default = 5000
+  max_entries_limit_per_query: 10000  # default = 5000, increased for production
   query_timeout: 1m  # default = 1m
-  split_queries_by_interval: 1h  # default = 1h
+  split_queries_by_interval: 6h  # default = 1h, larger for production
   volume_enabled: true  # default = true
   retention_period: 168h  # default = 0 (disabled), 7 days retention
   allow_structured_metadata: true  # default = true
@@ -355,10 +369,9 @@ limits_config:
 
 frontend_worker:
   frontend_address: 127.0.0.1:9095  # default = ""
-  query_frontend_grpc_client:
-    grpc_compression: snappy  # default = ""
-    connect_timeout: 5s  # default = 5s
-  query_scheduler_grpc_client:
+  grpc_client_config:
+    max_recv_msg_size: 209715200  # default = 4MB, 200MB for large responses
+    max_send_msg_size: 209715200  # default = 4MB, 200MB for large requests
     grpc_compression: snappy  # default = ""
     connect_timeout: 5s  # default = 5s
 
@@ -375,31 +388,31 @@ analytics:
 # AWS S3 Configuration (Thanos Objstore)
 # =============================================================================
 # Update these values for your AWS environment:
+#   - bucket_name: your S3 bucket
+#   - region: your AWS region
 #   - endpoint: s3.<region>.amazonaws.com
-#   - region: your AWS region (e.g., us-east-1, eu-west-1)
-#   - bucket_name: your S3 bucket name
 #   - access_key_id/secret_access_key: or use IAM role/instance profile
 # =============================================================================
 common:
-  path_prefix: /tmp/loki  # default = ""
+  path_prefix: /data/loki  # default = ""
   storage:
     object_store:
       s3:
-        endpoint: s3.us-east-1.amazonaws.com  # Change to your region
-        region: us-east-1  # Change to your region
-        bucket_name: my-loki-bucket  # Change to your bucket
-        access_key_id: ""  # Set or use IAM role
-        secret_access_key: ""  # Set or use IAM role
-        insecure: false  # default = false, use HTTPS for AWS S3
-        bucket_lookup_type: auto  # default = auto
+        endpoint: s3.ap-south-1.amazonaws.com  # default = "", Change to your region
+        region: ap-south-1  # default = "", Change to your region
+        bucket_name: <s3-bucketname>  # default = "", Change to your bucket
+        # access_key_id: ${AWS_ACCESS_KEY_ID}  # default = "", Set or use IAM role
+        # secret_access_key: ${AWS_SECRET_ACCESS_KEY}  # default = "", Set or use IAM role
+        # session_token: ${AWS_SESSION_TOKEN}  # default = "", Set or use IAM role
+        insecure: false  # default = false, use HTTPS for AWS
   persist_tokens: false  # default = false
   replication_factor: 1  # default = 3
   ring:
     kvstore:
       store: inmemory  # default = consul
     heartbeat_period: 15s  # default = 15s
-    heartbeat_timeout: 10m  # default = 1m, increased for single-node to avoid unhealthy marking
-    num_tokens: 128  # default = 128
+    heartbeat_timeout: 10m  # default = 1m, increased for stability
+    num_tokens: 256  # default = 128, more tokens for better distribution
     replication_factor: 1  # default = 3
     instance_id: ${HOSTNAME:-"loki-common"}  # default = hostname
     instance_port: 9095  # default = 0
