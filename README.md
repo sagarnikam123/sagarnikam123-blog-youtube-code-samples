@@ -8,9 +8,10 @@ A curated collection of production-ready code samples, automation frameworks, an
 
 ## 📋 Projects
 
-### 🔍 Logging & Observability
-- **[loki/monolithic/](loki/monolithic/)** - Loki monolithic deployment with comprehensive ring configurations, automated installation, multiple config variants (v2.x/v3.x), and log scraper integrations (Fluent Bit, Vector, Alloy) for local development and testing.
-- **[loki/microservices/](loki/microservices/)** - Loki distributed microservices deployment for development and learning on Minikube with automated setup, comprehensive tooling, and step-by-step guides.
+### 🔍 Observability
+- **[loki/](loki/)** - Grafana Loki deployment configurations for log aggregation.
+- **[mimir/](mimir/)** - Grafana Mimir deployment configurations for long-term metrics storage.
+- **[prometheus/](prometheus/)** - Prometheus deployment and configuration.
 
 ### 🤖 Automation & Infrastructure
 - **[grafana-automation/](grafana-automation/)** - Complete Ansible automation framework for managing Grafana resources with full CRUD operations, multienvironment support, and production-ready security practices.
