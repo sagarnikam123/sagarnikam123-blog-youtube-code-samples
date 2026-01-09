@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOKI_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # 🔧 EDIT THIS VARIABLE TO CHANGE CONFIG:
-LOKI_CONFIG="$LOKI_ROOT/configs/v3.x/v3.6.x/loki-3.6.x-ui-minio-inmemory.yaml"
+LOKI_CONFIG="$LOKI_ROOT/configs/v3.x/v3.6.x/loki-3.6.x-ui-minio-thanos-memberlist.yaml"
 
 # Available configs in configs/v3.x/v3.6.x/:
 #
