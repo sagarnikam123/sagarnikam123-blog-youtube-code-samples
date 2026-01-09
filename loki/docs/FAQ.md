@@ -24,6 +24,180 @@
 
 Use `inmemory` for single-node/monolithic, `memberlist` for multi-node/distributed.
 
+---
+
+## Running Loki
+
+### Running Loki as a Systemd Service (Recommended for Production)
+
+Create the service file `/etc/systemd/system/loki.service`:
+
+```ini
+[Unit]
+Description=Loki Service
+After=network.target
+
+[Service]
+LimitNPROC=1024000
+LimitNOFILE=1024000
+Type=simple
+ExecStart=/opt/loki/loki-linux-arm64 -config.file=/opt/loki/config/loki-config.yml -config.expand-env=true
+WorkingDirectory=/opt/loki
+ExecStartPre=/bin/mkdir -p /var/log/loki
+StandardOutput=file:/var/log/loki/loki.log
+StandardError=file:/var/log/loki/error.log
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Note:** Use `file:` instead of `append:` for older systemd versions. `append:` preserves logs across restarts but requires systemd 240+.
+
+#### Systemd Commands
+
+```bash
+# Reload systemd after creating/editing service file
+sudo systemctl daemon-reload
+
+# Enable service to start on boot
+sudo systemctl enable loki
+
+# Start the service
+sudo systemctl start loki
+
+# Check service status
+sudo systemctl status loki
+
+# View logs
+tail -f /var/log/loki/loki.log
+tail -f /var/log/loki/error.log
+
+# Or use journalctl
+sudo journalctl -u loki -f
+
+# Stop the service
+sudo systemctl stop loki
+
+# Restart the service
+sudo systemctl restart loki
+```
+
+#### Log Rotation for Systemd Logs
+
+Create `/etc/logrotate.d/loki`:
+
+```
+/var/log/loki/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+```
+
+### Running Loki in Background (Using nohup)
+
+For quick testing or when systemd is not available:
+
+```bash
+# Start Loki in background with logs to file
+nohup ./loki-linux-arm64 -config.file=config/loki-config.yml -config.expand-env=true > loki.log 2>&1 &
+
+# Save PID for later management
+echo $! > loki.pid
+
+# View logs
+tail -f loki.log
+
+# Stop Loki using saved PID
+kill $(cat loki.pid)
+
+# Or find and kill by process name
+pkill -f loki-linux-arm64
+
+# Force kill if needed
+pkill -9 -f loki-linux-arm64
+```
+
+#### One-liner with PID file
+
+```bash
+nohup ./loki-linux-arm64 -config.file=config/loki-config.yml -config.expand-env=true > loki.log 2>&1 & echo $! > loki.pid
+```
+
+#### Check if Loki is Running
+
+```bash
+# Using PID file
+ps -p $(cat loki.pid)
+
+# Using process name
+ps aux | grep loki-linux-arm64
+
+# Using pgrep
+pgrep -f loki-linux-arm64
+```
+
+### Running Loki with Screen/Tmux
+
+For interactive sessions where you want to attach/detach:
+
+```bash
+# Using screen
+screen -dmS loki ./loki-linux-arm64 -config.file=config/loki-config.yml -config.expand-env=true
+
+# Attach to session
+screen -r loki
+
+# Detach: Ctrl+A, then D
+
+# Using tmux
+tmux new-session -d -s loki './loki-linux-arm64 -config.file=config/loki-config.yml -config.expand-env=true'
+
+# Attach to session
+tmux attach -t loki
+
+# Detach: Ctrl+B, then D
+```
+
+### Environment Variables in Config
+
+The `-config.expand-env=true` flag enables environment variable expansion in the config file:
+
+```yaml
+# In config file
+storage_config:
+  object_store:
+    s3:
+      access_key_id: ${AWS_ACCESS_KEY_ID}
+      secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+```
+
+Set environment variables before starting:
+
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+./loki-linux-arm64 -config.file=config/loki-config.yml -config.expand-env=true
+```
+
+For systemd, add to service file:
+
+```ini
+[Service]
+Environment="AWS_ACCESS_KEY_ID=your-access-key"
+Environment="AWS_SECRET_ACCESS_KEY=your-secret-key"
+# Or use EnvironmentFile
+EnvironmentFile=/opt/loki/config/loki.env
+```
+
+---
+
 ## Storage
 
 ### What storage backends does Loki support?
@@ -52,6 +226,8 @@ mc mb myminio/loki-data
 ```
 
 Or use the `start-minio.sh` script which creates required buckets automatically.
+
+---
 
 ## Log Collectors
 
@@ -100,28 +276,121 @@ The `parser` option in tail input accepts only ONE parser name:
 
 For mixed log formats, use separate tail inputs per format.
 
-## Helm Installation
+---
 
-### Memberlist warnings during startup
+## Configuration
+
+### Out-of-Order Writes & Timestamp Configuration
+
+#### "entry too far behind" error
 
 ```
-msg="joining memberlist cluster" err="no such host"
+entry with timestamp 2026-01-07 19:43:30 ignored, reason: 'entry too far behind,
+entry timestamp is: 2026-01-07T19:43:30Z, oldest acceptable timestamp is: 2026-01-07T19:43:51Z'
 ```
 
-These warnings are normal during startup. They resolve once the pod is fully up and the memberlist service is available.
+This error occurs when Loki receives log entries with timestamps that are older than what it expects for a given stream.
 
-### MinIO endpoint configuration
+#### How Out-of-Order Ingestion Works
 
-For Helm deployments with bundled MinIO:
+Loki's rule for out-of-order log ingestion:
+
+> **Any logs received within `max_chunk_age/2` (default: 1 hour) of the most recent log received *for a stream* will be accepted. Any log older than this window will be rejected.**
+
+Two critical concepts:
+1. **Most recent log** - The log with the most recent timestamp received by Loki
+2. **For a stream** - Loki determines the most recent log on a **stream-by-stream basis**, so different streams can have different acceptance windows
+
+**Example:**
+- Stream A's latest log: 10:00 → accepts logs from 09:00 onwards
+- Stream B's latest log: 09:30 → accepts logs from 08:30 onwards
+- Same log at 08:45 would be accepted by Stream B but rejected by Stream A
+
+#### Key Configuration Settings
+
+| Setting | Location | Default | Description |
+|---------|----------|---------|-------------|
+| `reject_old_samples` | `limits_config` | `true` | Whether to reject samples older than `reject_old_samples_max_age` |
+| `reject_old_samples_max_age` | `limits_config` | `1w` | Maximum age of samples to accept (e.g., `168h`, `1w`) |
+| `max_chunk_age` | `ingester` | `2h` | Maximum chunk duration; **out-of-order window = max_chunk_age/2** |
+| `query_ingesters_within` | `querier` | `3h` | Time window to query ingesters (affects old data queryability) |
+
+#### Out-of-Order Window Calculation
+
+```
+out_of_order_window = max_chunk_age / 2
+```
+
+With default `max_chunk_age: 2h`:
+- Out-of-order window = 1 hour
+- Logs up to 1 hour behind the stream's latest timestamp are accepted
+
+**⚠️ Warning:** Grafana Labs strongly discourages increasing `max_chunk_age` to create a larger out-of-order window. Instead, use labels to separate streams so they can be ingested independently.
+
+#### Querying Caveats for Older Data
+
+**Important:** If you ingest data older than 2 hours from current time, it will NOT be immediately queryable!
+
+This is because of `query_ingesters_within` (default: 3h). Loki only queries ingesters for data within this window from current time. Data outside this window is only queried from storage.
+
+**The problem:** If you send logs from yesterday, they sit in the ingester until flushed (up to 2 hours). During this time, queries won't find them because:
+- Queries for yesterday don't ask ingesters (outside `query_ingesters_within`)
+- Data hasn't been flushed to storage yet
+
+**Solutions:**
+1. **Wait for flush** - For backfill operations, wait ~2 hours for data to flush to storage
+2. **Increase `query_ingesters_within`** - Set to 48h to query ingesters for older data (NOT recommended - increases ingester load and cost)
+
+#### Configuration Examples
+
+**Allow all old samples (development/testing)**
 ```yaml
-# values-minio.yaml
-loki:
-  storage:
-    s3:
-      endpoint: http://loki-minio.loki.svc:9000
+limits_config:
+  reject_old_samples: false  # accept all samples regardless of age
 ```
 
-Note: The endpoint format is `loki-minio.<namespace>.svc`
+**Production settings (recommended by Grafana Labs)**
+```yaml
+limits_config:
+  reject_old_samples: true
+  reject_old_samples_max_age: 1w  # reject samples older than 1 week
+
+ingester:
+  max_chunk_age: 2h  # out-of-order window of 1 hour (max_chunk_age/2)
+
+querier:
+  query_ingesters_within: 3h  # default, don't increase unless necessary
+```
+
+**Backfill old data (e.g., importing historical logs)**
+```yaml
+limits_config:
+  reject_old_samples: false  # or set reject_old_samples_max_age to cover your data range
+
+# After backfill completes, wait 2 hours for flush, then data is queryable
+```
+
+#### Common Causes of "entry too far behind"
+
+1. **Clock skew** - Log source and Loki have different system times
+2. **Delayed log shipping** - Fluent Bit/Promtail buffering or network delays
+3. **Batch processing** - Processing old log files with historical timestamps
+4. **Incorrect timestamp parsing** - Parser extracting wrong timestamp from logs
+5. **Stream-specific timing** - Different streams have different "most recent" timestamps
+
+#### Related Settings
+
+| Setting | Location | Default | Description |
+|---------|----------|---------|-------------|
+| `increment_duplicate_timestamp` | `limits_config` | `false` | Add 1ns to duplicate timestamps to preserve order |
+| `max_line_size` | `limits_config` | `256KB` | Maximum log line size before rejection/truncation |
+| `max_line_size_truncate` | `limits_config` | `false` | Truncate instead of reject oversized lines |
+
+#### Reference
+
+Content adapted from [The concise guide to Loki: How to work with out-of-order and older logs](https://grafana.com/blog/the-concise-guide-to-loki-how-to-work-with-out-of-order-and-older-logs/) by Grafana Labs.
+
+---
 
 ## Querying
 
@@ -144,43 +413,7 @@ frontend:
   max_outstanding_per_tenant: 2048
 ```
 
-## Troubleshooting
-
-### Loki not starting - compactor error
-
-```
-failed to init delete store: failed to get s3 object
-```
-
-Ensure:
-1. Storage backend (MinIO/S3) is running
-2. Bucket exists
-3. Credentials are correct
-4. Endpoint URL is accessible
-
-### Check Loki health
-
-```bash
-# Ready check
-curl http://127.0.0.1:3100/ready
-
-# Metrics
-curl http://127.0.0.1:3100/metrics
-
-# Config
-curl http://127.0.0.1:3100/config
-```
-
-### View Loki logs
-
-```bash
-# Binary install
-# Check terminal where Loki is running
-
-# Kubernetes
-kubectl logs -n loki -l app.kubernetes.io/name=loki -f
-```
-
+---
 
 ## Metrics & Monitoring
 
@@ -219,16 +452,7 @@ curl -s http://127.0.0.1:2020/api/v1/metrics | jq
 # Get all output metrics
 curl -s http://127.0.0.1:2020/api/v1/metrics | jq '.output'
 
-# Response shows proc_records per Loki output:
-# "loki.0": {"proc_records": 1523, "proc_bytes": 245678, "errors": 0, ...}
-# "loki.1": {"proc_records": 892, "proc_bytes": 156234, "errors": 0, ...}
-```
-
-#### Prometheus Metrics
-
-Fluent Bit also exposes Prometheus format at `http://127.0.0.1:2020/api/v1/metrics/prometheus`
-
-```bash
+# Prometheus format
 curl -s http://127.0.0.1:2020/api/v1/metrics/prometheus | grep fluentbit_output
 ```
 
@@ -244,19 +468,6 @@ Loki exposes Prometheus metrics at `http://127.0.0.1:3100/metrics`
 | `loki_distributor_bytes_received_total` | Total bytes received |
 | `loki_ingester_chunks_created_total` | Chunks created |
 | `loki_ingester_chunks_flushed_total` | Chunks flushed to storage |
-
-#### Example: Check lines ingested into Loki
-
-```bash
-# Total lines received
-curl -s http://127.0.0.1:3100/metrics | grep loki_distributor_lines_received_total
-
-# Total bytes received
-curl -s http://127.0.0.1:3100/metrics | grep loki_distributor_bytes_received_total
-
-# Ingestion rate (lines/sec) - use with Prometheus or calculate delta
-curl -s http://127.0.0.1:3100/metrics | grep loki_distributor_lines_received_total
-```
 
 #### Key Query Metrics
 
@@ -274,14 +485,6 @@ curl -s http://127.0.0.1:3100/metrics | grep loki_distributor_lines_received_tot
 | `loki_compactor_running` | Compactor status (1=running) |
 | `loki_boltdb_shipper_uploads_total` | Index uploads to object store |
 
-#### Health & Status
-
-| Metric | Description |
-|--------|-------------|
-| `loki_build_info` | Loki version info |
-| `loki_ingester_memory_chunks` | In-memory chunks count |
-| `loki_ingester_wal_records_logged_total` | WAL records written |
-
 ### Quick Health Check Commands
 
 ```bash
@@ -293,13 +496,10 @@ curl -s http://127.0.0.1:2020/api/v1/metrics | jq '{
 }'
 
 # Loki: Lines ingested
-curl -s http://127.0.0.1:3100/metrics 2>/dev/null | grep -E "^loki_distributor_lines_received_total"
+curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_distributor_lines_received_total"
 
 # Loki: Ready status
 curl -s http://127.0.0.1:3100/ready
-
-# Loki: Ingester status
-curl -s http://127.0.0.1:3100/ring | head -20
 ```
 
 ### How much data received in Loki (MB/GB)?
@@ -320,8 +520,6 @@ curl -s http://127.0.0.1:3100/metrics | grep loki_distributor_bytes_received_tot
 
 ### What is the last data/timestamp received in Loki?
 
-Use LogQL to find the most recent log entry:
-
 ```bash
 # Using logcli - get latest log timestamp
 logcli query '{job=~".+"}' --limit=1 --since=1h
@@ -340,12 +538,6 @@ curl -G "http://127.0.0.1:3100/loki/api/v1/query_range" \
   jq -r '.data.result[0].values[0][0] | tonumber / 1000000000 | strftime("%Y-%m-%d %H:%M:%S")'
 ```
 
-Using Loki metrics (approximate):
-```bash
-# Check when last chunk was created (indicates recent ingestion)
-curl -s http://127.0.0.1:3100/metrics | grep loki_ingester_chunks_created_total
-```
-
 ### How many failed logs in Fluent Bit?
 
 ```bash
@@ -354,40 +546,25 @@ curl -s http://127.0.0.1:2020/api/v1/metrics | jq '[.output[].errors] | add'
 
 # Detailed error breakdown per output
 curl -s http://127.0.0.1:2020/api/v1/metrics | jq '.output | to_entries[] | {name: .key, errors: .value.errors, retries: .value.retries, retries_failed: .value.retries_failed, dropped: .value.dropped_records}'
-
-# Prometheus format - total errors
-curl -s http://127.0.0.1:2020/api/v1/metrics/prometheus | grep -E "fluentbit_output_errors_total|fluentbit_output_retries"
 ```
 
-Key error metrics:
-| Metric | Description |
-|--------|-------------|
-| `errors` | Total failed send attempts |
-| `retries` | Retry attempts made |
-| `retries_failed` | Retries that ultimately failed |
-| `dropped_records` | Records dropped (buffer overflow, etc.) |
-
-### What errors are in Fluent Bit or Loki? (Using Metrics)
+### What errors are in Fluent Bit or Loki?
 
 #### Fluent Bit Error Detection
 
 ```bash
-# Check for any errors in outputs
 curl -s http://127.0.0.1:2020/api/v1/metrics | jq '{
   total_errors: [.output[].errors] | add,
   total_retries_failed: [.output[].retries_failed] | add,
   total_dropped: [.output[].dropped_records] | add,
   outputs_with_errors: [.output | to_entries[] | select(.value.errors > 0) | .key]
 }'
-
-# Prometheus format - all error-related metrics
-curl -s http://127.0.0.1:2020/api/v1/metrics/prometheus | grep -E "(error|retry|drop)"
 ```
 
 #### Loki Error Detection
 
 ```bash
-# Discarded/rejected samples (rate limiting, validation errors)
+# Discarded/rejected samples
 curl -s http://127.0.0.1:3100/metrics | grep loki_discarded_samples_total
 
 # Request errors by route
@@ -396,23 +573,9 @@ curl -s http://127.0.0.1:3100/metrics | grep -E "loki_request_duration_seconds_c
 # Ingester errors
 curl -s http://127.0.0.1:3100/metrics | grep -E "loki_ingester.*(error|failed)"
 
-# Compactor errors
-curl -s http://127.0.0.1:3100/metrics | grep -E "loki_compactor.*(error|failed)"
-
 # WAL errors
 curl -s http://127.0.0.1:3100/metrics | grep -E "loki_ingester_wal.*(error|failed|corrupt)"
 ```
-
-#### Key Error Metrics Summary
-
-| Component | Metric | Description |
-|-----------|--------|-------------|
-| **Fluent Bit** | `errors` | Failed output attempts |
-| **Fluent Bit** | `retries_failed` | Exhausted retries |
-| **Fluent Bit** | `dropped_records` | Lost records |
-| **Loki** | `loki_discarded_samples_total` | Rejected logs (by reason) |
-| **Loki** | `loki_request_duration_seconds_count{status_code=~"4..\\|5.."}` | HTTP errors |
-| **Loki** | `loki_ingester_wal_corruptions_total` | WAL corruption events |
 
 #### Common Error Reasons in `loki_discarded_samples_total`
 
@@ -424,7 +587,166 @@ curl -s http://127.0.0.1:3100/metrics | grep -E "loki_ingester_wal.*(error|faile
 | `per_stream_rate_limit` | Per-stream rate limit exceeded |
 | `invalid_labels` | Malformed or invalid labels |
 
-#### Quick Error Summary Script
+### Quick Operational Status Commands
+
+#### All-in-One Health Check Script
+
+```bash
+#!/bin/bash
+LOKI_URL="${1:-http://127.0.0.1:3100}"
+
+echo "=== Loki Health Check ==="
+
+echo "--- Ready Status ---"
+curl -s "$LOKI_URL/ready"
+echo ""
+
+echo "--- Ingestion ---"
+curl -s "$LOKI_URL/metrics" | grep -E "^loki_distributor_(lines_received_total|bytes_received_total|ingester_clients)"
+
+echo "--- Memory & Chunks ---"
+curl -s "$LOKI_URL/metrics" | grep -E "^loki_ingester_(memory_chunks|chunks_created_total|chunks_flushed_total|flush_queue_length)"
+
+echo "--- WAL ---"
+curl -s "$LOKI_URL/metrics" | grep -E "^loki_ingester_wal_(bytes_in_use|disk_full_failures_total)"
+
+echo "--- Compactor ---"
+curl -s "$LOKI_URL/metrics" | grep -E "^loki_boltdb_shipper_compactor_running"
+
+echo "--- Errors ---"
+curl -s "$LOKI_URL/metrics" | grep -E "^loki_discarded_samples_total"
+```
+
+#### Individual Status Commands
+
+```bash
+# Distributor - log ingestion
+curl -s http://127.0.0.1:3100/metrics | grep loki_distributor_lines_received_total
+curl -s http://127.0.0.1:3100/metrics | grep loki_distributor_ingester_clients
+
+# Ingester ring (HTML page)
+curl -s http://127.0.0.1:3100/ring
+
+# Chunks in memory
+curl -s http://127.0.0.1:3100/metrics | grep loki_ingester_memory_chunks
+
+# WAL status
+curl -s http://127.0.0.1:3100/metrics | grep loki_ingester_wal_bytes_in_use
+
+# Chunks flushed to storage
+curl -s http://127.0.0.1:3100/metrics | grep loki_ingester_chunks_flushed_total
+
+# Compactor ring (HTML page)
+curl -s http://127.0.0.1:3100/compactor/ring
+
+# Scheduler ring (if use_scheduler_ring: true)
+curl -s http://127.0.0.1:3100/scheduler/ring
+
+# Index gateway ring (if mode: ring)
+curl -s http://127.0.0.1:3100/indexgateway/ring
+```
+
+#### Key Metrics Reference
+
+| Category | Metric | Description | Alert If |
+|----------|--------|-------------|----------|
+| **Ingestion** | `loki_distributor_lines_received_total` | Log lines received | Rate drops |
+| **Ingestion** | `loki_distributor_ingester_clients` | Connected ingesters | = 0 |
+| **Memory** | `loki_ingester_memory_chunks` | In-memory chunks | Too high |
+| **WAL** | `loki_ingester_wal_bytes_in_use` | WAL disk usage | Growing fast |
+| **WAL** | `loki_ingester_wal_disk_full_failures_total` | Disk full errors | > 0 |
+| **Chunks** | `loki_ingester_chunks_flushed_total` | Chunks to storage | Not increasing |
+| **Chunks** | `loki_ingester_chunks_flush_failures_total` | Flush failures | > 0 |
+| **Compactor** | `loki_boltdb_shipper_compactor_running` | Compactor status | = 0 |
+| **Errors** | `loki_discarded_samples_total` | Rejected logs | > 0 |
+| **Cache** | `loki_cache_hits` / `loki_cache_fetched_keys` | Hit ratio | Low ratio |
+
+#### Understanding Chunk Flush Timing
+
+Chunks are flushed to storage when:
+
+| Condition | Config Setting | Default |
+|-----------|----------------|---------|
+| Stream idle | `chunk_idle_period` | 30m |
+| Chunk age reached | `max_chunk_age` | 2h |
+| Chunk size reached | `chunk_target_size` | 1.5MB |
+| Graceful shutdown | N/A | Always |
+
+If `loki_ingester_chunks_flushed_total` is 0:
+- Streams are still active (receiving logs within idle period)
+- Chunks haven't reached target size
+- max_chunk_age hasn't been reached yet
+
+To force flush for testing:
+```bash
+# Option 1: Stop log source and wait for chunk_idle_period
+# Option 2: Graceful shutdown (flushes WAL)
+kill -SIGTERM <loki_pid>
+```
+
+### Grafana Dashboards
+
+For visual monitoring, import these community dashboards:
+
+- **Fluent Bit**: Dashboard ID `7752` (Fluent Bit Monitoring)
+- **Loki**: Dashboard ID `13407` (Loki & Promtail) or `14055` (Loki Operational)
+
+---
+
+## Troubleshooting
+
+### Loki not starting - compactor error
+
+```
+failed to init delete store: failed to get s3 object
+```
+
+Ensure:
+1. Storage backend (MinIO/S3) is running
+2. Bucket exists
+3. Credentials are correct
+4. Endpoint URL is accessible
+
+### Check Loki health
+
+```bash
+curl http://127.0.0.1:3100/ready   # Ready check
+curl http://127.0.0.1:3100/config  # View config
+```
+
+See "Quick Operational Status Commands" section for detailed health checks.
+
+### View Loki logs
+
+```bash
+# Binary install with systemd
+tail -f /var/log/loki/loki.log
+sudo journalctl -u loki -f
+
+# Binary install with nohup
+tail -f loki.log
+
+# Kubernetes
+kubectl logs -n loki -l app.kubernetes.io/name=loki -f
+```
+
+### Troubleshooting Out-of-Order Writes
+
+```bash
+# 1. Check system time on log source vs Loki
+date
+
+# 2. Verify timestamp in log file matches expected format
+tail -1 /path/to/logfile.log
+
+# 3. Check Loki's current config
+curl -s http://127.0.0.1:3100/config | grep -A5 "limits_config"
+
+# 4. Check discarded samples metric
+curl -s http://127.0.0.1:3100/metrics | grep loki_discarded_samples_total
+```
+
+### Quick Error Summary Script
 
 ```bash
 #!/bin/bash
@@ -444,146 +766,35 @@ echo "=== Loki HTTP Errors (4xx/5xx) ==="
 curl -s http://127.0.0.1:3100/metrics 2>/dev/null | grep -E 'loki_request_duration_seconds_count.*status_code="[45]' | head -5 || echo "No HTTP errors"
 ```
 
-### Key Operational Metrics for Loki
+---
 
-These are the most important metrics to monitor for Loki's operational efficiency:
+## Installation Notes
 
-#### Ingestion Health
+### Helm Installation
 
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `loki_distributor_bytes_received_total` | Total bytes ingested | Monitor rate |
-| `loki_distributor_lines_received_total` | Total log lines ingested | Monitor rate |
-| `loki_distributor_ingester_clients` | Connected ingesters | Should be > 0 |
-| `loki_ingester_memory_chunks` | In-memory chunks | High = memory pressure |
-| `loki_ingester_memory_streams_labels_bytes` | Memory used by stream labels | Monitor growth |
+#### Memberlist warnings during startup
 
-```bash
-# Quick ingestion health check
-curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_(distributor_bytes_received_total|distributor_lines_received_total|distributor_ingester_clients|ingester_memory_chunks)"
+```
+msg="joining memberlist cluster" err="no such host"
 ```
 
-#### WAL (Write-Ahead Log) Health
+These warnings are normal during startup. They resolve once the pod is fully up and the memberlist service is available.
 
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `loki_ingester_wal_bytes_in_use` | WAL disk usage | Monitor growth |
-| `loki_ingester_wal_logged_bytes_total` | Total bytes written to WAL | Monitor rate |
-| `loki_ingester_wal_disk_full_failures_total` | WAL disk full errors | > 0 = critical |
-| `loki_ingester_wal_replay_active` | WAL replay in progress | 1 during startup |
+#### MinIO endpoint configuration
 
-```bash
-# WAL health check
-curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_ingester_wal_(bytes_in_use|logged_bytes_total|disk_full_failures_total|replay_active)"
+For Helm deployments with bundled MinIO:
+```yaml
+# values-minio.yaml
+loki:
+  storage:
+    s3:
+      endpoint: http://loki-minio.loki.svc:9000
 ```
 
-#### Chunk Lifecycle
+Note: The endpoint format is `loki-minio.<namespace>.svc`
 
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `loki_ingester_chunks_created_total` | Chunks created | Monitor rate |
-| `loki_ingester_chunks_flush_failures_total` | Failed chunk flushes | > 0 = investigate |
-| `loki_ingester_flush_queue_length` | Pending flush queue | High = backpressure |
-| `loki_chunk_store_deduped_chunks_total` | Deduplicated chunks | Normal operation |
+### Binary Installation
 
-```bash
-# Chunk health check
-curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_ingester_(chunks_created_total|chunks_flush_failures_total|flush_queue_length)"
-```
+See "Running Loki" section for systemd service setup and nohup commands.
 
-#### Compactor Health
-
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `loki_boltdb_shipper_compactor_running` | Compactor status | 1 = running |
-| `loki_compactor_apply_retention_operation_total` | Retention runs | Monitor success |
-| `loki_compactor_apply_retention_last_successful_run_timestamp_seconds` | Last successful retention | Stale = problem |
-
-```bash
-# Compactor health check
-curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_(boltdb_shipper_compactor_running|compactor_apply_retention)"
-```
-
-#### Cache Efficiency
-
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `loki_cache_hits` | Cache hits by cache type | Higher = better |
-| `loki_cache_fetched_keys` | Total cache lookups | Compare with hits |
-| `loki_embeddedcache_memory_bytes` | Cache memory usage | Monitor limits |
-| `loki_cache_corrupt_chunks_total` | Corrupted cache entries | > 0 = investigate |
-
-```bash
-# Cache efficiency (hit ratio)
-curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_cache_(hits|fetched_keys)" | grep -v "bucket"
-```
-
-#### Query Performance
-
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `loki_request_duration_seconds` | Request latency | p99 > 10s = slow |
-| `loki_query_frontend_connected_clients` | Connected queriers | Should be > 0 |
-| `loki_querier_tail_active` | Active tail queries | Monitor for load |
-
-```bash
-# Query performance
-curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_(request_duration_seconds|query_frontend_connected_clients|querier_tail_active)" | grep -v "bucket"
-```
-
-#### Error Tracking
-
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
-| `loki_discarded_samples_total` | Rejected logs by reason | > 0 = investigate |
-| `loki_internal_log_messages_total{level="error"}` | Internal errors | Monitor growth |
-| `loki_ingester_autoforget_unhealthy_ingesters_total` | Ring health issues | > 0 = ring problem |
-
-```bash
-# Error summary
-curl -s http://127.0.0.1:3100/metrics | grep -E "^loki_(discarded_samples_total|internal_log_messages_total|ingester_autoforget)"
-```
-
-#### Complete Health Check Script
-
-```bash
-#!/bin/bash
-LOKI_URL="${1:-http://127.0.0.1:3100}"
-
-echo "=== Loki Operational Health Check ==="
-echo ""
-
-echo "--- Ingestion ---"
-curl -s "$LOKI_URL/metrics" | grep -E "^loki_distributor_(bytes_received_total|lines_received_total|ingester_clients)" 2>/dev/null || echo "No ingestion metrics"
-
-echo ""
-echo "--- Memory ---"
-curl -s "$LOKI_URL/metrics" | grep -E "^loki_ingester_memory_(chunks|streams_labels_bytes)" 2>/dev/null || echo "No memory metrics"
-
-echo ""
-echo "--- WAL ---"
-curl -s "$LOKI_URL/metrics" | grep -E "^loki_ingester_wal_(bytes_in_use|disk_full_failures_total)" 2>/dev/null || echo "No WAL metrics"
-
-echo ""
-echo "--- Chunks ---"
-curl -s "$LOKI_URL/metrics" | grep -E "^loki_ingester_(chunks_created_total|chunks_flush_failures_total|flush_queue_length)" 2>/dev/null || echo "No chunk metrics"
-
-echo ""
-echo "--- Compactor ---"
-curl -s "$LOKI_URL/metrics" | grep -E "^loki_boltdb_shipper_compactor_running" 2>/dev/null || echo "Compactor not running"
-
-echo ""
-echo "--- Errors ---"
-curl -s "$LOKI_URL/metrics" | grep -E "^loki_(discarded_samples_total|internal_log_messages_total.*error)" 2>/dev/null || echo "No errors"
-
-echo ""
-echo "--- Ready Status ---"
-curl -s "$LOKI_URL/ready" 2>/dev/null || echo "Loki not ready"
-```
-
-### Grafana Dashboards
-
-For visual monitoring, import these community dashboards:
-
-- **Fluent Bit**: Dashboard ID `7752` (Fluent Bit Monitoring)
-- **Loki**: Dashboard ID `13407` (Loki & Promtail) or `14055` (Loki Operational)
+Download binaries from: https://github.com/grafana/loki/releases
