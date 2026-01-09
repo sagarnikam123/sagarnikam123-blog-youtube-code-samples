@@ -106,7 +106,7 @@ query_range:
     compression: snappy  # default = "", options: snappy
   cache_results: true  # default = false
   max_retries: 5  # default = 5
-  cache_index_stats_results: true  # default = false
+  cache_index_stats_results: true  # default = true
   index_stats_results_cache:
     cache:
       default_validity: 1h
@@ -115,7 +115,7 @@ query_range:
         max_size_mb: 50
         ttl: 1h
     compression: snappy
-  cache_volume_results: true  # default = false
+  cache_volume_results: true  # default = true
   volume_results_cache:
     cache:
       default_validity: 1h
@@ -133,7 +133,7 @@ query_range:
         max_size_mb: 50
         ttl: 1h
     compression: snappy
-  cache_series_results: true  # default = false
+  cache_series_results: true  # default = true
   series_results_cache:
     cache:
       default_validity: 1h
@@ -142,7 +142,7 @@ query_range:
         max_size_mb: 50
         ttl: 1h
     compression: snappy
-  cache_label_results: true  # default = false
+  cache_label_results: true  # default = true
   label_results_cache:
     cache:
       default_validity: 1h
@@ -230,7 +230,7 @@ pattern_ingester:
       kvstore:
         store: memberlist  # default = consul
       heartbeat_timeout: 1m  # default = 1m
-      replication_factor: 1  # default = 3
+      replication_factor: 1  # default = 1
     num_tokens: 128  # default = 128
     heartbeat_period: 5s  # default = 5s
     heartbeat_timeout: 1m  # default = 1m
