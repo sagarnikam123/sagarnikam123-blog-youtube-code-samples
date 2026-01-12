@@ -1,0 +1,35 @@
+# RabbitMQ ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape RabbitMQ built-in Prometheus plugin
+#
+# Requirements: 7.5, 7.6 - ServiceMonitor CRDs for declarative scrape configuration
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  namespace: monitoring
+  labels:
+    app: rabbitmq
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  namespaceSelector:
+    matchNames:
+      - rabbitmq
+      - messaging
+      - monitoring
+  endpoints:
+    - port: prometheus
+      interval: 30s
+      scrapeTimeout: 20s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_cluster]
+          targetLabel: cluster
+      metricRelabelings:
+        # Drop temporary queue metrics
+        - sourceLabels: [queue]
+          regex: 'amq\.gen-.*'
+          action: drop

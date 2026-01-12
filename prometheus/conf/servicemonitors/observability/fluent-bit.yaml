@@ -1,0 +1,30 @@
+# Fluent Bit ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Fluent Bit
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fluent-bit
+  namespace: monitoring
+  labels:
+    app: fluent-bit
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit
+  namespaceSelector:
+    matchNames:
+      - logging
+      - fluent-bit
+      - kube-system
+  endpoints:
+    - port: http
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /api/v1/metrics/prometheus
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_endpoint_node_name]
+          targetLabel: node

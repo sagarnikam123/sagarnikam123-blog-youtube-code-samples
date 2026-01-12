@@ -1,0 +1,32 @@
+# kube-state-metrics ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape kube-state-metrics
+#
+# Requirements: 7.5, 7.6 - ServiceMonitor CRDs for declarative scrape configuration
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+  labels:
+    app: kube-state-metrics
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  namespaceSelector:
+    matchNames:
+      - monitoring
+      - kube-system
+  endpoints:
+    # Main metrics endpoint
+    - port: http-metrics
+      interval: 30s
+      scrapeTimeout: 20s
+      path: /metrics
+      honorLabels: true
+    # Telemetry endpoint (self-monitoring)
+    - port: telemetry
+      interval: 30s
+      path: /metrics

@@ -1,0 +1,124 @@
+# Grafana Tempo ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Tempo components
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo
+  namespace: monitoring
+  labels:
+    app: tempo
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+  namespaceSelector:
+    matchNames:
+      - tempo
+      - tracing
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: component
+          regex: 'tempo-(.*)'
+          replacement: '${1}'
+---
+# Tempo Distributor ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-distributor
+  namespace: monitoring
+  labels:
+    app: tempo-distributor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: distributor
+      app.kubernetes.io/name: tempo
+  namespaceSelector:
+    matchNames:
+      - tempo
+      - tracing
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Tempo Ingester ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-ingester
+  namespace: monitoring
+  labels:
+    app: tempo-ingester
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ingester
+      app.kubernetes.io/name: tempo
+  namespaceSelector:
+    matchNames:
+      - tempo
+      - tracing
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Tempo Querier ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-querier
+  namespace: monitoring
+  labels:
+    app: tempo-querier
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: querier
+      app.kubernetes.io/name: tempo
+  namespaceSelector:
+    matchNames:
+      - tempo
+      - tracing
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Tempo Compactor ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-compactor
+  namespace: monitoring
+  labels:
+    app: tempo-compactor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: compactor
+      app.kubernetes.io/name: tempo
+  namespaceSelector:
+    matchNames:
+      - tempo
+      - tracing
+  endpoints:
+    - port: http-metrics
+      interval: 30s
+      path: /metrics

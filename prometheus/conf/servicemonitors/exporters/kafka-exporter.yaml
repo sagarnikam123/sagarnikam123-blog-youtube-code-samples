@@ -1,0 +1,30 @@
+# Kafka Exporter ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Kafka Exporter
+#
+# Requirements: 7.5, 7.6 - ServiceMonitor CRDs for declarative scrape configuration
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kafka-exporter
+  namespace: monitoring
+  labels:
+    app: kafka-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kafka-exporter
+  namespaceSelector:
+    matchNames:
+      - kafka
+      - messaging
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 30s
+      scrapeTimeout: 20s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_cluster]
+          targetLabel: cluster

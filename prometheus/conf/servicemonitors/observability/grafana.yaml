@@ -1,0 +1,26 @@
+# Grafana ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Grafana
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  namespaceSelector:
+    matchNames:
+      - monitoring
+      - grafana
+  endpoints:
+    - port: http
+      interval: 30s
+      scrapeTimeout: 15s
+      path: /metrics

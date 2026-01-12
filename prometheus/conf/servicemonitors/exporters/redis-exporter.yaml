@@ -1,0 +1,32 @@
+# Redis Exporter ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Redis Exporter
+#
+# Requirements: 7.5, 7.6 - ServiceMonitor CRDs for declarative scrape configuration
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  labels:
+    app: redis-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis-exporter
+  namespaceSelector:
+    matchNames:
+      - cache
+      - production
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_role]
+          targetLabel: role
+        - sourceLabels: [__meta_kubernetes_service_label_cluster]
+          targetLabel: cluster

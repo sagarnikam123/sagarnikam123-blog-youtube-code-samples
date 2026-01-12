@@ -1,0 +1,35 @@
+# Node Exporter ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Node Exporter
+#
+# Requirements: 7.5, 7.6 - ServiceMonitor CRDs for declarative scrape configuration
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels:
+    app: node-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: node-exporter
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_endpoint_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_endpoint_node_name]
+          targetLabel: instance
+      metricRelabelings:
+        # Drop high-cardinality filesystem metrics for tmpfs/overlay
+        - sourceLabels: [__name__, fstype]
+          regex: 'node_filesystem_.+;(tmpfs|overlay)'
+          action: drop

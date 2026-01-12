@@ -1,0 +1,57 @@
+# Elasticsearch Exporter ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Elasticsearch Exporter
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: elasticsearch-exporter
+  namespace: monitoring
+  labels:
+    app: elasticsearch-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: elasticsearch-exporter
+  namespaceSelector:
+    matchNames:
+      - elasticsearch
+      - logging
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 30s
+      scrapeTimeout: 20s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_cluster]
+          targetLabel: cluster
+---
+# OpenSearch Exporter ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: opensearch-exporter
+  namespace: monitoring
+  labels:
+    app: opensearch-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opensearch-exporter
+  namespaceSelector:
+    matchNames:
+      - opensearch
+      - logging
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 30s
+      scrapeTimeout: 20s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_cluster]
+          targetLabel: cluster

@@ -1,0 +1,123 @@
+# Grafana Mimir ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Mimir components
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mimir
+  namespace: monitoring
+  labels:
+    app: mimir
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mimir
+  namespaceSelector:
+    matchNames:
+      - mimir
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: component
+          regex: 'mimir-(.*)'
+          replacement: '${1}'
+---
+# Mimir Distributor ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mimir-distributor
+  namespace: monitoring
+  labels:
+    app: mimir-distributor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: distributor
+      app.kubernetes.io/name: mimir
+  namespaceSelector:
+    matchNames:
+      - mimir
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Mimir Ingester ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mimir-ingester
+  namespace: monitoring
+  labels:
+    app: mimir-ingester
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ingester
+      app.kubernetes.io/name: mimir
+  namespaceSelector:
+    matchNames:
+      - mimir
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Mimir Querier ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mimir-querier
+  namespace: monitoring
+  labels:
+    app: mimir-querier
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: querier
+      app.kubernetes.io/name: mimir
+  namespaceSelector:
+    matchNames:
+      - mimir
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Mimir Compactor ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mimir-compactor
+  namespace: monitoring
+  labels:
+    app: mimir-compactor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: compactor
+      app.kubernetes.io/name: mimir
+  namespaceSelector:
+    matchNames:
+      - mimir
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 30s
+      path: /metrics

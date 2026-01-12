@@ -1,0 +1,32 @@
+# MongoDB Exporter ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape MongoDB Exporter
+#
+# Requirements: 7.5, 7.6 - ServiceMonitor CRDs for declarative scrape configuration
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mongodb-exporter
+  namespace: monitoring
+  labels:
+    app: mongodb-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb-exporter
+  namespaceSelector:
+    matchNames:
+      - databases
+      - production
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 30s
+      scrapeTimeout: 20s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_replicaset]
+          targetLabel: replicaset
+        - sourceLabels: [__meta_kubernetes_service_label_role]
+          targetLabel: role

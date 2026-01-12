@@ -1,0 +1,101 @@
+# Grafana Loki ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Loki components
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    app: loki
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+  namespaceSelector:
+    matchNames:
+      - loki
+      - logging
+      - monitoring
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: component
+          regex: 'loki-(.*)'
+          replacement: '${1}'
+---
+# Loki Distributor ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: loki-distributor
+  namespace: monitoring
+  labels:
+    app: loki-distributor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: distributor
+      app.kubernetes.io/name: loki
+  namespaceSelector:
+    matchNames:
+      - loki
+      - logging
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Loki Ingester ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: loki-ingester
+  namespace: monitoring
+  labels:
+    app: loki-ingester
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ingester
+      app.kubernetes.io/name: loki
+  namespaceSelector:
+    matchNames:
+      - loki
+      - logging
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics
+---
+# Loki Querier ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: loki-querier
+  namespace: monitoring
+  labels:
+    app: loki-querier
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: querier
+      app.kubernetes.io/name: loki
+  namespaceSelector:
+    matchNames:
+      - loki
+      - logging
+  endpoints:
+    - port: http-metrics
+      interval: 15s
+      path: /metrics

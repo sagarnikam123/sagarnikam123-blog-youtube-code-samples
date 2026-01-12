@@ -1,0 +1,146 @@
+# Thanos ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Thanos components
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: thanos
+  namespace: monitoring
+  labels:
+    app: thanos
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: thanos
+  namespaceSelector:
+    matchNames:
+      - thanos
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: component
+          regex: 'thanos-(.*)'
+          replacement: '${1}'
+---
+# Thanos Sidecar ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: thanos-sidecar
+  namespace: monitoring
+  labels:
+    app: thanos-sidecar
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: sidecar
+      app.kubernetes.io/name: thanos
+  namespaceSelector:
+    matchNames:
+      - thanos
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics
+---
+# Thanos Query ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: thanos-query
+  namespace: monitoring
+  labels:
+    app: thanos-query
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: query
+      app.kubernetes.io/name: thanos
+  namespaceSelector:
+    matchNames:
+      - thanos
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics
+---
+# Thanos Store ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: thanos-store
+  namespace: monitoring
+  labels:
+    app: thanos-store
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: store
+      app.kubernetes.io/name: thanos
+  namespaceSelector:
+    matchNames:
+      - thanos
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics
+---
+# Thanos Compactor ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: thanos-compactor
+  namespace: monitoring
+  labels:
+    app: thanos-compactor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: compactor
+      app.kubernetes.io/name: thanos
+  namespaceSelector:
+    matchNames:
+      - thanos
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+---
+# Thanos Ruler ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: thanos-ruler
+  namespace: monitoring
+  labels:
+    app: thanos-ruler
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ruler
+      app.kubernetes.io/name: thanos
+  namespaceSelector:
+    matchNames:
+      - thanos
+      - monitoring
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics

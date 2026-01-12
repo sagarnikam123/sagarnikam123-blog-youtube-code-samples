@@ -1,0 +1,38 @@
+# cAdvisor ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape cAdvisor
+#
+# Requirements: 7.5, 7.6 - ServiceMonitor CRDs for declarative scrape configuration
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cadvisor
+  namespace: monitoring
+  labels:
+    app: cadvisor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cadvisor
+  namespaceSelector:
+    matchNames:
+      - monitoring
+      - kube-system
+  endpoints:
+    - port: http
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_endpoint_node_name]
+          targetLabel: node
+      metricRelabelings:
+        # Drop pause container metrics
+        - sourceLabels: [container]
+          regex: 'POD'
+          action: drop
+        # Drop empty container names
+        - sourceLabels: [container]
+          regex: ''
+          action: drop

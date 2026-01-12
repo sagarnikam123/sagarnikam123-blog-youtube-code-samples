@@ -1,0 +1,78 @@
+# Jaeger ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape Jaeger components
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jaeger
+  namespace: monitoring
+  labels:
+    app: jaeger
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jaeger
+  namespaceSelector:
+    matchNames:
+      - jaeger
+      - tracing
+      - monitoring
+  endpoints:
+    - port: admin-http
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: component
+          regex: 'jaeger-(.*)'
+          replacement: '${1}'
+---
+# Jaeger Collector ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jaeger-collector
+  namespace: monitoring
+  labels:
+    app: jaeger-collector
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: collector
+      app.kubernetes.io/name: jaeger
+  namespaceSelector:
+    matchNames:
+      - jaeger
+      - tracing
+  endpoints:
+    - port: admin-http
+      interval: 15s
+      path: /metrics
+---
+# Jaeger Query ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jaeger-query
+  namespace: monitoring
+  labels:
+    app: jaeger-query
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: query
+      app.kubernetes.io/name: jaeger
+  namespaceSelector:
+    matchNames:
+      - jaeger
+      - tracing
+  endpoints:
+    - port: admin-http
+      interval: 15s
+      path: /metrics

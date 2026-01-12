@@ -1,0 +1,76 @@
+# OpenTelemetry Collector ServiceMonitor
+# Kubernetes CRD for Prometheus Operator to scrape OpenTelemetry Collector
+#
+# Requirements: 7.5, 7.6, 8.10 - ServiceMonitor CRDs for observability components
+#
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector
+  namespace: monitoring
+  labels:
+    app: otel-collector
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+  namespaceSelector:
+    matchNames:
+      - opentelemetry
+      - otel
+      - monitoring
+  endpoints:
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+---
+# OpenTelemetry Collector Gateway ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector-gateway
+  namespace: monitoring
+  labels:
+    app: otel-collector-gateway
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: gateway
+      app.kubernetes.io/name: opentelemetry-collector
+  namespaceSelector:
+    matchNames:
+      - opentelemetry
+      - otel
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+---
+# OpenTelemetry Collector Agent ServiceMonitor (DaemonSet)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector-agent
+  namespace: monitoring
+  labels:
+    app: otel-collector-agent
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: agent
+      app.kubernetes.io/name: opentelemetry-collector
+  namespaceSelector:
+    matchNames:
+      - opentelemetry
+      - otel
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_endpoint_node_name]
+          targetLabel: node
