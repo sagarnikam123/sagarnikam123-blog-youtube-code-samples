@@ -1,0 +1,114 @@
+# OpenTelemetry Collector Scrape Configuration
+# Collects metrics from OpenTelemetry Collector
+#
+# Requirements: 8.8 - Scrape configuration for OpenTelemetry Collector metrics
+#
+# Default port: 8888 (metrics)
+# Metrics: Receivers, processors, exporters, spans, metrics, logs processed, etc.
+
+scrape_configs:
+  # OpenTelemetry Collector
+  - job_name: 'otel-collector'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'otel-collector-1.example.com:8888'
+          - 'otel-collector-2.example.com:8888'
+        labels:
+          environment: 'production'
+          component: 'collector'
+          cluster: 'otel'
+
+  # OpenTelemetry Collector Gateway
+  - job_name: 'otel-gateway'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'otel-gateway.example.com:8888'
+        labels:
+          environment: 'production'
+          component: 'gateway'
+          cluster: 'otel'
+
+  # OpenTelemetry Collector Agent (DaemonSet)
+  - job_name: 'otel-agent'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'otel-agent-node1.example.com:8888'
+          - 'otel-agent-node2.example.com:8888'
+        labels:
+          environment: 'production'
+          component: 'agent'
+          cluster: 'otel'
+
+  # Kubernetes deployment - all OTel components
+  - job_name: 'otel-collector-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - opentelemetry
+            - otel
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: '(otel|opentelemetry).*collector.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(metrics|prometheus)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_endpoint_node_name]
+        action: replace
+        target_label: node
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+
+  # OTel Operator managed collectors
+  - job_name: 'otel-operator-collectors'
+
+    kubernetes_sd_configs:
+      - role: pod
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_managed_by]
+        action: keep
+        regex: 'opentelemetry-operator'
+
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

@@ -1,0 +1,143 @@
+# Thanos Scrape Configuration
+# Collects metrics from Thanos components for long-term storage and HA
+#
+# Requirements: 8.9 - Scrape configuration for Thanos components (sidecar, query, store, compactor)
+#
+# Default port: 10902 (HTTP)
+# Metrics: gRPC requests, store operations, compaction, query latency, etc.
+
+scrape_configs:
+  # Thanos Sidecar
+  - job_name: 'thanos-sidecar'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'thanos-sidecar-1.example.com:10902'
+          - 'thanos-sidecar-2.example.com:10902'
+        labels:
+          environment: 'production'
+          component: 'sidecar'
+          cluster: 'thanos'
+
+  # Thanos Query
+  - job_name: 'thanos-query'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'thanos-query-1.example.com:10902'
+          - 'thanos-query-2.example.com:10902'
+        labels:
+          environment: 'production'
+          component: 'query'
+          cluster: 'thanos'
+
+  # Thanos Query Frontend
+  - job_name: 'thanos-query-frontend'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'thanos-query-frontend.example.com:10902'
+        labels:
+          environment: 'production'
+          component: 'query-frontend'
+          cluster: 'thanos'
+
+  # Thanos Store Gateway
+  - job_name: 'thanos-store'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'thanos-store-1.example.com:10902'
+          - 'thanos-store-2.example.com:10902'
+        labels:
+          environment: 'production'
+          component: 'store'
+          cluster: 'thanos'
+
+  # Thanos Compactor
+  - job_name: 'thanos-compactor'
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'thanos-compactor.example.com:10902'
+        labels:
+          environment: 'production'
+          component: 'compactor'
+          cluster: 'thanos'
+
+  # Thanos Ruler
+  - job_name: 'thanos-ruler'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'thanos-ruler-1.example.com:10902'
+          - 'thanos-ruler-2.example.com:10902'
+        labels:
+          environment: 'production'
+          component: 'ruler'
+          cluster: 'thanos'
+
+  # Thanos Receive
+  - job_name: 'thanos-receive'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'thanos-receive-1.example.com:10902'
+          - 'thanos-receive-2.example.com:10902'
+          - 'thanos-receive-3.example.com:10902'
+        labels:
+          environment: 'production'
+          component: 'receive'
+          cluster: 'thanos'
+
+  # Kubernetes deployment - all Thanos components
+  - job_name: 'thanos-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - thanos
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'thanos.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(http|http-metrics)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      # Extract component from service name
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: component
+        regex: 'thanos-(.*)'
+        replacement: '${1}'
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

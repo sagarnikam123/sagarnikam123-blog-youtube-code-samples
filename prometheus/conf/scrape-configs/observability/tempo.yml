@@ -1,0 +1,115 @@
+# Grafana Tempo Scrape Configuration
+# Collects metrics from Tempo distributed tracing backend
+#
+# Requirements: 8.3 - Scrape configuration for Tempo metrics (distributor, ingester, querier, compactor)
+#
+# Default port: 3200 (HTTP)
+# Metrics: Trace ingestion, query latency, compaction, storage, etc.
+
+scrape_configs:
+  # Tempo Distributor
+  - job_name: 'tempo-distributor'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'tempo-distributor-1.example.com:3200'
+          - 'tempo-distributor-2.example.com:3200'
+        labels:
+          environment: 'production'
+          component: 'distributor'
+          cluster: 'tempo'
+
+  # Tempo Ingester
+  - job_name: 'tempo-ingester'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'tempo-ingester-1.example.com:3200'
+          - 'tempo-ingester-2.example.com:3200'
+          - 'tempo-ingester-3.example.com:3200'
+        labels:
+          environment: 'production'
+          component: 'ingester'
+          cluster: 'tempo'
+
+  # Tempo Querier
+  - job_name: 'tempo-querier'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'tempo-querier-1.example.com:3200'
+          - 'tempo-querier-2.example.com:3200'
+        labels:
+          environment: 'production'
+          component: 'querier'
+          cluster: 'tempo'
+
+  # Tempo Query Frontend
+  - job_name: 'tempo-query-frontend'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'tempo-query-frontend.example.com:3200'
+        labels:
+          environment: 'production'
+          component: 'query-frontend'
+          cluster: 'tempo'
+
+  # Tempo Compactor
+  - job_name: 'tempo-compactor'
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'tempo-compactor.example.com:3200'
+        labels:
+          environment: 'production'
+          component: 'compactor'
+          cluster: 'tempo'
+
+  # Kubernetes deployment - all Tempo components
+  - job_name: 'tempo-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - tempo
+            - tracing
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'tempo.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(http-metrics|http|prom-metrics)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: component
+        regex: 'tempo-(.*)'
+        replacement: '${1}'
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

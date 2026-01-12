@@ -1,0 +1,128 @@
+# Grafana Loki Scrape Configuration
+# Collects metrics from Loki log aggregation system
+#
+# Requirements: 8.4 - Scrape configuration for Loki metrics (distributor, ingester, querier)
+#
+# Default port: 3100 (HTTP)
+# Metrics: Log ingestion rate, query latency, storage, streams, etc.
+
+scrape_configs:
+  # Loki Distributor
+  - job_name: 'loki-distributor'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'loki-distributor-1.example.com:3100'
+          - 'loki-distributor-2.example.com:3100'
+        labels:
+          environment: 'production'
+          component: 'distributor'
+          cluster: 'loki'
+
+  # Loki Ingester
+  - job_name: 'loki-ingester'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'loki-ingester-1.example.com:3100'
+          - 'loki-ingester-2.example.com:3100'
+          - 'loki-ingester-3.example.com:3100'
+        labels:
+          environment: 'production'
+          component: 'ingester'
+          cluster: 'loki'
+
+  # Loki Querier
+  - job_name: 'loki-querier'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'loki-querier-1.example.com:3100'
+          - 'loki-querier-2.example.com:3100'
+        labels:
+          environment: 'production'
+          component: 'querier'
+          cluster: 'loki'
+
+  # Loki Query Frontend
+  - job_name: 'loki-query-frontend'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'loki-query-frontend.example.com:3100'
+        labels:
+          environment: 'production'
+          component: 'query-frontend'
+          cluster: 'loki'
+
+  # Loki Compactor
+  - job_name: 'loki-compactor'
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'loki-compactor.example.com:3100'
+        labels:
+          environment: 'production'
+          component: 'compactor'
+          cluster: 'loki'
+
+  # Loki Gateway (optional)
+  - job_name: 'loki-gateway'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'loki-gateway.example.com:3100'
+        labels:
+          environment: 'production'
+          component: 'gateway'
+          cluster: 'loki'
+
+  # Kubernetes deployment - all Loki components
+  - job_name: 'loki-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - loki
+            - logging
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'loki.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(http-metrics|http)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: component
+        regex: 'loki-(.*)'
+        replacement: '${1}'
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

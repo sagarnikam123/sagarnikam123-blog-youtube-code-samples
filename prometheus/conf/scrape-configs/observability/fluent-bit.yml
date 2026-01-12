@@ -1,0 +1,59 @@
+# Fluent Bit Scrape Configuration
+# Collects metrics from Fluent Bit log processor
+#
+# Requirements: 8.5 - Scrape configuration for Fluent Bit metrics
+#
+# Default port: 2020 (HTTP)
+# Metrics: Input/output records, bytes, errors, buffer usage, etc.
+
+scrape_configs:
+  # Static configuration
+  - job_name: 'fluent-bit'
+    scrape_interval: 15s
+    metrics_path: /api/v1/metrics/prometheus
+
+    static_configs:
+      - targets:
+          - 'fluent-bit-1.example.com:2020'
+          - 'fluent-bit-2.example.com:2020'
+          - 'fluent-bit-3.example.com:2020'
+        labels:
+          environment: 'production'
+          component: 'log-processor'
+
+  # Kubernetes DaemonSet deployment
+  - job_name: 'fluent-bit-k8s'
+    metrics_path: /api/v1/metrics/prometheus
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - logging
+            - fluent-bit
+            - kube-system
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'fluent-bit.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(http|metrics)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_endpoint_node_name]
+        action: replace
+        target_label: node
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

@@ -1,0 +1,101 @@
+# Jaeger Scrape Configuration
+# Collects metrics from Jaeger distributed tracing components
+#
+# Requirements: 8.6 - Scrape configuration for Jaeger metrics (collector, agent, query)
+#
+# Default ports: 14269 (collector admin), 14271 (agent admin), 16687 (query admin)
+# Metrics: Spans received, processed, dropped, latency, storage, etc.
+
+scrape_configs:
+  # Jaeger Collector
+  - job_name: 'jaeger-collector'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'jaeger-collector-1.example.com:14269'
+          - 'jaeger-collector-2.example.com:14269'
+        labels:
+          environment: 'production'
+          component: 'collector'
+          cluster: 'jaeger'
+
+  # Jaeger Agent
+  - job_name: 'jaeger-agent'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'jaeger-agent-1.example.com:14271'
+          - 'jaeger-agent-2.example.com:14271'
+        labels:
+          environment: 'production'
+          component: 'agent'
+          cluster: 'jaeger'
+
+  # Jaeger Query
+  - job_name: 'jaeger-query'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'jaeger-query.example.com:16687'
+        labels:
+          environment: 'production'
+          component: 'query'
+          cluster: 'jaeger'
+
+  # Jaeger Ingester (for Kafka-based deployment)
+  - job_name: 'jaeger-ingester'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'jaeger-ingester-1.example.com:14270'
+          - 'jaeger-ingester-2.example.com:14270'
+        labels:
+          environment: 'production'
+          component: 'ingester'
+          cluster: 'jaeger'
+
+  # Kubernetes deployment - all Jaeger components
+  - job_name: 'jaeger-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - jaeger
+            - tracing
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'jaeger.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(admin-http|metrics|http-metrics)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: component
+        regex: 'jaeger-(.*)'
+        replacement: '${1}'
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

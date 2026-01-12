@@ -1,0 +1,187 @@
+# Vector Scrape Configuration
+# Collects metrics from Vector.dev data pipeline
+#
+# Requirements: 8.6 - Scrape configuration for Vector metrics (vector.dev data pipeline)
+#
+# Default port: 9598 (Prometheus exporter)
+# Metrics: Events processed, bytes, errors, buffer usage, component health, etc.
+#
+# Vector exposes Prometheus metrics via the prometheus_exporter sink or
+# the internal_metrics source with prometheus_exporter sink.
+
+scrape_configs:
+  # Static configuration - single Vector instance
+  - job_name: 'vector'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'vector-1.example.com:9598'
+          - 'vector-2.example.com:9598'
+          - 'vector-3.example.com:9598'
+        labels:
+          environment: 'production'
+          component: 'data-pipeline'
+
+  # Vector Aggregator (centralized processing)
+  - job_name: 'vector-aggregator'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'vector-aggregator-1.example.com:9598'
+          - 'vector-aggregator-2.example.com:9598'
+        labels:
+          environment: 'production'
+          component: 'aggregator'
+          role: 'aggregator'
+
+  # Vector Agent (edge collection)
+  - job_name: 'vector-agent'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'vector-agent-1.example.com:9598'
+          - 'vector-agent-2.example.com:9598'
+          - 'vector-agent-3.example.com:9598'
+        labels:
+          environment: 'production'
+          component: 'agent'
+          role: 'agent'
+
+  # Kubernetes DaemonSet deployment (Vector Agent)
+  - job_name: 'vector-agent-k8s'
+    metrics_path: /metrics
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - vector
+            - logging
+            - observability
+            - kube-system
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'vector-agent.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(prom-exporter|metrics|prometheus)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_endpoint_node_name]
+        action: replace
+        target_label: node
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+
+      - action: replace
+        target_label: role
+        replacement: 'agent'
+
+  # Kubernetes StatefulSet/Deployment (Vector Aggregator)
+  - job_name: 'vector-aggregator-k8s'
+    metrics_path: /metrics
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - vector
+            - logging
+            - observability
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'vector-aggregator.*|vector$'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(prom-exporter|metrics|prometheus)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+
+      - action: replace
+        target_label: role
+        replacement: 'aggregator'
+
+  # Kubernetes - all Vector components via pod annotations
+  - job_name: 'vector-k8s-pods'
+
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - vector
+            - logging
+            - observability
+            - kube-system
+
+    relabel_configs:
+      # Only scrape pods with vector annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: 'true'
+
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: 'vector.*'
+
+      # Use custom port if specified
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: '${1}'
+
+      # Use custom path if specified
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: replace
+        target_label: app
+
+      - source_labels: [__meta_kubernetes_pod_label_vector_dev_role]
+        action: replace
+        target_label: role

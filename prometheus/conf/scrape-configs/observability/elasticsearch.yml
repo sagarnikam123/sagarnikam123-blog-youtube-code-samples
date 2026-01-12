@@ -1,0 +1,90 @@
+# Elasticsearch/OpenSearch Exporter Scrape Configuration
+# Collects metrics from Elasticsearch/OpenSearch clusters
+#
+# Requirements: 8.7 - Scrape configuration for Elasticsearch/OpenSearch metrics (via elasticsearch_exporter)
+#
+# Default port: 9114 (elasticsearch_exporter)
+# Metrics: Cluster health, indices, nodes, JVM, search, indexing, etc.
+
+scrape_configs:
+  # Elasticsearch Exporter
+  - job_name: 'elasticsearch-exporter'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'elasticsearch-exporter.example.com:9114'
+        labels:
+          environment: 'production'
+          cluster: 'logs'
+          component: 'elasticsearch'
+
+  # Multiple Elasticsearch clusters
+  - job_name: 'elasticsearch-exporter-multi'
+    scrape_interval: 30s
+
+    static_configs:
+      - targets:
+          - 'es-exporter-logs.example.com:9114'
+        labels:
+          environment: 'production'
+          cluster: 'logs'
+
+      - targets:
+          - 'es-exporter-search.example.com:9114'
+        labels:
+          environment: 'production'
+          cluster: 'search'
+
+      - targets:
+          - 'es-exporter-analytics.example.com:9114'
+        labels:
+          environment: 'production'
+          cluster: 'analytics'
+
+  # OpenSearch Exporter (same exporter works for OpenSearch)
+  - job_name: 'opensearch-exporter'
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'opensearch-exporter.example.com:9114'
+        labels:
+          environment: 'production'
+          cluster: 'opensearch'
+          component: 'opensearch'
+
+  # Kubernetes deployment
+  - job_name: 'elasticsearch-exporter-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - elasticsearch
+            - logging
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: '(elasticsearch|opensearch).*exporter.*'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_label_cluster]
+        action: replace
+        target_label: cluster
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

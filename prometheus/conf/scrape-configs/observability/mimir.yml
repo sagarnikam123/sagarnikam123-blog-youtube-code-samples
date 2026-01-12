@@ -1,0 +1,130 @@
+# Grafana Mimir Scrape Configuration
+# Collects metrics from Mimir long-term storage components
+#
+# Requirements: 8.2 - Scrape configuration for Mimir metrics (distributor, ingester, querier, compactor)
+#
+# Default ports: 8080 (HTTP), 9095 (gRPC)
+# Metrics: Ingestion rate, query latency, compaction, storage, etc.
+
+scrape_configs:
+  # Mimir Distributor
+  - job_name: 'mimir-distributor'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'mimir-distributor-1.example.com:8080'
+          - 'mimir-distributor-2.example.com:8080'
+        labels:
+          environment: 'production'
+          component: 'distributor'
+          cluster: 'mimir'
+
+  # Mimir Ingester
+  - job_name: 'mimir-ingester'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'mimir-ingester-1.example.com:8080'
+          - 'mimir-ingester-2.example.com:8080'
+          - 'mimir-ingester-3.example.com:8080'
+        labels:
+          environment: 'production'
+          component: 'ingester'
+          cluster: 'mimir'
+
+  # Mimir Querier
+  - job_name: 'mimir-querier'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'mimir-querier-1.example.com:8080'
+          - 'mimir-querier-2.example.com:8080'
+        labels:
+          environment: 'production'
+          component: 'querier'
+          cluster: 'mimir'
+
+  # Mimir Query Frontend
+  - job_name: 'mimir-query-frontend'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'mimir-query-frontend.example.com:8080'
+        labels:
+          environment: 'production'
+          component: 'query-frontend'
+          cluster: 'mimir'
+
+  # Mimir Compactor
+  - job_name: 'mimir-compactor'
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'mimir-compactor-1.example.com:8080'
+          - 'mimir-compactor-2.example.com:8080'
+        labels:
+          environment: 'production'
+          component: 'compactor'
+          cluster: 'mimir'
+
+  # Mimir Store Gateway
+  - job_name: 'mimir-store-gateway'
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'mimir-store-gateway-1.example.com:8080'
+          - 'mimir-store-gateway-2.example.com:8080'
+        labels:
+          environment: 'production'
+          component: 'store-gateway'
+          cluster: 'mimir'
+
+  # Kubernetes deployment - all Mimir components
+  - job_name: 'mimir-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - mimir
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'mimir.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(http-metrics|http)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      # Extract component from service name
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: component
+        regex: 'mimir-(.*)'
+        replacement: '${1}'
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

@@ -1,0 +1,52 @@
+# Grafana Scrape Configuration
+# Collects Grafana dashboard and visualization metrics
+#
+# Requirements: 8.1 - Scrape configuration for Grafana metrics (/metrics endpoint)
+#
+# Default port: 3000
+# Metrics: HTTP requests, dashboard loads, data source queries, alerting, etc.
+
+scrape_configs:
+  # Static configuration
+  - job_name: 'grafana'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'grafana.example.com:3000'
+        labels:
+          environment: 'production'
+          component: 'visualization'
+
+  # Kubernetes deployment
+  - job_name: 'grafana-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - monitoring
+            - grafana
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'grafana.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: '(http|grafana|metrics)'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
