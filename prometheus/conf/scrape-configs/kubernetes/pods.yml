@@ -1,0 +1,161 @@
+# Kubernetes Pod Discovery Configuration
+# Discovers and scrapes pods with prometheus.io annotations
+#
+# Requirements:
+# - 7.1: kubernetes_sd_config for automatic service discovery
+# - 7.2: Discover pods with prometheus.io/scrape: "true" annotation
+# - 7.3: Support configuring scrape port via prometheus.io/port annotation
+# - 7.4: Support configuring scrape path via prometheus.io/path annotation
+#
+# Usage: Include this configuration in your prometheus.yml scrape_configs
+
+scrape_configs:
+  # Scrape pods with prometheus.io/scrape annotation
+  - job_name: 'kubernetes-pods'
+
+    # Kubernetes service discovery configuration
+    kubernetes_sd_configs:
+      - role: pod
+        # Optional: Limit to specific namespaces
+        # namespaces:
+        #   names:
+        #     - default
+        #     - production
+
+    # Relabel configurations for pod discovery
+    relabel_configs:
+      # Only scrape pods with prometheus.io/scrape: "true" annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
+      # Use prometheus.io/scheme annotation for http/https (default: http)
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+        action: replace
+        target_label: __scheme__
+        regex: (https?)
+
+      # Use prometheus.io/path annotation for metrics path (default: /metrics)
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      # Use prometheus.io/port annotation for port (default: pod's first container port)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+      # Map Kubernetes labels to Prometheus labels
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+      # Add namespace label
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+
+      # Add pod name label
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+
+      # Add node name label
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        action: replace
+        target_label: kubernetes_node
+
+      # Add container name label
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        action: replace
+        target_label: container
+
+      # Add pod IP label
+      - source_labels: [__meta_kubernetes_pod_ip]
+        action: replace
+        target_label: pod_ip
+
+  # Scrape pods with specific application labels
+  - job_name: 'kubernetes-pods-app'
+
+    kubernetes_sd_configs:
+      - role: pod
+
+    relabel_configs:
+      # Only scrape pods with app label
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: .+
+
+      # Only scrape pods with prometheus.io/scrape annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
+      # Use custom port from annotation
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+      # Use custom path from annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      # Set job name from app label
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: replace
+        target_label: job
+
+      # Add standard labels
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+
+  # Scrape pods in specific namespace with slow scrape interval
+  - job_name: 'kubernetes-pods-slow'
+    scrape_interval: 60s
+    scrape_timeout: 30s
+
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - batch-jobs
+            - cron-jobs
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

@@ -1,0 +1,67 @@
+[
+  {
+    "labels": {
+      "datacenter": "us-east-1",
+      "environment": "production",
+      "job": "web-application",
+      "service": "web-app",
+      "team": "backend"
+    },
+    "targets": [
+      "webapp-1.example.com:8080",
+      "webapp-2.example.com:8080",
+      "webapp-3.example.com:8080"
+    ]
+  },
+  {
+    "labels": {
+      "datacenter": "us-east-1",
+      "environment": "production",
+      "job": "api-service",
+      "service": "api-gateway",
+      "team": "api"
+    },
+    "targets": [
+      "api-1.example.com:9090",
+      "api-2.example.com:9090"
+    ]
+  },
+  {
+    "labels": {
+      "datacenter": "us-east-1",
+      "environment": "production",
+      "job": "postgres-exporter",
+      "service": "postgres",
+      "team": "dba"
+    },
+    "targets": [
+      "db-exporter-1.example.com:9187",
+      "db-exporter-2.example.com:9187"
+    ]
+  },
+  {
+    "labels": {
+      "datacenter": "us-east-1",
+      "environment": "production",
+      "job": "redis-exporter",
+      "service": "redis-cache",
+      "team": "platform"
+    },
+    "targets": [
+      "cache-1.example.com:9121",
+      "cache-2.example.com:9121"
+    ]
+  },
+  {
+    "labels": {
+      "datacenter": "us-west-2",
+      "environment": "staging",
+      "job": "web-application",
+      "service": "web-app",
+      "team": "backend"
+    },
+    "targets": [
+      "staging-app.example.com:8080"
+    ]
+  }
+]

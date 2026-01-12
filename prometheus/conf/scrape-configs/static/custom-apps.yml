@@ -1,0 +1,142 @@
+# Custom Application Metrics Scrape Configuration
+# This template provides examples for scraping custom application metrics
+# using static_configs for manually defined targets.
+#
+# Requirements: 5.1 (static_configs support)
+#
+# Usage: Include this file in your prometheus.yml under scrape_configs
+# or merge the job definitions into your existing configuration.
+
+scrape_configs:
+  # Example: Custom web application with /metrics endpoint
+  - job_name: 'custom-web-app'
+    # Scrape interval for this job (overrides global default)
+    scrape_interval: 15s
+    # Timeout for scrape requests
+    scrape_timeout: 10s
+    # Metrics path (default is /metrics)
+    metrics_path: /metrics
+    # Scheme (http or https)
+    scheme: http
+
+    static_configs:
+      - targets:
+          - 'webapp-1.example.com:8080'
+          - 'webapp-2.example.com:8080'
+          - 'webapp-3.example.com:8080'
+        labels:
+          environment: 'production'
+          team: 'backend'
+          service: 'web-app'
+
+  # Example: API service with custom metrics port
+  - job_name: 'api-service'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    metrics_path: /api/metrics
+    scheme: https
+
+    # TLS configuration for HTTPS endpoints
+    tls_config:
+      # Skip certificate verification (not recommended for production)
+      insecure_skip_verify: false
+      # CA certificate for verification
+      # ca_file: /etc/prometheus/certs/ca.crt
+
+    # Basic authentication (if required)
+    # basic_auth:
+    #   username: 'prometheus'
+    #   password_file: /etc/prometheus/secrets/api-password
+
+    static_configs:
+      - targets:
+          - 'api.example.com:9443'
+        labels:
+          environment: 'production'
+          team: 'api'
+          service: 'api-gateway'
+
+  # Example: Microservices with multiple instances
+  - job_name: 'microservices'
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scheme: http
+
+    # Relabel configurations to modify labels before scraping
+    relabel_configs:
+      # Add instance label from target address
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\d+'
+        replacement: '${1}'
+
+      # Add port label
+      - source_labels: [__address__]
+        target_label: port
+        regex: '[^:]+:(\d+)'
+        replacement: '${1}'
+
+    # Metric relabel configurations to filter/modify scraped metrics
+    metric_relabel_configs:
+      # Drop high-cardinality metrics
+      - source_labels: [__name__]
+        regex: 'go_gc_.*'
+        action: drop
+
+      # Rename metrics
+      - source_labels: [__name__]
+        regex: 'http_requests_total'
+        target_label: __name__
+        replacement: 'app_http_requests_total'
+
+    static_configs:
+      # User service instances
+      - targets:
+          - 'user-svc-1:8080'
+          - 'user-svc-2:8080'
+        labels:
+          service: 'user-service'
+          tier: 'backend'
+
+      # Order service instances
+      - targets:
+          - 'order-svc-1:8080'
+          - 'order-svc-2:8080'
+        labels:
+          service: 'order-service'
+          tier: 'backend'
+
+      # Payment service instances
+      - targets:
+          - 'payment-svc-1:8080'
+        labels:
+          service: 'payment-service'
+          tier: 'backend'
+          critical: 'true'
+
+  # Example: Batch job metrics (longer scrape interval)
+  - job_name: 'batch-jobs'
+    scrape_interval: 60s
+    scrape_timeout: 30s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'batch-processor.example.com:9100'
+        labels:
+          environment: 'production'
+          type: 'batch'
+
+  # Example: Development environment targets
+  - job_name: 'dev-apps'
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+    static_configs:
+      - targets:
+          - 'localhost:8080'
+          - 'localhost:8081'
+          - 'localhost:8082'
+        labels:
+          environment: 'development'
+          team: 'dev'

@@ -1,0 +1,171 @@
+# Kubernetes Service Discovery Configuration
+# Discovers and scrapes Kubernetes services and endpoints
+#
+# Requirements:
+# - 7.1: kubernetes_sd_config for automatic service discovery
+# - 7.2: Discover services with prometheus.io/scrape annotation
+# - 7.3: Support configuring scrape port via prometheus.io/port annotation
+# - 7.4: Support configuring scrape path via prometheus.io/path annotation
+#
+# Usage: Include this configuration in your prometheus.yml scrape_configs
+
+scrape_configs:
+  # Scrape service endpoints with prometheus.io annotations
+  - job_name: 'kubernetes-service-endpoints'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+
+    relabel_configs:
+      # Only scrape services with prometheus.io/scrape: "true" annotation
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
+      # Use prometheus.io/scheme annotation (default: http)
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+        action: replace
+        target_label: __scheme__
+        regex: (https?)
+
+      # Use prometheus.io/path annotation (default: /metrics)
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      # Use prometheus.io/port annotation for port
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+
+      # Map Kubernetes labels to Prometheus labels
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+
+      # Add namespace label
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+
+      # Add service name label
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: kubernetes_service
+
+      # Add endpoint name label
+      - source_labels: [__meta_kubernetes_endpoint_node_name]
+        action: replace
+        target_label: kubernetes_node
+
+  # Scrape services directly (for headless services)
+  - job_name: 'kubernetes-services'
+
+    kubernetes_sd_configs:
+      - role: service
+
+    metrics_path: /metrics
+
+    relabel_configs:
+      # Only scrape services with prometheus.io/scrape: "true" annotation
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
+      # Use prometheus.io/path annotation
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      # Use prometheus.io/port annotation
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+
+      # Add namespace label
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      # Add service name as job
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+  # Scrape ingress endpoints for blackbox probing
+  - job_name: 'kubernetes-ingresses'
+
+    kubernetes_sd_configs:
+      - role: ingress
+
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+
+    relabel_configs:
+      # Only probe ingresses with prometheus.io/probe: "true" annotation
+      - source_labels: [__meta_kubernetes_ingress_annotation_prometheus_io_probe]
+        action: keep
+        regex: true
+
+      # Construct probe URL from ingress host and path
+      - source_labels: [__meta_kubernetes_ingress_scheme, __address__, __meta_kubernetes_ingress_path]
+        regex: (.+);(.+);(.+)
+        replacement: ${1}://${2}${3}
+        target_label: __param_target
+
+      # Use blackbox exporter as target
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+      # Add ingress labels
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_ingress_name]
+        target_label: ingress
+
+  # Scrape endpoints in specific namespace
+  - job_name: 'kubernetes-endpoints-production'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - production
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
