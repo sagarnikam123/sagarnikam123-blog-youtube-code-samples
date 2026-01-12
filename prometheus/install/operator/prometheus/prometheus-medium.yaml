@@ -1,0 +1,85 @@
+# Prometheus - Medium Size
+# For medium production workloads
+# Retention: 30d, Replicas: 2
+#
+# Prerequisites:
+#   1. Prometheus Operator installed
+#   2. RBAC created (see rbac.yaml)
+#
+# Apply:
+#   kubectl apply -f prometheus-medium.yaml
+
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus-medium
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: prometheus-medium
+    app.kubernetes.io/component: prometheus
+spec:
+  replicas: 2
+  version: v2.54.1
+  serviceAccountName: prometheus
+  serviceMonitorSelector:
+    matchLabels:
+      prometheus: main
+  serviceMonitorNamespaceSelector: {}
+  podMonitorSelector:
+    matchLabels:
+      prometheus: main
+  podMonitorNamespaceSelector: {}
+  retention: 30d
+  retentionSize: 90GB
+  resources:
+    requests:
+      cpu: 1
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  securityContext:
+    fsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: gp3
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Gi
+  alerting:
+    alertmanagers:
+      - namespace: monitoring
+        name: alertmanager-main
+        port: web
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+      prometheus: main
+  ruleNamespaceSelector: {}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              app.kubernetes.io/instance: prometheus-medium
+          topologyKey: kubernetes.io/hostname
+  enableFeatures:
+    - remote-write-receiver
+  externalLabels:
+    cluster: production
+    environment: medium
+  additionalScrapeConfigs:
+    name: additional-scrape-configs
+    key: prometheus-additional.yaml
+    optional: true
+  probeSelector:
+    matchLabels:
+      prometheus: main
+  probeNamespaceSelector: {}

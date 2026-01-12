@@ -1,0 +1,69 @@
+# Prometheus configuration file
+# Default configuration for binary installation
+#
+# Documentation: https://prometheus.io/docs/prometheus/latest/configuration/configuration/
+
+global:
+  # How frequently to scrape targets by default
+  scrape_interval: 15s
+
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+
+  # Scrape timeout (default: 10s)
+  # scrape_timeout: 10s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager)
+  external_labels:
+    monitor: 'prometheus-server'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Rule files specifying groups of rules to be loaded
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+  # - "/etc/prometheus/rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  # This is required for Prometheus to monitor itself
+  - job_name: "prometheus"
+    # Override the global default and scrape targets from this job every 5 seconds
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          instance: "prometheus-server"
+
+  # Node Exporter - System metrics
+  # Uncomment when node_exporter is installed
+  # - job_name: "node"
+  #   static_configs:
+  #     - targets: ["localhost:9100"]
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: instance
+  #       regex: '([^:]+):\d+'
+  #       replacement: '${1}'
+
+  # Example: Custom application metrics
+  # - job_name: "my-app"
+  #   static_configs:
+  #     - targets: ["localhost:8080"]
+  #   metrics_path: /metrics
+  #   scheme: http
+
+  # Example: File-based service discovery
+  # - job_name: "file-sd"
+  #   file_sd_configs:
+  #     - files:
+  #         - "/etc/prometheus/targets/*.json"
+  #       refresh_interval: 30s

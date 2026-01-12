@@ -1,0 +1,83 @@
+# Docker Compose for Single-Node Prometheus
+#
+# This configuration deploys a standalone Prometheus instance with:
+# - Persistent storage via Docker volumes
+# - Configurable port mapping
+# - Bind-mounted configuration file
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose down
+#
+# Requirements: 2.1, 2.3, 2.4
+
+services:
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.54.1}
+    container_name: prometheus
+    restart: unless-stopped
+
+    # Port mapping - configurable via PROMETHEUS_PORT env var
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
+    # Volume mounts for configuration and persistent storage
+    volumes:
+      # Bind-mount custom configuration file
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Persistent storage for TSDB data
+      - prometheus_data:/prometheus
+      # Optional: mount rules directory
+      - ./rules:/etc/prometheus/rules:ro
+      # Optional: mount alerts directory
+      - ./alerts:/etc/prometheus/alerts:ro
+
+    # Command line arguments
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}'
+      - '--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-0}'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+
+    # Resource limits (optional, adjust based on workload)
+    deploy:
+      resources:
+        limits:
+          memory: ${PROMETHEUS_MEMORY_LIMIT:-2g}
+        reservations:
+          memory: ${PROMETHEUS_MEMORY_RESERVATION:-512m}
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Network configuration
+    networks:
+      - prometheus-network
+
+# Named volumes for persistent storage
+volumes:
+  prometheus_data:
+    driver: local
+    name: prometheus_data
+
+# Network definition
+networks:
+  prometheus-network:
+    driver: bridge
+    name: prometheus-network

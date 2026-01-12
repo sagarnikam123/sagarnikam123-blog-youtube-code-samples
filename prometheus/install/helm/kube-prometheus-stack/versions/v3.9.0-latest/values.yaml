@@ -1,0 +1,33 @@
+# Prometheus v3.9.0 Latest Version Override
+# Latest release with Native Histograms GA
+#
+# Usage:
+#   helm install prometheus prometheus-community/kube-prometheus-stack \
+#     -n prometheus --create-namespace \
+#     -f base/values.yaml \
+#     -f versions/v3.9.0-latest/values.yaml \
+#     -f environments/<env>/values.yaml
+
+prometheus:
+  prometheusSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/prometheus
+      tag: v3.9.0
+    # Native Histograms is now GA - enable if needed
+    # enableFeatures:
+    #   - native-histograms  # No longer needed, use scrape config instead
+    additionalScrapeConfigs: []
+    # To enable native histogram scraping, add to your scrape configs:
+    # scrape_native_histograms: true
+
+# Compatible component versions for v3.9.0
+alertmanager:
+  alertmanagerSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/alertmanager
+      tag: v0.28.0
+
+# Chart version reference: 80.13.0
+# helm install prometheus prometheus-community/kube-prometheus-stack --version 80.13.0

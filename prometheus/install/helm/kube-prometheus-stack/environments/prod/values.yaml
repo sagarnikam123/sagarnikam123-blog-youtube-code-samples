@@ -1,0 +1,78 @@
+# Production Environment Values
+# High availability, longer retention, production-grade resources
+#
+# Usage:
+#   helm install prometheus prometheus-community/kube-prometheus-stack \
+#     -n prometheus --create-namespace \
+#     -f ../../base/values.yaml \
+#     -f ../../versions/v3.5.0-lts/values.yaml \
+#     -f values.yaml
+
+prometheus:
+  prometheusSpec:
+    replicas: 2
+    retention: 15d
+    resources:
+      requests:
+        cpu: 4
+        memory: 8Gi
+      limits:
+        cpu: 8
+        memory: 16Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3  # AWS EKS
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 100Gi
+    # Pod anti-affinity for HA
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: prometheus
+            topologyKey: kubernetes.io/hostname
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 3
+    retention: 120h
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: alertmanager
+            topologyKey: kubernetes.io/hostname
+
+grafana:
+  replicas: 2
+  persistence:
+    size: 20Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+# Enable all monitoring for production
+kubeEtcd:
+  enabled: true
+kubeControllerManager:
+  enabled: true
+kubeScheduler:
+  enabled: true
+kubeProxy:
+  enabled: true

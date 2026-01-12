@@ -1,0 +1,135 @@
+# Prometheus Configuration File
+#
+# Default configuration for Docker-based Prometheus deployment
+# Customize scrape configs based on your monitoring requirements
+#
+# Requirements: 2.2, 2.6
+
+global:
+  # How frequently to scrape targets by default
+  scrape_interval: 15s
+
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+
+  # Scrape timeout (must be <= scrape_interval)
+  scrape_timeout: 10s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager)
+  external_labels:
+    monitor: 'docker-prometheus'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # Alertmanager endpoint (use service name in docker-compose.full.yml)
+          - alertmanager:9093
+      # Timeout for sending alerts
+      timeout: 10s
+
+# Rule files - load recording and alerting rules
+rule_files:
+  - /etc/prometheus/rules/*.yml
+  - /etc/prometheus/alerts/*.yml
+
+# Scrape configurations
+scrape_configs:
+  # ==========================================================================
+  # Prometheus Self-Monitoring
+  # ==========================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: 'prometheus-server'
+    # Scrape more frequently for self-monitoring
+    scrape_interval: 10s
+
+  # ==========================================================================
+  # Docker Host Metrics (via Node Exporter)
+  # ==========================================================================
+  # Uncomment when Node Exporter is deployed
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: instance
+  #       regex: '([^:]+):\d+'
+  #       replacement: '${1}'
+
+  # ==========================================================================
+  # Docker Container Metrics (via cAdvisor)
+  # ==========================================================================
+  # Uncomment when cAdvisor is deployed
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #   metric_relabel_configs:
+  #     # Drop high-cardinality metrics
+  #     - source_labels: [__name__]
+  #       regex: 'container_tasks_state'
+  #       action: drop
+
+  # ==========================================================================
+  # Grafana Metrics
+  # ==========================================================================
+  # Uncomment when using docker-compose.full.yml
+  # - job_name: 'grafana'
+  #   static_configs:
+  #     - targets: ['grafana:3000']
+  #   metrics_path: /metrics
+
+  # ==========================================================================
+  # Alertmanager Metrics
+  # ==========================================================================
+  # Uncomment when using docker-compose.full.yml
+  # - job_name: 'alertmanager'
+  #   static_configs:
+  #     - targets: ['alertmanager:9093']
+
+  # ==========================================================================
+  # Custom Application Metrics
+  # ==========================================================================
+  # Add your application scrape configs here
+  # Example:
+  # - job_name: 'my-app'
+  #   static_configs:
+  #     - targets: ['my-app:8080']
+  #   metrics_path: /metrics
+  #   scheme: http
+
+  # ==========================================================================
+  # File-based Service Discovery
+  # ==========================================================================
+  # Uncomment to use file-based service discovery
+  # - job_name: 'file-sd'
+  #   file_sd_configs:
+  #     - files:
+  #         - /etc/prometheus/file_sd/*.json
+  #         - /etc/prometheus/file_sd/*.yml
+  #       refresh_interval: 30s
+
+  # ==========================================================================
+  # Blackbox Exporter (Probe Monitoring)
+  # ==========================================================================
+  # Uncomment when Blackbox Exporter is deployed
+  # - job_name: 'blackbox-http'
+  #   metrics_path: /probe
+  #   params:
+  #     module: [http_2xx]
+  #   static_configs:
+  #     - targets:
+  #         - https://example.com
+  #         - https://prometheus.io
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115

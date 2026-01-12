@@ -61,8 +61,11 @@ kubectl apply -f prometheus/rbac.yaml
 ### 2. Apply Prometheus CR
 
 ```bash
-# Choose a size: demo, small
-kubectl apply -f prometheus/prometheus-demo.yaml
+# Choose a size: demo, small, medium, large
+kubectl apply -f prometheus/prometheus-demo.yaml    # Development
+kubectl apply -f prometheus/prometheus-small.yaml   # Small production
+kubectl apply -f prometheus/prometheus-medium.yaml  # Medium production
+kubectl apply -f prometheus/prometheus-large.yaml   # Large production (HA)
 ```
 
 ## Files
@@ -71,6 +74,8 @@ kubectl apply -f prometheus/prometheus-demo.yaml
 |------|-------------|
 | `prometheus/prometheus-demo.yaml` | Demo size (development) |
 | `prometheus/prometheus-small.yaml` | Small production |
+| `prometheus/prometheus-medium.yaml` | Medium production |
+| `prometheus/prometheus-large.yaml` | Large production (HA) |
 | `prometheus/rbac.yaml` | ServiceAccount and RBAC |
 | `prometheus/servicemonitor.yaml` | Example ServiceMonitor |
 | `openshift/subscription.yaml` | OpenShift OperatorHub |
@@ -79,12 +84,12 @@ kubectl apply -f prometheus/prometheus-demo.yaml
 
 ## Prometheus Sizes
 
-| Size | Retention | Replicas | Use Case |
-|------|-----------|----------|----------|
-| Demo | 24h | 1 | Development |
-| Small | 15d | 2 | Small production |
-| Medium | 30d | 2 | Medium production |
-| Large | 90d | 3 | Large production |
+| Size | Retention | Replicas | Storage | Memory | Use Case |
+|------|-----------|----------|---------|--------|----------|
+| Demo | 24h | 1 | 10Gi | 1Gi | Development |
+| Small | 15d | 2 | 50Gi | 4Gi | Small production |
+| Medium | 30d | 2 | 100Gi | 8Gi | Medium production |
+| Large | 90d | 3 | 500Gi | 16Gi | Large production (HA) |
 
 ## Verify
 

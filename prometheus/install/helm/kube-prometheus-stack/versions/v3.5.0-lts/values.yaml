@@ -1,0 +1,27 @@
+# Prometheus v3.5.0 LTS Version Override
+# Long Term Support release - recommended for production stability
+#
+# Usage:
+#   helm install prometheus prometheus-community/kube-prometheus-stack \
+#     -n prometheus --create-namespace \
+#     -f base/values.yaml \
+#     -f versions/v3.5.0-lts/values.yaml \
+#     -f environments/<env>/values.yaml
+
+prometheus:
+  prometheusSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/prometheus
+      tag: v3.5.0
+
+# Compatible component versions for v3.5.0 LTS
+alertmanager:
+  alertmanagerSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/alertmanager
+      tag: v0.28.0
+
+# Chart version reference: 77.10.0
+# helm install prometheus prometheus-community/kube-prometheus-stack --version 77.10.0

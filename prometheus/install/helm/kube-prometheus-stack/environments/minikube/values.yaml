@@ -1,0 +1,72 @@
+# Minikube Environment Values
+# Fixes PV permission issues with hostpath provisioner
+#
+# Usage:
+#   helm install prometheus prometheus-community/kube-prometheus-stack \
+#     -n prometheus --create-namespace \
+#     -f ../../base/values.yaml \
+#     -f ../../versions/v3.5.0-lts/values.yaml \
+#     -f values.yaml
+
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    # Fix hostpath permission issues
+    securityContext:
+      runAsUser: 0
+      runAsNonRoot: false
+      fsGroup: 0
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard  # minikube default
+          resources:
+            requests:
+              storage: 5Gi
+
+alertmanager:
+  alertmanagerSpec:
+    retention: 24h
+    securityContext:
+      runAsUser: 0
+      runAsNonRoot: false
+      fsGroup: 0
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+grafana:
+  securityContext:
+    runAsUser: 0
+    runAsNonRoot: false
+    fsGroup: 0
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Disable components not needed for local dev
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

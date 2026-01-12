@@ -1,0 +1,84 @@
+<!--
+  Prometheus Windows Service Configuration
+
+  This file is a template for WinSW (Windows Service Wrapper) configuration.
+  WinSW allows running any executable as a Windows service.
+
+  Installation:
+    1. Download WinSW from https://github.com/winsw/winsw/releases
+    2. Rename winsw.exe to prometheus-service.exe
+    3. Place this XML file alongside prometheus-service.exe
+    4. Run: prometheus-service.exe install
+
+  Usage:
+    Install:   prometheus-service.exe install
+    Uninstall: prometheus-service.exe uninstall
+    Start:     prometheus-service.exe start
+    Stop:      prometheus-service.exe stop
+    Status:    prometheus-service.exe status
+
+  Requirements: 1.4, 1.8, 1.9
+-->
+<service>
+  <!-- Service identification -->
+  <id>prometheus</id>
+  <name>Prometheus Monitoring System</name>
+  <description>Prometheus monitoring system and time series database for metrics collection and alerting.</description>
+
+  <!-- Executable configuration -->
+  <executable>%BASE%\prometheus.exe</executable>
+  <arguments>--config.file="%BASE%\prometheus.yml" --storage.tsdb.path="C:\ProgramData\prometheus" --web.console.templates="%BASE%\consoles" --web.console.libraries="%BASE%\console_libraries" --web.listen-address=0.0.0.0:9090 --web.enable-lifecycle</arguments>
+
+  <!-- Working directory -->
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <!-- Logging configuration -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <logpath>C:\ProgramData\prometheus\logs</logpath>
+
+  <!-- Service startup configuration -->
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>false</delayedAutoStart>
+
+  <!-- Service account (LocalSystem by default) -->
+  <!-- Uncomment to run as a specific user -->
+  <!--
+  <serviceaccount>
+    <username>.\prometheus</username>
+    <password>password</password>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+  -->
+
+  <!-- Failure recovery actions -->
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <resetfailure>1 day</resetfailure>
+
+  <!-- Stop timeout -->
+  <stoptimeout>30 sec</stoptimeout>
+
+  <!-- Priority -->
+  <priority>Normal</priority>
+
+  <!-- Dependencies (optional) -->
+  <!--
+  <depend>Tcpip</depend>
+  <depend>Dnscache</depend>
+  -->
+
+  <!-- Environment variables (optional) -->
+  <!--
+  <env name="PROMETHEUS_STORAGE_TSDB_PATH" value="C:\ProgramData\prometheus"/>
+  -->
+
+  <!-- Security descriptor (optional) -->
+  <!-- Allows Administrators and SYSTEM full control -->
+  <!--
+  <securityDescriptor>D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)</securityDescriptor>
+  -->
+</service>

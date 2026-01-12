@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Prometheus launchd plist for macOS
+
+  Installation:
+    User agent:   cp io.prometheus.prometheus.plist ~/Library/LaunchAgents/
+    System daemon: sudo cp io.prometheus.prometheus.plist /Library/LaunchDaemons/
+
+  Usage:
+    Load:   launchctl load ~/Library/LaunchAgents/io.prometheus.prometheus.plist
+    Unload: launchctl unload ~/Library/LaunchAgents/io.prometheus.prometheus.plist
+    Status: launchctl list | grep prometheus
+
+  Requirements: 1.3, 1.7, 1.9
+-->
+<plist version="1.0">
+<dict>
+    <!-- Service identifier -->
+    <key>Label</key>
+    <string>io.prometheus.prometheus</string>
+
+    <!-- Program and arguments -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/prometheus</string>
+        <string>--config.file=/usr/local/etc/prometheus/prometheus.yml</string>
+        <string>--storage.tsdb.path=/usr/local/var/prometheus</string>
+        <string>--web.console.templates=/usr/local/etc/prometheus/consoles</string>
+        <string>--web.console.libraries=/usr/local/etc/prometheus/console_libraries</string>
+        <string>--web.listen-address=127.0.0.1:9090</string>
+        <string>--web.enable-lifecycle</string>
+    </array>
+
+    <!-- Start automatically at login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart on failure -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Throttle restarts (wait 10 seconds between restarts) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Log files -->
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/prometheus/prometheus.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/prometheus/prometheus.error.log</string>
+
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/usr/local/var/prometheus</string>
+
+    <!-- Environment variables (optional) -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Resource limits -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>65536</integer>
+    </dict>
+
+    <key>HardResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>65536</integer>
+    </dict>
+
+    <!-- Process type (for Activity Monitor) -->
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

@@ -1,0 +1,116 @@
+# Docker Compose for Full Monitoring Stack
+#
+# This configuration deploys a complete monitoring stack:
+# - Prometheus: Metrics collection and storage
+# - Grafana: Visualization and dashboards
+# - Alertmanager: Alert routing and notification
+#
+# Usage:
+#   docker-compose -f docker-compose.full.yml up -d
+#   docker-compose -f docker-compose.full.yml down
+#
+# Requirements: 2.1
+
+services:
+  # Prometheus - Metrics collection and storage
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.54.1}
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./rules:/etc/prometheus/rules:ro
+      - ./alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - monitoring-network
+    depends_on:
+      alertmanager:
+        condition: service_healthy
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION:-11.2.0}
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - GF_INSTALL_PLUGINS=${GRAFANA_PLUGINS:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - monitoring-network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+  # Alertmanager - Alert routing and notification
+  alertmanager:
+    image: prom/alertmanager:${ALERTMANAGER_VERSION:-v0.27.0}
+    container_name: alertmanager
+    restart: unless-stopped
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://localhost:9093}'
+      - '--cluster.listen-address='
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - monitoring-network
+
+# Named volumes for persistent storage
+volumes:
+  prometheus_data:
+    driver: local
+    name: prometheus_data
+  grafana_data:
+    driver: local
+    name: grafana_data
+  alertmanager_data:
+    driver: local
+    name: alertmanager_data
+
+# Network definition - shared between all services
+networks:
+  monitoring-network:
+    driver: bridge
+    name: monitoring-network

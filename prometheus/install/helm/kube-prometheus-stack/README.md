@@ -36,10 +36,15 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm search repo prometheus-community/kube-prometheus-stack --versions
 
 # Check Prometheus version in a specific chart
+# prometheus:v3.9.0 (Latest)
 helm show values prometheus-community/kube-prometheus-stack --version 80.13.0 | grep -B2 -A2 "prometheus/prometheus"
 
 # Check all default images that will be deployed
-helm template prometheus prometheus-community/kube-prometheus-stack --version 80.13.0 | grep "image:" | sort -u
+# prometheus:v3.5.0 (LTS)
+helm template prometheus prometheus-community/kube-prometheus-stack --version 77.10.0 | grep "image:" | sort -u
+
+# get default values
+helm show values prometheus-community/kube-prometheus-stack > default-values.yaml
 ```
 
 > **Note:** The `appVersion` in chart metadata is the Prometheus Operator version, not Prometheus itself.
@@ -179,6 +184,120 @@ echo
 # Open browser (username: admin)
 open http://localhost:3000
 ```
+
+## Folder Structure
+
+This repository organizes Helm values for multi-version and multi-environment deployments:
+
+```
+kube-prometheus-stack/
+├── README.md                           # This file
+├── base/
+│   └── values.yaml                     # Common settings (retention, resources, etc.)
+├── versions/
+│   ├── v3.5.0-lts/
+│   │   ├── values.yaml                 # LTS version override
+│   │   ├── default-values.yaml         # Chart defaults for reference
+│   │   └── README.md                   # LTS release notes
+│   └── v3.9.0-latest/
+│       ├── values.yaml                 # Latest version override
+│       ├── default-values.yaml         # Chart defaults for reference
+│       └── README.md                   # Latest release notes
+└── environments/
+    ├── minikube/
+    │   └── values.yaml                 # Minikube-specific (fixes PV permissions)
+    ├── dev/
+    │   └── values.yaml                 # Minimal resources
+    ├── staging/
+    │   └── values.yaml                 # Moderate resources
+    └── prod/
+        └── values.yaml                 # HA, production-grade resources
+```
+
+## Version-Specific Installation
+
+### Install on Minikube
+
+Minikube requires special `securityContext` settings to fix hostpath PV permission issues:
+
+```bash
+# v3.5.0 LTS on Minikube
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/minikube/values.yaml
+
+# v3.9.0 Latest on Minikube
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.9.0-latest/values.yaml \
+  -f environments/minikube/values.yaml
+```
+
+### Install v3.5.0 LTS (Recommended for Production)
+
+```bash
+# Development (non-minikube)
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/dev/values.yaml
+
+# Production
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/prod/values.yaml
+```
+
+### Install v3.9.0 Latest
+
+```bash
+# Development (non-minikube)
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.9.0-latest/values.yaml \
+  -f environments/dev/values.yaml
+
+# Staging
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.9.0-latest/values.yaml \
+  -f environments/staging/values.yaml
+```
+
+### Using Specific Chart Version
+
+Alternatively, use the chart version directly (includes matching Prometheus version):
+
+```bash
+# v3.5.0 LTS (chart 77.10.0)
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --version 77.10.0 \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f environments/dev/values.yaml
+
+# v3.9.0 Latest (chart 80.13.0)
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --version 80.13.0 \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f environments/dev/values.yaml
+```
+
+### Version Mapping (Prometheus 3.x)
+
+| Chart Version | Prometheus Version | Type   |
+|---------------|--------------------|--------|
+| 80.13.0       | v3.9.0             | Latest |
+| 77.10.0       | v3.5.0             | LTS    |
 
 ## Custom Installation
 
@@ -458,12 +577,12 @@ kubectl get prometheusrules -n prometheus prometheus-kube-prometheus-prometheus-
 ### Resource Planning
 
 | Active Series | CPU Request | Memory Request | Storage |
-|--------------|-------------|----------------|---------|
-| < 100K | 1 core | 2Gi | 10Gi |
-| 100K - 500K | 2 cores | 4Gi | 25Gi |
-| 500K - 1M | 4 cores | 8Gi | 50Gi |
-| 1M - 5M | 8 cores | 16Gi | 100Gi |
-| > 5M | 16+ cores | 32Gi+ | 200Gi+ |
+|---------------|-------------|----------------|---------|
+| < 100K        | 1 core      | 2Gi            | 10Gi    |
+| 100K - 500K   | 2 cores     | 4Gi            | 25Gi    |
+| 500K - 1M     | 4 cores     | 8Gi            | 50Gi    |
+| 1M - 5M       | 8 cores     | 16Gi           | 100Gi   |
+| > 5M          | 16+ cores   | 32Gi+          | 200Gi+  |
 
 ### Retention Strategy
 
@@ -490,12 +609,12 @@ If you have high cardinality (millions of series):
 ## Version Compatibility
 
 | Chart Version | Prometheus Version | Kubernetes Version |
-|--------------|-------------------|-------------------|
-| 55.x | 2.49.x | 1.19+ |
-| 54.x | 2.48.x | 1.19+ |
-| 53.x | 2.47.x | 1.19+ |
-| 52.x | 2.46.x | 1.19+ |
-| 51.x | 2.45.x | 1.19+ |
+|---------------|--------------------|--------------------|
+| 55.x          | 2.49.x             | 1.19+              |
+| 54.x          | 2.48.x             | 1.19+              |
+| 53.x          | 2.47.x             | 1.19+              |
+| 52.x          | 2.46.x             | 1.19+              |
+| 51.x          | 2.45.x             | 1.19+              |
 
 Check current versions:
 ```bash

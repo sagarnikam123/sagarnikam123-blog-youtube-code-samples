@@ -1,0 +1,105 @@
+# Prometheus - Large Size
+# For large production workloads with high availability
+# Retention: 90d, Replicas: 3
+#
+# Prerequisites:
+#   1. Prometheus Operator installed
+#   2. RBAC created (see rbac.yaml)
+#   3. Sufficient cluster resources (recommended: dedicated node pool)
+#
+# Apply:
+#   kubectl apply -f prometheus-large.yaml
+
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus-large
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: prometheus-large
+    app.kubernetes.io/component: prometheus
+spec:
+  replicas: 3
+  version: v2.54.1
+  serviceAccountName: prometheus
+  serviceMonitorSelector:
+    matchLabels:
+      prometheus: main
+  serviceMonitorNamespaceSelector: {}
+  podMonitorSelector:
+    matchLabels:
+      prometheus: main
+  podMonitorNamespaceSelector: {}
+  retention: 90d
+  retentionSize: 450GB
+  resources:
+    requests:
+      cpu: 2
+      memory: 8Gi
+    limits:
+      cpu: 8
+      memory: 16Gi
+  securityContext:
+    fsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: gp3
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Gi
+  alerting:
+    alertmanagers:
+      - namespace: monitoring
+        name: alertmanager-main
+        port: web
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+      prometheus: main
+  ruleNamespaceSelector: {}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              app.kubernetes.io/instance: prometheus-large
+          topologyKey: kubernetes.io/hostname
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node-role.kubernetes.io/monitoring
+                operator: Exists
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: monitoring
+      effect: NoSchedule
+  enableFeatures:
+    - remote-write-receiver
+    - exemplar-storage
+  externalLabels:
+    cluster: production
+    environment: large
+  additionalScrapeConfigs:
+    name: additional-scrape-configs
+    key: prometheus-additional.yaml
+    optional: true
+  probeSelector:
+    matchLabels:
+      prometheus: main
+  probeNamespaceSelector: {}
+  shards: 1
+  walCompression: true
+  enableAdminAPI: false
+  queryLogFile: ""
+  scrapeInterval: 30s
+  evaluationInterval: 30s

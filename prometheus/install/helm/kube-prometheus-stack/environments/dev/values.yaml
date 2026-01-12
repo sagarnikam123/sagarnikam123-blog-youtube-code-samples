@@ -1,0 +1,58 @@
+# Development Environment Values
+# Minimal resources, short retention for cost savings
+#
+# Usage:
+#   helm install prometheus prometheus-community/kube-prometheus-stack \
+#     -n prometheus --create-namespace \
+#     -f ../../base/values.yaml \
+#     -f ../../versions/v3.9.0-latest/values.yaml \
+#     -f values.yaml
+
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  alertmanagerSpec:
+    retention: 24h
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+
+grafana:
+  persistence:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Disable some components for dev
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
