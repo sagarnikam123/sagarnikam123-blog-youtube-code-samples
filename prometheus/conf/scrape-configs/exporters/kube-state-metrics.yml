@@ -1,0 +1,74 @@
+# kube-state-metrics Scrape Configuration
+# Collects Kubernetes object state metrics
+#
+# Requirements: 6.2 - Scrape configuration for kube-state-metrics (Kubernetes object metrics)
+#
+# Default port: 8080 (metrics), 8081 (telemetry)
+# Metrics: Deployments, pods, nodes, services, configmaps, etc.
+
+scrape_configs:
+  # Main kube-state-metrics endpoint
+  - job_name: 'kube-state-metrics'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+
+    # Static config for non-Kubernetes deployments
+    static_configs:
+      - targets:
+          - 'kube-state-metrics.monitoring.svc.cluster.local:8080'
+        labels:
+          cluster: 'production'
+
+    # Honor labels from kube-state-metrics
+    honor_labels: true
+
+    metric_relabel_configs:
+      # Drop deprecated metrics
+      - source_labels: [__name__]
+        regex: 'kube_pod_container_status_ready'
+        action: drop
+
+  # Kubernetes service discovery
+  - job_name: 'kube-state-metrics-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - monitoring
+            - kube-system
+
+    relabel_configs:
+      # Only scrape kube-state-metrics service
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: kube-state-metrics
+
+      # Only scrape the http-metrics port
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: http-metrics
+
+      # Add cluster label
+      - target_label: cluster
+        replacement: 'production'
+
+    honor_labels: true
+
+  # kube-state-metrics telemetry endpoint (self-monitoring)
+  - job_name: 'kube-state-metrics-telemetry'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - monitoring
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: kube-state-metrics
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: telemetry

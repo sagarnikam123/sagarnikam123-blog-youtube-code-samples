@@ -1,0 +1,63 @@
+# PostgreSQL Exporter Scrape Configuration
+# Collects PostgreSQL database metrics
+#
+# Requirements: 6.5 - Scrape configuration for database exporters (postgres)
+#
+# Default port: 9187
+# Metrics: Connections, transactions, locks, replication, table stats, etc.
+
+scrape_configs:
+  # Static configuration
+  - job_name: 'postgres-exporter'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+
+    static_configs:
+      - targets:
+          - 'postgres-exporter-primary.example.com:9187'
+        labels:
+          environment: 'production'
+          role: 'primary'
+          cluster: 'main'
+
+      - targets:
+          - 'postgres-exporter-replica1.example.com:9187'
+          - 'postgres-exporter-replica2.example.com:9187'
+        labels:
+          environment: 'production'
+          role: 'replica'
+          cluster: 'main'
+
+    metric_relabel_configs:
+      # Drop per-query statistics if too high cardinality
+      - source_labels: [__name__]
+        regex: 'pg_stat_statements_.*'
+        action: drop
+
+  # Kubernetes deployment
+  - job_name: 'postgres-exporter-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - databases
+            - production
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: '.*postgres.*exporter.*'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      # Add database cluster label from service label
+      - source_labels: [__meta_kubernetes_service_label_cluster]
+        action: replace
+        target_label: cluster

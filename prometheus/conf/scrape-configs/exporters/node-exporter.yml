@@ -1,0 +1,61 @@
+# Node Exporter Scrape Configuration
+# Collects system-level metrics from Linux/Unix hosts
+#
+# Requirements: 6.1 - Scrape configuration for Node Exporter (system metrics)
+#
+# Default port: 9100
+# Metrics: CPU, memory, disk, network, filesystem, etc.
+
+scrape_configs:
+  # Static configuration for bare-metal/VM deployments
+  - job_name: 'node-exporter'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+    static_configs:
+      - targets:
+          - 'node1.example.com:9100'
+          - 'node2.example.com:9100'
+          - 'node3.example.com:9100'
+        labels:
+          environment: 'production'
+          datacenter: 'us-east-1'
+
+    # Relabel to add hostname from instance
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\d+'
+        replacement: '${1}'
+
+    # Drop high-cardinality metrics if needed
+    metric_relabel_configs:
+      # Keep only essential filesystem metrics
+      - source_labels: [__name__, fstype]
+        regex: 'node_filesystem_.+;(tmpfs|overlay)'
+        action: drop
+
+  # Kubernetes DaemonSet deployment
+  - job_name: 'node-exporter-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - monitoring
+
+    relabel_configs:
+      # Only scrape node-exporter service
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: node-exporter
+
+      # Add node name label
+      - source_labels: [__meta_kubernetes_endpoint_node_name]
+        action: replace
+        target_label: node
+
+      # Add instance label from node name
+      - source_labels: [__meta_kubernetes_endpoint_node_name]
+        action: replace
+        target_label: instance

@@ -1,0 +1,79 @@
+# Redis Exporter Scrape Configuration
+# Collects Redis cache/database metrics
+#
+# Requirements: 6.5 - Scrape configuration for database exporters (redis)
+#
+# Default port: 9121
+# Metrics: Memory, connections, commands, replication, keyspace, etc.
+
+scrape_configs:
+  # Static configuration
+  - job_name: 'redis-exporter'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+    static_configs:
+      - targets:
+          - 'redis-exporter-cache.example.com:9121'
+        labels:
+          environment: 'production'
+          role: 'cache'
+          cluster: 'cache-cluster'
+
+      - targets:
+          - 'redis-exporter-session.example.com:9121'
+        labels:
+          environment: 'production'
+          role: 'session'
+          cluster: 'session-cluster'
+
+      - targets:
+          - 'redis-exporter-queue.example.com:9121'
+        labels:
+          environment: 'production'
+          role: 'queue'
+          cluster: 'queue-cluster'
+
+  # Redis Cluster monitoring
+  - job_name: 'redis-cluster-exporter'
+    scrape_interval: 15s
+
+    static_configs:
+      - targets:
+          - 'redis-cluster-node1.example.com:9121'
+          - 'redis-cluster-node2.example.com:9121'
+          - 'redis-cluster-node3.example.com:9121'
+          - 'redis-cluster-node4.example.com:9121'
+          - 'redis-cluster-node5.example.com:9121'
+          - 'redis-cluster-node6.example.com:9121'
+        labels:
+          environment: 'production'
+          cluster: 'redis-cluster'
+          mode: 'cluster'
+
+  # Kubernetes deployment
+  - job_name: 'redis-exporter-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - cache
+            - production
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: '.*redis.*exporter.*'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_label_role]
+        action: replace
+        target_label: role

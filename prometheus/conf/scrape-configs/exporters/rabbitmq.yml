@@ -1,0 +1,70 @@
+# RabbitMQ Exporter Scrape Configuration
+# Collects RabbitMQ message broker metrics
+#
+# Requirements: 6.6 - Scrape configuration for message queue exporters (rabbitmq)
+#
+# Default port: 15692 (built-in Prometheus plugin)
+# Metrics: Queues, connections, channels, messages, memory, etc.
+
+scrape_configs:
+  # RabbitMQ built-in Prometheus plugin
+  - job_name: 'rabbitmq'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+
+    static_configs:
+      - targets:
+          - 'rabbitmq-1.example.com:15692'
+          - 'rabbitmq-2.example.com:15692'
+          - 'rabbitmq-3.example.com:15692'
+        labels:
+          environment: 'production'
+          cluster: 'main'
+
+    metric_relabel_configs:
+      # Drop per-queue metrics for temporary queues
+      - source_labels: [queue]
+        regex: 'amq\.gen-.*'
+        action: drop
+
+  # RabbitMQ Exporter (alternative)
+  - job_name: 'rabbitmq-exporter'
+    scrape_interval: 30s
+
+    static_configs:
+      - targets:
+          - 'rabbitmq-exporter.example.com:9419'
+        labels:
+          environment: 'production'
+          cluster: 'main'
+
+  # Kubernetes deployment with built-in plugin
+  - job_name: 'rabbitmq-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - rabbitmq
+            - messaging
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: 'rabbitmq.*'
+
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: 'prometheus'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod

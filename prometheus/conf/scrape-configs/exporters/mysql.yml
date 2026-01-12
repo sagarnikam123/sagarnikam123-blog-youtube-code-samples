@@ -1,0 +1,62 @@
+# MySQL Exporter Scrape Configuration
+# Collects MySQL/MariaDB database metrics
+#
+# Requirements: 6.5 - Scrape configuration for database exporters (mysql)
+#
+# Default port: 9104
+# Metrics: Connections, queries, InnoDB, replication, table stats, etc.
+
+scrape_configs:
+  # Static configuration
+  - job_name: 'mysql-exporter'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+
+    static_configs:
+      - targets:
+          - 'mysql-exporter-primary.example.com:9104'
+        labels:
+          environment: 'production'
+          role: 'primary'
+          cluster: 'main'
+
+      - targets:
+          - 'mysql-exporter-replica1.example.com:9104'
+          - 'mysql-exporter-replica2.example.com:9104'
+        labels:
+          environment: 'production'
+          role: 'replica'
+          cluster: 'main'
+
+    metric_relabel_configs:
+      # Drop high-cardinality per-table metrics if needed
+      - source_labels: [__name__]
+        regex: 'mysql_info_schema_table_.*'
+        action: drop
+
+  # Kubernetes deployment
+  - job_name: 'mysql-exporter-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - databases
+            - production
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: '.*mysql.*exporter.*'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_label_cluster]
+        action: replace
+        target_label: cluster

@@ -1,0 +1,87 @@
+# Kafka Exporter Scrape Configuration
+# Collects Apache Kafka metrics
+#
+# Requirements: 6.6 - Scrape configuration for message queue exporters (kafka)
+#
+# Default port: 9308 (kafka_exporter)
+# Metrics: Consumer lag, partition offsets, broker metrics, topic metrics
+
+scrape_configs:
+  # Kafka Exporter (consumer lag, offsets)
+  - job_name: 'kafka-exporter'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+
+    static_configs:
+      - targets:
+          - 'kafka-exporter.example.com:9308'
+        labels:
+          environment: 'production'
+          cluster: 'main'
+
+    metric_relabel_configs:
+      # Drop per-partition metrics if too high cardinality
+      - source_labels: [__name__, partition]
+        regex: 'kafka_consumergroup_lag;.*'
+        action: keep
+
+  # JMX Exporter for Kafka brokers
+  - job_name: 'kafka-jmx'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+
+    static_configs:
+      - targets:
+          - 'kafka-broker-1.example.com:9999'
+          - 'kafka-broker-2.example.com:9999'
+          - 'kafka-broker-3.example.com:9999'
+        labels:
+          environment: 'production'
+          cluster: 'main'
+          component: 'broker'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\d+'
+        replacement: '${1}'
+
+  # Kafka Connect JMX
+  - job_name: 'kafka-connect-jmx'
+    scrape_interval: 30s
+
+    static_configs:
+      - targets:
+          - 'kafka-connect-1.example.com:9999'
+          - 'kafka-connect-2.example.com:9999'
+        labels:
+          environment: 'production'
+          cluster: 'main'
+          component: 'connect'
+
+  # Kubernetes deployment
+  - job_name: 'kafka-exporter-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - kafka
+            - messaging
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: '.*kafka.*exporter.*'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_label_cluster]
+        action: replace
+        target_label: cluster

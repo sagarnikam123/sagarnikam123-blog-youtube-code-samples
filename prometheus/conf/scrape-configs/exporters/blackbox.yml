@@ -1,0 +1,171 @@
+# Blackbox Exporter Scrape Configuration
+# Probes endpoints over HTTP, HTTPS, DNS, TCP, ICMP
+#
+# Requirements: 6.4 - Scrape configuration for blackbox_exporter (probe monitoring)
+#
+# Default port: 9115
+# Metrics: Probe success, duration, SSL certificate expiry, etc.
+
+scrape_configs:
+  # HTTP/HTTPS endpoint probing
+  - job_name: 'blackbox-http'
+    scrape_interval: 30s
+    scrape_timeout: 25s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+
+    static_configs:
+      - targets:
+          - 'https://example.com'
+          - 'https://api.example.com/health'
+          - 'http://internal-service.local:8080/healthz'
+        labels:
+          probe_type: 'http'
+
+    relabel_configs:
+      # Pass target URL as parameter
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      # Add target URL as instance label
+      - source_labels: [__param_target]
+        target_label: instance
+
+      # Point to blackbox exporter
+      - target_label: __address__
+        replacement: 'blackbox-exporter:9115'
+
+  # TCP port probing
+  - job_name: 'blackbox-tcp'
+    scrape_interval: 30s
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+
+    static_configs:
+      - targets:
+          - 'database.example.com:5432'
+          - 'redis.example.com:6379'
+          - 'kafka.example.com:9092'
+        labels:
+          probe_type: 'tcp'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 'blackbox-exporter:9115'
+
+  # DNS probing
+  - job_name: 'blackbox-dns'
+    scrape_interval: 60s
+    metrics_path: /probe
+    params:
+      module: [dns_lookup]
+
+    static_configs:
+      - targets:
+          - '8.8.8.8'
+          - '1.1.1.1'
+        labels:
+          probe_type: 'dns'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 'blackbox-exporter:9115'
+
+  # ICMP ping probing
+  - job_name: 'blackbox-icmp'
+    scrape_interval: 30s
+    metrics_path: /probe
+    params:
+      module: [icmp]
+
+    static_configs:
+      - targets:
+          - 'gateway.example.com'
+          - 'router.example.com'
+        labels:
+          probe_type: 'icmp'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 'blackbox-exporter:9115'
+
+  # SSL certificate monitoring
+  - job_name: 'blackbox-ssl'
+    scrape_interval: 300s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+
+    static_configs:
+      - targets:
+          - 'https://example.com'
+          - 'https://api.example.com'
+        labels:
+          probe_type: 'ssl'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 'blackbox-exporter:9115'
+
+  # Kubernetes service probing
+  - job_name: 'blackbox-k8s-services'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+
+    kubernetes_sd_configs:
+      - role: service
+
+    relabel_configs:
+      # Only probe services with prometheus.io/probe annotation
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_probe]
+        action: keep
+        regex: true
+
+      # Get probe module from annotation
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_probe_module]
+        action: replace
+        target_label: __param_module
+        regex: (.+)
+
+      # Construct target URL
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 'blackbox-exporter.monitoring.svc:9115'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: service

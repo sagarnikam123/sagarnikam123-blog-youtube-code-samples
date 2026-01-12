@@ -1,0 +1,62 @@
+# MongoDB Exporter Scrape Configuration
+# Collects MongoDB database metrics
+#
+# Requirements: 6.5 - Scrape configuration for database exporters (mongodb)
+#
+# Default port: 9216
+# Metrics: Connections, operations, replication, storage, etc.
+
+scrape_configs:
+  # Static configuration
+  - job_name: 'mongodb-exporter'
+    scrape_interval: 30s
+    scrape_timeout: 20s
+
+    static_configs:
+      - targets:
+          - 'mongodb-exporter-primary.example.com:9216'
+        labels:
+          environment: 'production'
+          role: 'primary'
+          replicaset: 'rs0'
+
+      - targets:
+          - 'mongodb-exporter-secondary1.example.com:9216'
+          - 'mongodb-exporter-secondary2.example.com:9216'
+        labels:
+          environment: 'production'
+          role: 'secondary'
+          replicaset: 'rs0'
+
+    metric_relabel_configs:
+      # Drop per-collection metrics if too high cardinality
+      - source_labels: [__name__]
+        regex: 'mongodb_mongod_db_coll_.*'
+        action: drop
+
+  # Kubernetes deployment
+  - job_name: 'mongodb-exporter-k8s'
+
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - databases
+            - production
+
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: '.*mongodb.*exporter.*'
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: service
+
+      - source_labels: [__meta_kubernetes_service_label_replicaset]
+        action: replace
+        target_label: replicaset
