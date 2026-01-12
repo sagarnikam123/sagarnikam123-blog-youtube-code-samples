@@ -1,0 +1,81 @@
+# Custom Application PodMonitor
+# Kubernetes CRD for Prometheus Operator to scrape pods directly
+#
+# Requirements: 7.6 - PodMonitor CRDs for direct pod scraping (Operator mode)
+#
+# Use PodMonitor when:
+# - Pods don't have a Service
+# - You want to scrape all pods matching a selector
+# - You need per-pod metrics without service abstraction
+#
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: custom-app
+  namespace: monitoring
+  labels:
+    app: custom-app
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: custom-app
+  namespaceSelector:
+    matchNames:
+      - production
+      - staging
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_pod_label_version]
+          targetLabel: version
+---
+# Batch Job PodMonitor
+# For scraping batch/cron job pods that don't have services
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: batch-jobs
+  namespace: monitoring
+  labels:
+    app: batch-jobs
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: batch
+  namespaceSelector:
+    matchNames:
+      - batch-jobs
+      - cron-jobs
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 60s
+      scrapeTimeout: 30s
+      path: /metrics
+---
+# Sidecar Container PodMonitor
+# For scraping sidecar containers in pods
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: sidecar-metrics
+  namespace: monitoring
+  labels:
+    app: sidecar-metrics
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      sidecar.prometheus.io/scrape: "true"
+  namespaceSelector:
+    any: true
+  podMetricsEndpoints:
+    - port: sidecar-metrics
+      interval: 30s
+      path: /metrics
