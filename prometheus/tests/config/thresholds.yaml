@@ -1,0 +1,32 @@
+# Test Pass/Fail Thresholds Configuration
+# Requirements: 11.6
+
+sanity:
+  api_response_time_ms: 1000
+
+load:
+  query_latency_p99_ms: 500
+  scrape_success_rate_percent: 99.0
+  cpu_utilization_percent: 80
+  memory_utilization_percent: 85
+
+stress:
+  min_series_before_failure: 1000000
+  min_ingestion_rate: 100000
+
+performance:
+  simple_query_latency_ms: 50
+  complex_query_latency_ms: 500
+  range_query_1h_latency_ms: 200
+  range_query_24h_latency_ms: 1000
+
+endurance:
+  memory_growth_percent_per_hour: 1
+  query_latency_degradation_percent: 10
+
+reliability:
+  recovery_time_seconds: 60
+  data_loss_tolerance_percent: 0
+
+scalability:
+  degradation_threshold_percent: 20

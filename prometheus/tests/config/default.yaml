@@ -1,0 +1,152 @@
+# Default Test Configuration for Prometheus Testing Framework
+# Requirements: 10.1, 10.2, 10.9
+
+test:
+  name: "prometheus-test-suite"
+  platform: "minikube"  # minikube, eks, gke, aks, docker, binary
+  deployment_mode: "monolithic"  # monolithic, distributed
+  prometheus:
+    version: "v3.5.0"
+    namespace: "monitoring"
+    url: "http://localhost:9090"
+
+  # Test Runner Host configuration
+  runner:
+    python_version: "3.10+"
+    k6_path: "/usr/local/bin/k6"
+    kubectl_path: "/usr/local/bin/kubectl"
+
+  # Remote cluster credentials (via environment variables)
+  credentials:
+    kubeconfig: "${KUBECONFIG}"
+    aws_profile: "${AWS_PROFILE}"
+    gcp_credentials: "${GOOGLE_APPLICATION_CREDENTIALS}"
+    azure_subscription: "${AZURE_SUBSCRIPTION_ID}"
+
+# Sanity Tests - Quick validation
+sanity:
+  enabled: true
+  timeout: 60s
+  healthcheck_endpoints:
+    - "/-/healthy"
+    - "/-/ready"
+    - "/api/v1/status/runtimeinfo"
+
+# Integration Tests - Component integration
+integration:
+  enabled: true
+  components:
+    - node-exporter
+    - alertmanager
+    - grafana
+  test_federation: true  # Only for distributed mode
+
+# Load Tests - Performance under load
+load:
+  enabled: true
+  duration: 30m
+  k6:
+    vus: 100
+    scripts:
+      - "k6/query-load.js"
+      - "k6/query-range-load.js"
+      - "k6/remote-write-load.js"
+  targets:
+    - 100
+    - 1000
+    - 10000
+  series:
+    - 10000
+    - 100000
+    - 1000000
+
+# Stress Tests - Breaking point discovery
+stress:
+  enabled: true
+  k6:
+    stages:
+      - duration: "5m"
+        target: 100
+      - duration: "10m"
+        target: 500
+      - duration: "5m"
+        target: 1000
+  cardinality:
+    max_labels: 1000000
+  ingestion:
+    max_samples_per_second: 1000000
+  queries:
+    concurrent: 100
+
+# Performance Tests - Benchmarks
+performance:
+  enabled: true
+  iterations: 100
+  k6:
+    scripts:
+      - "k6/benchmark.js"
+  api_endpoints:
+    - "/api/v1/query"
+    - "/api/v1/query_range"
+    - "/api/v1/labels"
+    - "/api/v1/label/__name__/values"
+    - "/api/v1/series"
+
+# Scalability Tests - Scaling behavior
+scalability:
+  enabled: true
+  k6:
+    concurrent_users:
+      - 10
+      - 50
+      - 100
+      - 200
+      - 500
+  dimensions:
+    - targets
+    - series
+    - cardinality
+    - retention
+    - queries
+  test_horizontal_scaling: true  # Only for distributed mode
+
+# Endurance Tests - Long-running stability
+endurance:
+  enabled: false  # Long-running, disabled by default
+  duration: 24h
+  k6:
+    vus: 50
+    scripts:
+      - "k6/query-load.js"
+  healthcheck_interval: 5m
+
+# Reliability Tests - Failure handling
+reliability:
+  enabled: true
+  healthcheck_endpoints:
+    - "/-/healthy"
+    - "/-/ready"
+  test_replica_failure: true  # Only for distributed mode
+
+# Chaos Tests - Unexpected failures
+chaos:
+  enabled: false  # Requires chaos tools
+  tool: "chaos-mesh"  # chaos-mesh, litmus
+  scenarios:
+    monolithic:
+      - container_kill
+      - process_kill
+    distributed:
+      - pod_kill
+      - replica_failure
+
+# Regression Tests - Version comparison
+regression:
+  enabled: false
+  baseline_version: "v3.4.0"
+
+# Security Tests - Security validation
+security:
+  enabled: true
+  scan_vulnerabilities: true
+  test_api_auth: true
