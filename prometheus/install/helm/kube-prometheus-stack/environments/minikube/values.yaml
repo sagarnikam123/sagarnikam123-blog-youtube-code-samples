@@ -16,6 +16,13 @@ prometheus:
       runAsUser: 0
       runAsNonRoot: false
       fsGroup: 0
+    # Container-level security context - disable readOnlyRootFilesystem
+    containers:
+      - name: prometheus
+        securityContext:
+          runAsUser: 0
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
     resources:
       requests:
         cpu: 500m
@@ -23,13 +30,10 @@ prometheus:
       limits:
         cpu: 1
         memory: 1Gi
+    # Disable persistent storage for minikube
     storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: standard  # minikube default
-          resources:
-            requests:
-              storage: 5Gi
+      emptyDir:
+        sizeLimit: 5Gi
 
 alertmanager:
   alertmanagerSpec:
@@ -47,12 +51,16 @@ alertmanager:
         memory: 128Mi
 
 grafana:
+  # Disable init-chown-data to avoid permission issues
+  initChownData:
+    enabled: false
   securityContext:
     runAsUser: 0
     runAsNonRoot: false
     fsGroup: 0
+  # Use emptyDir for minikube testing
   persistence:
-    size: 1Gi
+    enabled: false
   resources:
     requests:
       cpu: 50m
@@ -70,3 +78,24 @@ kubeScheduler:
   enabled: false
 kubeProxy:
   enabled: false
+
+# Disable API server scraping (job="apiserver")
+kubeApiServer:
+  enabled: false
+
+# Disable CoreDNS scraping (job="coredns")
+coreDns:
+  enabled: false
+
+# Disable kubelet scraping (job="kubelet", cadvisor, probes)
+kubelet:
+  enabled: false
+
+# Disable kube-state-metrics (job="kube-state-metrics")
+kube-state-metrics:
+  enabled: false
+
+# Disable prometheus-operator self-monitoring (job="prometheus-kube-prometheus-operator", config-reloader)
+prometheusOperator:
+  serviceMonitor:
+    selfMonitor: false
