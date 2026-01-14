@@ -8,9 +8,17 @@
 #     -f ../../versions/v3.9.0-latest/values.yaml \
 #     -f values.yaml
 
+# Common tolerations - use YAML anchor for reuse
+_tolerations: &common_tolerations
+  - key: app-support
+    operator: Equal
+    value: multi-platform-all
+    effect: NoSchedule
+
 prometheus:
   prometheusSpec:
     retention: 3d
+    tolerations: *common_tolerations
     resources:
       requests:
         cpu: 500m
@@ -21,6 +29,8 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
           resources:
             requests:
               storage: 10Gi
@@ -28,6 +38,7 @@ prometheus:
 alertmanager:
   alertmanagerSpec:
     retention: 24h
+    tolerations: *common_tolerations
     resources:
       requests:
         cpu: 50m
@@ -37,7 +48,11 @@ alertmanager:
         memory: 256Mi
 
 grafana:
+  adminPassword: prom-operator
+  tolerations: *common_tolerations
   persistence:
+    enabled: true
+    storageClassName: gp3
     size: 5Gi
   resources:
     requests:
@@ -47,7 +62,21 @@ grafana:
       cpu: 200m
       memory: 256Mi
 
-# Disable some components for dev
+prometheusOperator:
+  tolerations: *common_tolerations
+
+kube-state-metrics:
+  enabled: false
+  tolerations: *common_tolerations
+
+prometheus-node-exporter:
+  tolerations: *common_tolerations
+
+thanosRuler:
+  thanosRulerSpec:
+    tolerations: *common_tolerations
+
+# Disable Kubernetes component scraping for dev
 kubeEtcd:
   enabled: false
 kubeControllerManager:
@@ -55,4 +84,10 @@ kubeControllerManager:
 kubeScheduler:
   enabled: false
 kubeProxy:
+  enabled: false
+kubeApiServer:
+  enabled: false
+coreDns:
+  enabled: false
+kubelet:
   enabled: false
