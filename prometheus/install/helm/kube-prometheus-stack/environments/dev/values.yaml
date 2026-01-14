@@ -1,12 +1,13 @@
 # Development Environment Values
-# Minimal resources, short retention for cost savings
+# Aligned with scnx-dts01-eks configuration
 #
 # Usage:
 #   helm install prometheus prometheus-community/kube-prometheus-stack \
 #     -n prometheus --create-namespace \
-#     -f ../../base/values.yaml \
-#     -f ../../versions/v3.9.0-latest/values.yaml \
-#     -f values.yaml
+#     -f base/values.yaml \
+#     -f versions/v3.5.0-lts/values.yaml \
+#     -f environments/dev/values.yaml \
+#     --timeout 15m
 
 # Common tolerations - use YAML anchor for reuse
 _tolerations: &common_tolerations
@@ -17,15 +18,35 @@ _tolerations: &common_tolerations
 
 prometheus:
   prometheusSpec:
-    retention: 3d
+    # Scrape settings (aligned with dts01-eks)
+    scrapeInterval: 5m
+    scrapeTimeout: 1m
+    evaluationInterval: 1m
+
+    # Route prefix for /prometheus path
+    routePrefix: /prometheus
+    externalUrl: https://scnx-global-dev-aps1-eks.securonix.net/prometheus
+
+    # External labels for identification
+    externalLabels:
+      environment: global-dev-aps1
+
+    # Enable native histograms
+    enableFeatures:
+      - native-histograms
+
+    # OTLP configuration
+    enableOTLPReceiver: true
+
+    retention: 15d
     tolerations: *common_tolerations
     resources:
       requests:
-        cpu: 500m
-        memory: 1Gi
+        cpu: 2
+        memory: 4Gi
       limits:
-        cpu: 1
-        memory: 2Gi
+        cpu: 4
+        memory: 8Gi
     storageSpec:
       volumeClaimTemplate:
         spec:
@@ -33,34 +54,62 @@ prometheus:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 10Gi
+              storage: 50Gi
+
+  # Ingress configuration (using nginx-internal like other services)
+  ingress:
+    enabled: true
+    ingressClassName: nginx-internal
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    hosts:
+      - scnx-global-dev-aps1-eks.securonix.net
+    paths:
+      - /prometheus
 
 alertmanager:
   alertmanagerSpec:
-    retention: 24h
+    retention: 120h
     tolerations: *common_tolerations
     resources:
       requests:
-        cpu: 50m
-        memory: 128Mi
-      limits:
         cpu: 100m
         memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
 
 grafana:
   adminPassword: prom-operator
   tolerations: *common_tolerations
+
+  # Serve Grafana under /grafana path
+  grafana.ini:
+    server:
+      root_url: https://scnx-global-dev-aps1-eks.securonix.net/grafana
+      serve_from_sub_path: true
+
+  # Ingress for Grafana
+  ingress:
+    enabled: true
+    ingressClassName: nginx-internal
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    hosts:
+      - scnx-global-dev-aps1-eks.securonix.net
+    path: /grafana
+
   persistence:
     enabled: true
     storageClassName: gp3
-    size: 5Gi
+    size: 10Gi
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
+      cpu: 100m
       memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 prometheusOperator:
   tolerations: *common_tolerations
