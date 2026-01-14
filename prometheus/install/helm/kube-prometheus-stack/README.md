@@ -227,6 +227,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -f base/values.yaml \
   -f versions/v3.5.0-lts/values.yaml \
   -f environments/minikube/values.yaml
+  --timeout 15m
 
 # v3.9.0 Latest on Minikube
 helm install prometheus prometheus-community/kube-prometheus-stack \
@@ -234,6 +235,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -f base/values.yaml \
   -f versions/v3.9.0-latest/values.yaml \
   -f environments/minikube/values.yaml
+  --timeout 15m
 ```
 
 ### Install v3.5.0 LTS (Recommended for Production)
@@ -245,6 +247,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -f base/values.yaml \
   -f versions/v3.5.0-lts/values.yaml \
   -f environments/dev/values.yaml
+  --timeout 15m
 
 # Production
 helm install prometheus prometheus-community/kube-prometheus-stack \
@@ -252,6 +255,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -f base/values.yaml \
   -f versions/v3.5.0-lts/values.yaml \
   -f environments/prod/values.yaml
+  --timeout 15m
 ```
 
 ### Install v3.9.0 Latest
@@ -263,6 +267,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -f base/values.yaml \
   -f versions/v3.9.0-latest/values.yaml \
   -f environments/dev/values.yaml
+  --timeout 15m
 
 # Staging
 helm install prometheus prometheus-community/kube-prometheus-stack \
@@ -270,6 +275,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -f base/values.yaml \
   -f versions/v3.9.0-latest/values.yaml \
   -f environments/staging/values.yaml
+  --timeout 15m
 ```
 
 ### Using Specific Chart Version
@@ -283,6 +289,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -n prometheus --create-namespace \
   -f base/values.yaml \
   -f environments/dev/values.yaml
+  --timeout 15m
 
 # v3.9.0 Latest (chart 80.13.0)
 helm install prometheus prometheus-community/kube-prometheus-stack \
@@ -290,6 +297,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   -n prometheus --create-namespace \
   -f base/values.yaml \
   -f environments/dev/values.yaml
+  --timeout 15m
 ```
 
 ### Version Mapping (Prometheus 3.x)
@@ -342,6 +350,46 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 ```
 
 ### AWS EKS Specific Configuration
+
+#### Prerequisites: EBS CSI Driver and gp3 StorageClass
+
+EKS requires the EBS CSI driver for dynamic volume provisioning:
+
+```bash
+# Verify EBS CSI driver is installed
+kubectl get pods -n kube-system | grep ebs-csi
+
+# If not installed, enable the EKS addon
+aws eks create-addon \
+  --cluster-name <your-cluster-name> \
+  --addon-name aws-ebs-csi-driver \
+  --region <your-region>
+```
+
+Create gp3 StorageClass (recommended over gp2 for better performance):
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  fsType: ext4
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+EOF
+
+# Verify
+kubectl get sc gp3
+```
+
+> **Note**: `WaitForFirstConsumer` ensures volumes are created in the same AZ as the pod, preventing AZ mismatch issues.
+
+#### EKS Values Example
 
 For EKS with EBS storage:
 
@@ -439,6 +487,149 @@ alertmanager:
     replicas: 3
 ```
 
+## Disable ServiceMonitors (Control Scrape Targets)
+
+By default, kube-prometheus-stack scrapes many Kubernetes components. You can disable specific targets to reduce noise or resource usage.
+
+### View Current Targets
+
+```bash
+# Port-forward and open targets page
+kubectl port-forward -n prometheus svc/prometheus-kube-prometheus-prometheus 9090:9090
+open http://localhost:9090/targets
+```
+
+### Disable Kubernetes Component Scraping
+
+```yaml
+# Disable API Server scraping (job="apiserver")
+kubeApiServer:
+  enabled: false
+
+# Disable CoreDNS scraping (job="coredns")
+coreDns:
+  enabled: false
+
+# Disable kubelet scraping (job="kubelet", includes cadvisor and probes)
+kubelet:
+  enabled: false
+
+# Disable etcd scraping (job="kube-etcd")
+kubeEtcd:
+  enabled: false
+
+# Disable kube-controller-manager scraping
+kubeControllerManager:
+  enabled: false
+
+# Disable kube-scheduler scraping
+kubeScheduler:
+  enabled: false
+
+# Disable kube-proxy scraping
+kubeProxy:
+  enabled: false
+```
+
+### Disable Stack Component Scraping
+
+```yaml
+# Disable kube-state-metrics entirely (job="kube-state-metrics")
+kube-state-metrics:
+  enabled: false
+
+# Disable node-exporter entirely (job="node-exporter")
+prometheus-node-exporter:
+  enabled: false
+
+# Disable Prometheus Operator self-monitoring (job="prometheus-kube-prometheus-operator")
+prometheusOperator:
+  serviceMonitor:
+    selfMonitor: false
+
+# Disable Alertmanager self-monitoring
+alertmanager:
+  serviceMonitor:
+    selfMonitor: false
+
+# Disable Prometheus self-monitoring
+prometheus:
+  serviceMonitor:
+    selfMonitor: false
+
+# Disable Grafana monitoring
+grafana:
+  serviceMonitor:
+    enabled: false
+```
+
+### Minimal Scraping Example (Local Dev/Minikube)
+
+For local development, you might only want node-exporter and self-monitoring:
+
+```yaml
+# Disable all Kubernetes component scraping
+kubeApiServer:
+  enabled: false
+coreDns:
+  enabled: false
+kubelet:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+# Disable kube-state-metrics
+kube-state-metrics:
+  enabled: false
+
+# Disable operator self-monitoring
+prometheusOperator:
+  serviceMonitor:
+    selfMonitor: false
+```
+
+### Advanced: ServiceMonitor Selectors
+
+Control which ServiceMonitors Prometheus will scrape using label selectors:
+
+```yaml
+prometheus:
+  prometheusSpec:
+    # Only scrape ServiceMonitors with specific labels
+    serviceMonitorSelector:
+      matchLabels:
+        prometheus: main
+
+    # Only scrape PodMonitors with specific labels
+    podMonitorSelector:
+      matchLabels:
+        prometheus: main
+
+    # Scrape ServiceMonitors from all namespaces (default)
+    serviceMonitorNamespaceSelector: {}
+
+    # Or limit to specific namespaces
+    serviceMonitorNamespaceSelector:
+      matchLabels:
+        monitoring: enabled
+```
+
+### List All ServiceMonitors
+
+```bash
+# List all ServiceMonitors in the cluster
+kubectl get servicemonitors -A
+
+# View a specific ServiceMonitor
+kubectl get servicemonitor -n prometheus prometheus-kube-prometheus-kubelet -o yaml
+```
+
 ## Upgrade
 
 ```bash
@@ -453,6 +644,35 @@ helm upgrade prometheus prometheus-community/kube-prometheus-stack \
   -n prometheus \
   -f values.yaml
 ```
+
+## Multiple Instances
+
+To run multiple Prometheus instances in different namespaces (e.g., dev and prod), you must use unique release names and override resource names to avoid ClusterRole conflicts:
+
+```bash
+# Install in a new namespace with unique names
+helm install prometheus-dev prometheus-community/kube-prometheus-stack \
+  -n prometheus-dev --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/dev/values.yaml \
+  --set fullnameOverride=prometheus-dev \
+  --set grafana.fullnameOverride=grafana-dev \
+  --set prometheusOperator.fullnameOverride=prometheus-operator-dev
+```
+
+Or add to your environment values file:
+
+```yaml
+# environments/dev/values.yaml
+fullnameOverride: prometheus-dev
+grafana:
+  fullnameOverride: grafana-dev
+prometheusOperator:
+  fullnameOverride: prometheus-operator-dev
+```
+
+> **Note**: ClusterRoles and ClusterRoleBindings are cluster-wide resources. Without unique names, Helm will fail with ownership metadata errors when installing a second instance.
 
 ## Uninstall
 
