@@ -35,6 +35,7 @@ alertmanager:
 
 grafana:
   enabled: true
+  adminPassword: prom-operator
   persistence:
     enabled: true
     size: 10Gi
