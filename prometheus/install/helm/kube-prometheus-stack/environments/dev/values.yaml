@@ -25,7 +25,7 @@ prometheus:
 
     # Route prefix for /prometheus path
     routePrefix: /prometheus
-    externalUrl: https://scnx-global-dev-aps1-eks.securonix.net/prometheus
+    externalUrl: https://<external-url.com>/prometheus
 
     # External labels for identification
     externalLabels:
@@ -63,7 +63,7 @@ prometheus:
     annotations:
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
     hosts:
-      - scnx-global-dev-aps1-eks.securonix.net
+      - <external-url.com>
     paths:
       - /prometheus
 
@@ -86,7 +86,7 @@ grafana:
   # Serve Grafana under /grafana path
   grafana.ini:
     server:
-      root_url: https://scnx-global-dev-aps1-eks.securonix.net/grafana
+      root_url: https://<external-url.com>/grafana
       serve_from_sub_path: true
 
   # Ingress for Grafana
@@ -96,7 +96,7 @@ grafana:
     annotations:
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
     hosts:
-      - scnx-global-dev-aps1-eks.securonix.net
+      - <external-url.com>
     path: /grafana
 
   persistence:
