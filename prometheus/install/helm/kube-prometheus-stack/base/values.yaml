@@ -54,6 +54,12 @@ grafana:
     limits:
       cpu: 500m
       memory: 512Mi
+  # ServiceMonitor configuration
+  # When serve_from_sub_path=true and root_url has /grafana prefix,
+  # metrics endpoint is at /grafana/metrics instead of /metrics
+  serviceMonitor:
+    enabled: true
+    path: /grafana/metrics    # Required when serve_from_sub_path=true
 
 prometheus-node-exporter:
   enabled: true
