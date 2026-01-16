@@ -6,6 +6,14 @@ prometheus:
   prometheusSpec:
     retention: 15d
     walCompression: true
+    # Feature flags (requires Prometheus 2.40+ for native-histograms)
+    enableFeatures:
+      - exemplar-storage        # Store exemplars in TSDB (link metrics to traces)
+      - native-histograms       # Enable native histogram support (more efficient than classic)
+    # Exemplar storage limit (default: 100000)
+    # Each exemplar ~100 bytes, 100k = ~10MB memory
+    exemplars:
+      maxSize: 100000           # Max exemplars to store (default: 100000)
     resources:
       requests:
         cpu: 2
