@@ -56,6 +56,7 @@ alertmanager:
             topologyKey: kubernetes.io/hostname
 
 grafana:
+  adminPassword: prom-operator
   replicas: 2
   persistence:
     size: 20Gi

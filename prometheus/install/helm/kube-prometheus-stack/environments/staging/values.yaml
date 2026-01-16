@@ -37,6 +37,7 @@ alertmanager:
         memory: 512Mi
 
 grafana:
+  adminPassword: prom-operator
   persistence:
     size: 10Gi
   resources:
