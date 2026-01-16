@@ -342,20 +342,30 @@ kubectl exec -n prometheus $PROM_POD -c prometheus -- \
 | `container_*` | Pod churn | Filter by namespace |
 | `*_by_id` | Unique IDs | Use labeldrop |
 
-## How to delete/disable ServiceMonitors?
+## How to exclude services from scraping?
+
+### Method 1: Delete ServiceMonitor (quick, temporary)
 
 ```bash
-# Delete specific ServiceMonitors
+# List ServiceMonitors
+kubectl get servicemonitors -n prometheus
+
+# Delete specific one
 kubectl delete servicemonitor <name> -n prometheus
 
-# Example: Disable system components you don't need
+# Example: Disable system components
 kubectl delete servicemonitor prometheus-kube-prometheus-coredns -n prometheus
 kubectl delete servicemonitor prometheus-kube-prometheus-kube-proxy -n prometheus
 ```
 
-**Note:** Deleted ServiceMonitors will be recreated on next `helm upgrade`. To make changes permanent, update your Helm values:
+**Note:** Recreated on next `helm upgrade`
+
+### Method 2: Disable via Helm values (permanent)
 
 ```yaml
+# Disable built-in Kubernetes components
+kubeApiServer:
+  enabled: false
 kubeControllerManager:
   enabled: false
 kubeScheduler:
@@ -366,7 +376,206 @@ kubeProxy:
   enabled: false
 coreDns:
   enabled: false
+kubelet:
+  enabled: false
+
+# Disable stack components
+kube-state-metrics:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+
+# Disable self-monitoring
+prometheusOperator:
+  serviceMonitor:
+    selfMonitor: false
+alertmanager:
+  serviceMonitor:
+    selfMonitor: false
+prometheus:
+  serviceMonitor:
+    selfMonitor: false
+grafana:
+  serviceMonitor:
+    enabled: false
 ```
+
+### Method 3: Use relabelings to drop targets
+
+Drop specific services or namespaces using relabel configs:
+
+```yaml
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigs:
+      - job_name: 'my-job'
+        relabel_configs:
+          # Drop specific service by name
+          - source_labels: [__meta_kubernetes_service_name]
+            regex: 'my-service-to-exclude'
+            action: drop
+          # Drop by namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            regex: 'kube-system|logging|monitoring'
+            action: drop
+          # Drop by label
+          - source_labels: [__meta_kubernetes_service_label_app]
+            regex: 'redis|memcached'
+            action: drop
+```
+
+### Method 4: Use ServiceMonitor selectors (recommended for multi-team)
+
+Only scrape ServiceMonitors with specific labels:
+
+```yaml
+prometheus:
+  prometheusSpec:
+    # Only scrape ServiceMonitors with this label
+    serviceMonitorSelector:
+      matchLabels:
+        prometheus: main
+    # Scrape from all namespaces
+    serviceMonitorNamespaceSelector: {}
+    # Or limit to specific namespaces
+    # serviceMonitorNamespaceSelector:
+    #   matchLabels:
+    #     monitoring: enabled
+```
+
+Then label ServiceMonitors you want scraped:
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: my-app
+  labels:
+    prometheus: main  # Will be scraped
+```
+
+### Method 5: Use annotation on Service
+
+Add annotation to Service, then use relabel config to drop:
+
+```yaml
+# Service with skip annotation
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+  annotations:
+    prometheus.io/scrape: "false"
+```
+
+```yaml
+# Relabel config to honor the annotation
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigs:
+      - job_name: 'kubernetes-services'
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+            regex: "false"
+            action: drop
+```
+
+### Quick Reference: What to use when
+
+| Scenario | Method |
+|----------|--------|
+| Disable built-in K8s components | Helm values (`kubeProxy.enabled: false`) |
+| Disable stack components | Helm values (`kube-state-metrics.enabled: false`) |
+| Exclude specific namespace | Relabel config with `action: drop` |
+| Multi-team setup | ServiceMonitor selectors |
+| App-level control | Service annotation + relabel |
+| Quick testing | Delete ServiceMonitor |
+
+## How to enable exemplars?
+
+Exemplars link metrics to traces, enabling correlation between Prometheus metrics and distributed tracing systems (Jaeger, Tempo, etc.).
+
+### Enable via Helm values
+
+```yaml
+# values.yaml
+prometheus:
+  prometheusSpec:
+    enableFeatures:
+      - exemplar-storage        # Store exemplars in TSDB
+    exemplars:
+      maxSize: 100000           # Max exemplars to store (default: 100000)
+```
+
+### Enable via kubectl patch
+
+```bash
+kubectl patch prometheus prometheus-kube-prometheus-prometheus -n prometheus \
+  --type=merge -p '{
+    "spec": {
+      "enableFeatures": ["exemplar-storage"],
+      "exemplars": {"maxSize": 100000}
+    }
+  }'
+```
+
+### Verify exemplars are enabled
+
+```bash
+# Check feature flags
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/status/flags' 2>/dev/null | jq '.data["enable-feature"]'
+
+# Query exemplars API
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/query_exemplars?query=http_request_duration_seconds_bucket&start=2024-01-01T00:00:00Z&end=2024-12-31T23:59:59Z' 2>/dev/null | jq .
+```
+
+### Requirements for exemplars to work
+
+1. **Application must expose exemplars** - Use OpenTelemetry SDK or Prometheus client libraries that support exemplars
+2. **Metrics must be histograms or counters** - Exemplars attach to these metric types
+3. **Include trace_id label** - Exemplars typically contain `trace_id` for linking to traces
+
+### Example: Go application with exemplars
+
+```go
+import (
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+var httpDuration = promauto.NewHistogramVec(
+    prometheus.HistogramOpts{
+        Name: "http_request_duration_seconds",
+        Help: "HTTP request duration with exemplars",
+    },
+    []string{"method", "path"},
+)
+
+// Record with exemplar
+httpDuration.WithLabelValues("GET", "/api").
+    (prometheus.ExemplarObserver).ObserveWithExemplar(
+        duration.Seconds(),
+        prometheus.Labels{"trace_id": traceID},
+    )
+```
+
+### Query exemplars in Grafana
+
+1. Add Prometheus datasource with exemplars enabled
+2. In Explore, toggle "Exemplars" button
+3. Click on exemplar dots to jump to trace
+
+### Memory considerations
+
+| maxSize | Memory (~) | Use Case |
+|---------|------------|----------|
+| 10000 | ~1MB | Low traffic |
+| 100000 | ~10MB | Default |
+| 500000 | ~50MB | High traffic |
+| 1000000 | ~100MB | Very high traffic |
+
+---
 
 ## Quick Reference - Common Commands
 
