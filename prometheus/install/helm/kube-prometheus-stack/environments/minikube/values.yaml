@@ -8,6 +8,71 @@
 #     -f ../../versions/v3.5.0-lts/values.yaml \
 #     -f values.yaml
 
+# Disable noisy alerts not relevant for minikube/local dev
+defaultRules:
+  disabled:
+    # Minikube VMs don't have NTP configured
+    NodeClockNotSynchronising: true
+    NodeClockSkewDetected: true
+    # Watchdog is a dead man's switch - not needed for local dev
+    Watchdog: true
+    # These often fire on resource-constrained minikube
+    KubeMemoryOvercommit: true
+    KubeCPUOvercommit: true
+    # etcd not accessible in minikube
+    etcdHighNumberOfFailedGRPCRequests: true
+    etcdMemberCommunicationSlow: true
+    etcdNoLeader: true
+    etcdHighFsyncDurations: true
+    etcdHighCommitDurations: true
+    etcdInsufficientMembers: true
+    # Kubelet disabled - these will always fire
+    KubeletDown: true
+    KubeletTooManyPods: true
+    # DaemonSet alerts - often noisy on single-node minikube
+    KubeDaemonSetRolloutStuck: true
+    KubeDaemonSetMisScheduled: true
+    KubeDaemonSetNotScheduled: true
+    # TargetDown - expected when components are disabled
+    TargetDown: true
+
+  # Uncomment below to completely remove rule groups (not just disable alerts)
+  # This reduces rule count but removes recording rules too (may break dashboards)
+  # rules:
+  #   alertmanager: false
+  #   configReloaders: false
+  #   etcd: false
+  #   general: false
+  #   k8sContainerCpuUsageSecondsTotal: false
+  #   k8sContainerMemoryCache: false
+  #   k8sContainerMemoryRss: false
+  #   k8sContainerMemorySwap: false
+  #   k8sContainerMemoryWorkingSetBytes: false
+  #   k8sContainerResource: false
+  #   k8sPodOwner: false
+  #   kubeApiserverAvailability: false
+  #   kubeApiserverBurnrate: false
+  #   kubeApiserverHistogram: false
+  #   kubeApiserverSlos: false
+  #   kubeControllerManager: false
+  #   kubePrometheusGeneral: false
+  #   kubePrometheusNodeRecording: false
+  #   kubeProxy: false
+  #   kubeSchedulerAlerting: false
+  #   kubeSchedulerRecording: false
+  #   kubeStateMetrics: false
+  #   kubelet: false
+  #   kubernetesApps: false
+  #   kubernetesResources: false
+  #   kubernetesStorage: false
+  #   kubernetesSystem: false
+  #   network: false
+  #   node: false
+  #   nodeExporterAlerting: false
+  #   nodeExporterRecording: false
+  #   prometheus: false
+  #   prometheusOperator: false
+
 prometheus:
   prometheusSpec:
     retention: 3d
@@ -68,6 +133,11 @@ grafana:
     limits:
       cpu: 200m
       memory: 256Mi
+  # Minikube doesn't use serve_from_sub_path, so metrics at /metrics
+  # (base values.yaml has /grafana/metrics for production with ingress)
+  serviceMonitor:
+    enabled: true
+    path: /metrics
 
 # Disable components not needed for local dev
 kubeEtcd:
