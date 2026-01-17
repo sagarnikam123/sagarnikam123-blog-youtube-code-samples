@@ -89,6 +89,12 @@ grafana:
       root_url: https://<external-url.com>/grafana
       serve_from_sub_path: true
 
+  # ServiceMonitor path - must match serve_from_sub_path
+  # When serve_from_sub_path=true, metrics are at /grafana/metrics
+  serviceMonitor:
+    enabled: true
+    path: /grafana/metrics
+
   # Ingress for Grafana
   ingress:
     enabled: true
