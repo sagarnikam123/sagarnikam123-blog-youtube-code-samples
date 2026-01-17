@@ -96,8 +96,8 @@ echo "  Up:      ${GREEN}$UP${NC}"
 #############################################
 printf "\n"
 echo "${BLUE}═══ Targets by Job ═══${NC}"
-printf "%-40s %6s %6s %6s\n" "Job" "Total" "Up" "Down"
-printf "%-40s %6s %6s %6s\n" "---" "-----" "----" "----"
+printf "%-45s %6s %6s %6s  %-20s\n" "Job (Pods)" "Total" "Up" "Down" "Ports"
+printf "%-45s %6s %6s %6s  %-20s\n" "----------" "-----" "----" "----" "-----"
 
 echo "$TARGETS" | jq -r '
   .data.activeTargets | group_by(.labels.job) | .[] |
@@ -105,16 +105,19 @@ echo "$TARGETS" | jq -r '
     job: .[0].labels.job,
     total: length,
     up: [.[] | select(.health == "up")] | length,
-    down: [.[] | select(.health == "down")] | length
-  } | "\(.job) \(.total) \(.up) \(.down)"
-' 2>/dev/null | sort | while read job total up down; do
+    down: [.[] | select(.health == "down")] | length,
+    ports: ([.[].labels.instance | split(":")[1]] | unique | join(",")),
+    pods: ([.[].labels.instance | split(":")[0]] | unique | length)
+  } | "\(.job) \(.total) \(.up) \(.down) \(.ports) \(.pods)"
+' 2>/dev/null | sort | while read job total up down ports pods; do
     if [[ -n "$FILTER_JOB" && "$job" != *"$FILTER_JOB"* ]]; then
         continue
     fi
+    job_with_pods="${job} (${pods})"
     if [[ "$down" -gt 0 ]]; then
-        printf "%-40s %6s ${GREEN}%6s${NC} ${RED}%6s${NC}\n" "$job" "$total" "$up" "$down"
+        printf "%-45s %6s ${GREEN}%6s${NC} ${RED}%6s${NC}  %-20s\n" "$job_with_pods" "$total" "$up" "$down" "$ports"
     else
-        printf "%-40s %6s ${GREEN}%6s${NC} %6s\n" "$job" "$total" "$up" "$down"
+        printf "%-45s %6s ${GREEN}%6s${NC} %6s  %-20s\n" "$job_with_pods" "$total" "$up" "$down" "$ports"
     fi
 done
 
@@ -150,3 +153,6 @@ fi
 
 printf "\n"
 echo "${GREEN}✓ Target analysis complete${NC}"
+echo ""
+echo "${CYAN}Note: Targets ≠ Pods. A single pod can expose multiple ports (e.g., main + sidecar).${NC}"
+echo "${CYAN}      Check Instance column for port details (:9090 = main, :8080 = reloader).${NC}"

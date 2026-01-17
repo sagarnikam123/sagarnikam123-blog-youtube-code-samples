@@ -12,12 +12,12 @@ PROM_SVC="${PROM_SVC:-prometheus-kube-prometheus-prometheus}"
 PROM_API_PREFIX=""
 
 # Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+CYAN=$'\033[0;36m'
+NC=$'\033[0m'
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -38,9 +38,9 @@ done
 cleanup() { [[ -n "$PF_PID" ]] && kill $PF_PID 2>/dev/null; }
 trap cleanup EXIT
 
-echo -e "${GREEN}╔═══════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Prometheus Remote Write Status      ║${NC}"
-echo -e "${GREEN}╚═══════════════════════════════════════╝${NC}"
+echo "${GREEN}╔═══════════════════════════════════════╗${NC}"
+echo "${GREEN}║   Prometheus Remote Write Status      ║${NC}"
+echo "${GREEN}╚═══════════════════════════════════════╝${NC}"
 echo ""
 
 # Setup port-forward
@@ -52,16 +52,16 @@ PF_PID=$!
 for i in {1..30}; do
     if curl -s --connect-timeout 2 "http://localhost:${LOCAL_PORT}/prometheus/api/v1/query?query=up" 2>/dev/null | grep -q '"status":"success"'; then
         PROM_API_PREFIX="/prometheus"
-        echo -e "${GREEN}✓${NC} Connected"
+        printf "${GREEN}✓${NC} Connected\n"
         break
     fi
     if curl -s --connect-timeout 2 "http://localhost:${LOCAL_PORT}/api/v1/query?query=up" 2>/dev/null | grep -q '"status":"success"'; then
         PROM_API_PREFIX=""
-        echo -e "${GREEN}✓${NC} Connected"
+        printf "${GREEN}✓${NC} Connected\n"
         break
     fi
     sleep 1
-    [[ $i -eq 30 ]] && { echo -e "${RED}✗ Connection failed${NC}"; exit 1; }
+    [[ $i -eq 30 ]] && { echo "${RED}✗ Connection failed${NC}"; exit 1; }
 done
 
 BASE_URL="http://localhost:${LOCAL_PORT}${PROM_API_PREFIX}"
@@ -76,38 +76,46 @@ query_value() {
 #############################################
 # Check if remote_write is configured
 #############################################
-echo -e "\n${BLUE}═══ Remote Write Configuration ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Remote Write Configuration ═══${NC}"
 
 # Check config for remote_write
 CONFIG=$(curl -s "${BASE_URL}/api/v1/status/config" 2>/dev/null)
-RW_CONFIGURED=$(echo "$CONFIG" | jq -r '.data.yaml' 2>/dev/null | grep -c "remote_write:" || echo "0")
+CONFIG_YAML=$(echo "$CONFIG" | jq -r '.data.yaml' 2>/dev/null)
 
-if [[ "$RW_CONFIGURED" -eq 0 ]]; then
-    echo -e "  ${YELLOW}⚠ Remote write is NOT configured${NC}"
-    echo -e "\n  To enable remote_write, add to your Prometheus spec:"
-    echo -e "  ${CYAN}remoteWrite:${NC}"
-    echo -e "  ${CYAN}  - url: http://mimir-nginx.mimir.svc/api/v1/push${NC}"
-    echo -e "  ${CYAN}    headers:${NC}"
-    echo -e "  ${CYAN}      X-Scope-OrgID: <tenant-id>${NC}"
+# Check if remote_write section exists and has URLs
+RW_URLS=$(echo "$CONFIG_YAML" | grep -A5 "remote_write:" | grep "url:" | sed 's/.*url: *//' | tr -d '"' | tr -d "'" || true)
+
+if [[ -z "$RW_URLS" ]]; then
+    echo "  ${YELLOW}⚠ Remote write is NOT configured${NC}"
+    printf "\n  To enable remote_write, add to your Prometheus spec:\n"
+    echo "  ${CYAN}remoteWrite:${NC}"
+    echo "  ${CYAN}  - url: http://mimir-nginx.mimir.svc/api/v1/push${NC}"
+    echo "  ${CYAN}    headers:${NC}"
+    echo "  ${CYAN}      X-Scope-OrgID: <tenant-id>${NC}"
+    printf "\n${GREEN}✓ Remote write check complete${NC}\n"
     exit 0
 fi
 
-echo -e "  ${GREEN}✓ Remote write is configured${NC}"
+echo "  ${GREEN}✓ Remote write is configured${NC}"
 
 # Get remote write URLs
-echo -e "\n  Remote write endpoints:"
-echo "$CONFIG" | jq -r '.data.yaml' 2>/dev/null | grep -A1 "remote_write:" | grep "url:" | sed 's/.*url: /    - /'
+printf "\n  Remote write endpoints:\n"
+echo "$RW_URLS" | while read -r url; do
+    [[ -n "$url" ]] && echo "    - $url"
+done
 
 #############################################
 # Key Metrics
 #############################################
-echo -e "\n${BLUE}═══ Remote Write Metrics ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Remote Write Metrics ═══${NC}"
 
 # Samples sent
 SENT=$(query_value "sum(prometheus_remote_storage_samples_total)")
 if [[ -n "$SENT" ]]; then
     SENT_FMT=$(printf "%'d" "${SENT%.*}" 2>/dev/null || echo "$SENT")
-    echo -e "  Samples Sent:      ${GREEN}$SENT_FMT${NC}"
+    echo "  Samples Sent:      ${GREEN}$SENT_FMT${NC}"
 fi
 
 # Samples pending
@@ -116,11 +124,11 @@ if [[ -n "$PENDING" ]]; then
     PENDING_INT="${PENDING%.*}"
     PENDING_FMT=$(printf "%'d" "$PENDING_INT" 2>/dev/null || echo "$PENDING")
     if [[ "$PENDING_INT" -gt 100000 ]]; then
-        echo -e "  Samples Pending:   ${RED}$PENDING_FMT${NC} (queue backing up!)"
+        printf "  Samples Pending:   ${RED}$PENDING_FMT${NC} (queue backing up!)\n"
     elif [[ "$PENDING_INT" -gt 10000 ]]; then
-        echo -e "  Samples Pending:   ${YELLOW}$PENDING_FMT${NC}"
+        echo "  Samples Pending:   ${YELLOW}$PENDING_FMT${NC}"
     else
-        echo -e "  Samples Pending:   ${GREEN}$PENDING_FMT${NC}"
+        echo "  Samples Pending:   ${GREEN}$PENDING_FMT${NC}"
     fi
 fi
 
@@ -129,9 +137,9 @@ FAILED=$(query_value "sum(prometheus_remote_storage_samples_failed_total)")
 if [[ -n "$FAILED" ]]; then
     FAILED_INT="${FAILED%.*}"
     if [[ "$FAILED_INT" -gt 0 ]]; then
-        echo -e "  Samples Failed:    ${RED}$FAILED_INT${NC}"
+        echo "  Samples Failed:    ${RED}$FAILED_INT${NC}"
     else
-        echo -e "  Samples Failed:    ${GREEN}0${NC}"
+        echo "  Samples Failed:    ${GREEN}0${NC}"
     fi
 fi
 
@@ -150,24 +158,25 @@ if [[ -n "$DROPPED_TOTAL" ]]; then
         if [[ "$DROPPED_RELABEL_INT" -gt 0 && "$DROPPED_ERROR" -eq 0 ]]; then
             # All drops are from writeRelabelConfigs - this is intentional
             RELABEL_FMT=$(printf "%'d" "$DROPPED_RELABEL_INT" 2>/dev/null || echo "$DROPPED_RELABEL_INT")
-            echo -e "  Samples Dropped:   ${CYAN}$RELABEL_FMT${NC} (writeRelabelConfigs - intentional)"
+            printf "  Samples Dropped:   ${CYAN}$RELABEL_FMT${NC} (writeRelabelConfigs - intentional)\n"
         elif [[ "$DROPPED_ERROR" -gt 0 ]]; then
             # Some drops are errors
-            echo -e "  Samples Dropped:   ${RED}$DROPPED_FMT${NC}"
-            [[ "$DROPPED_RELABEL_INT" -gt 0 ]] && echo -e "    ├─ Relabel drops: ${CYAN}$DROPPED_RELABEL_INT${NC} (intentional)"
-            echo -e "    └─ Error drops:   ${RED}$DROPPED_ERROR${NC}"
+            echo "  Samples Dropped:   ${RED}$DROPPED_FMT${NC}"
+            [[ "$DROPPED_RELABEL_INT" -gt 0 ]] && printf "    ├─ Relabel drops: ${CYAN}$DROPPED_RELABEL_INT${NC} (intentional)\n"
+            echo "    └─ Error drops:   ${RED}$DROPPED_ERROR${NC}"
         else
-            echo -e "  Samples Dropped:   ${RED}$DROPPED_FMT${NC}"
+            echo "  Samples Dropped:   ${RED}$DROPPED_FMT${NC}"
         fi
     else
-        echo -e "  Samples Dropped:   ${GREEN}0${NC}"
+        echo "  Samples Dropped:   ${GREEN}0${NC}"
     fi
 fi
 
 #############################################
 # Shards
 #############################################
-echo -e "\n${BLUE}═══ Shard Status ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Shard Status ═══${NC}"
 
 SHARDS=$(query_value "sum(prometheus_remote_storage_shards)")
 SHARDS_DESIRED=$(query_value "sum(prometheus_remote_storage_shards_desired)")
@@ -175,20 +184,22 @@ SHARDS_MAX=$(query_value "sum(prometheus_remote_storage_shards_max)")
 SHARDS_MIN=$(query_value "sum(prometheus_remote_storage_shards_min)")
 
 if [[ -n "$SHARDS" ]]; then
-    echo -e "  Current Shards:  $SHARDS"
-    [[ -n "$SHARDS_DESIRED" ]] && echo -e "  Desired Shards:  $SHARDS_DESIRED"
-    [[ -n "$SHARDS_MIN" ]] && echo -e "  Min Shards:      $SHARDS_MIN"
-    [[ -n "$SHARDS_MAX" ]] && echo -e "  Max Shards:      $SHARDS_MAX"
+    printf "  Current Shards:  $SHARDS\n"
+    [[ -n "$SHARDS_DESIRED" ]] && printf "  Desired Shards:  $SHARDS_DESIRED\n"
+    [[ -n "$SHARDS_MIN" ]] && printf "  Min Shards:      $SHARDS_MIN\n"
+    [[ -n "$SHARDS_MAX" ]] && printf "  Max Shards:      $SHARDS_MAX\n"
 
     if [[ -n "$SHARDS_MAX" && "$SHARDS" == "$SHARDS_MAX" ]]; then
-        echo -e "\n  ${YELLOW}⚠ Shards at maximum - consider increasing maxShards${NC}"
+        printf "\n"
+echo "  ${YELLOW}⚠ Shards at maximum - consider increasing maxShards${NC}"
     fi
 fi
 
 #############################################
 # Lag
 #############################################
-echo -e "\n${BLUE}═══ Remote Write Lag ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Remote Write Lag ═══${NC}"
 
 HIGHEST_SENT=$(query_value "prometheus_remote_storage_queue_highest_sent_timestamp_seconds")
 if [[ -n "$HIGHEST_SENT" ]]; then
@@ -196,37 +207,39 @@ if [[ -n "$HIGHEST_SENT" ]]; then
     LAG=$((CURRENT_TIME - ${HIGHEST_SENT%.*}))
 
     if [[ "$LAG" -gt 300 ]]; then
-        echo -e "  Lag: ${RED}${LAG}s${NC} (>5min behind!)"
+        printf "  Lag: ${RED}${LAG}s${NC} (>5min behind!)\n"
     elif [[ "$LAG" -gt 60 ]]; then
-        echo -e "  Lag: ${YELLOW}${LAG}s${NC}"
+        echo "  Lag: ${YELLOW}${LAG}s${NC}"
     else
-        echo -e "  Lag: ${GREEN}${LAG}s${NC}"
+        echo "  Lag: ${GREEN}${LAG}s${NC}"
     fi
 else
-    echo -e "  ${YELLOW}Lag metric not available${NC}"
+    echo "  ${YELLOW}Lag metric not available${NC}"
 fi
 
 #############################################
 # Throughput
 #############################################
-echo -e "\n${BLUE}═══ Throughput (5m rate) ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Throughput (5m rate) ═══${NC}"
 
 RATE=$(query_value "sum(rate(prometheus_remote_storage_samples_total[5m]))")
 if [[ -n "$RATE" ]]; then
     RATE_FMT=$(printf "%.0f" "$RATE" 2>/dev/null || echo "$RATE")
-    echo -e "  Samples/sec: ${CYAN}$RATE_FMT${NC}"
+    echo "  Samples/sec: ${CYAN}$RATE_FMT${NC}"
 fi
 
 BYTES_RATE=$(query_value "sum(rate(prometheus_remote_storage_sent_bytes_total[5m]))")
 if [[ -n "$BYTES_RATE" ]]; then
     BYTES_MB=$(awk "BEGIN {printf \"%.2f\", $BYTES_RATE / 1024 / 1024}")
-    echo -e "  Throughput:  ${CYAN}${BYTES_MB} MB/s${NC}"
+    echo "  Throughput:  ${CYAN}${BYTES_MB} MB/s${NC}"
 fi
 
 #############################################
 # Health Summary
 #############################################
-echo -e "\n${BLUE}═══ Health Summary ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Health Summary ═══${NC}"
 
 HEALTHY=true
 ISSUES=""
@@ -253,14 +266,15 @@ if [[ -n "$LAG" && "$LAG" -gt 300 ]]; then
 fi
 
 if [[ "$HEALTHY" == "true" ]]; then
-    echo -e "  ${GREEN}✓ Remote write is healthy${NC}"
+    echo "  ${GREEN}✓ Remote write is healthy${NC}"
     if [[ -n "$DROPPED_RELABEL_INT" && "$DROPPED_RELABEL_INT" -gt 0 ]]; then
         RELABEL_FMT=$(printf "%'d" "$DROPPED_RELABEL_INT" 2>/dev/null || echo "$DROPPED_RELABEL_INT")
-        echo -e "  ${CYAN}ℹ${NC} $RELABEL_FMT samples filtered by writeRelabelConfigs (intentional)"
+        printf "  ${CYAN}ℹ${NC} $RELABEL_FMT samples filtered by writeRelabelConfigs (intentional)\n"
     fi
 else
-    echo -e "  ${RED}✗ Remote write has issues:${NC}"
-    echo -e "$ISSUES"
+    echo "  ${RED}✗ Remote write has issues:${NC}"
+    printf "$ISSUES\n"
 fi
 
-echo -e "\n${GREEN}✓ Remote write analysis complete${NC}\n"
+printf "\n"
+echo "${GREEN}✓ Remote write analysis complete${NC}"
