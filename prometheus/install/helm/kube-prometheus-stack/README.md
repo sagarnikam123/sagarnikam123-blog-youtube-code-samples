@@ -6,13 +6,13 @@ Complete guide to install Prometheus on Kubernetes/EKS using the kube-prometheus
 
 **kube-prometheus-stack** is the recommended way to deploy Prometheus on Kubernetes. It includes:
 
-- ✅ Prometheus Operator (CRD-based configuration)
-- ✅ Prometheus Server
-- ✅ Alertmanager
-- ✅ Grafana
-- ✅ Node Exporter
-- ✅ Kube-state-metrics
-- ✅ Pre-configured dashboards and alerts
+- Prometheus Operator (CRD-based configuration)
+- Prometheus Server
+- Alertmanager
+- Grafana
+- Node Exporter
+- Kube-state-metrics
+- Pre-configured dashboards and alerts
 
 ## Prerequisites
 
@@ -24,349 +24,221 @@ Complete guide to install Prometheus on Kubernetes/EKS using the kube-prometheus
 # Verify prerequisites
 kubectl version --client
 helm version
+
+# Add Helm repository
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
 ```
 
-## Check Versions Before Installing
+## Folder Structure
+
+This repository uses a layered values file approach for multi-version and multi-environment deployments:
+
+```
+kube-prometheus-stack/
+├── README.md                           # This file
+├── base/
+│   └── values.yaml                     # Common settings (retention, resources, serviceMonitor)
+├── versions/
+│   ├── v3.5.0-lts/
+│   │   ├── values.yaml                 # LTS version image tags
+│   │   ├── default-values.yaml         # Chart defaults for reference
+│   │   └── README.md                   # Release notes
+│   └── v3.9.0-latest/
+│       ├── values.yaml                 # Latest version image tags
+│       ├── default-values.yaml         # Chart defaults for reference
+│       └── README.md                   # Release notes
+└── environments/
+    ├── minikube/
+    │   └── values.yaml                 # Minikube-specific (PV permissions, disabled alerts)
+    ├── dev/
+    │   └── values.yaml                 # Dev environment (tolerations, ingress, sub-path)
+    ├── staging/
+    │   └── values.yaml                 # Staging environment
+    └── prod/
+        └── values.yaml                 # Production (HA, resources)
+```
+
+**Values file precedence** (later files override earlier):
+```
+base/values.yaml → versions/<version>/values.yaml → environments/<env>/values.yaml
+```
+
+## Quick Start
+
+### Default Installation (without custom values)
 
 ```bash
-# Add repo first
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace
+```
 
-# List available chart versions
+### Verify Installation
+
+```bash
+# Check pods
+kubectl get pods -n prometheus
+
+# Access Prometheus UI
+kubectl port-forward -n prometheus svc/prometheus-kube-prometheus-prometheus 9090:9090
+open http://localhost:9090
+
+# Access Grafana (username: admin)
+kubectl port-forward -n prometheus svc/prometheus-grafana 3000:80
+kubectl get secret -n prometheus prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+open http://localhost:3000
+```
+
+## Installation by Environment
+
+### Minikube
+
+```bash
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/minikube/values.yaml \
+  --timeout 15m
+```
+
+### Development (EKS)
+
+```bash
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/dev/values.yaml \
+  --timeout 15m
+```
+
+### Production (EKS)
+
+```bash
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/prod/values.yaml \
+  --timeout 15m
+```
+
+### Using Latest Version
+
+Replace `v3.5.0-lts` with `v3.9.0-latest`:
+
+```bash
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f versions/v3.9.0-latest/values.yaml \
+  -f environments/dev/values.yaml \
+  --timeout 15m
+```
+
+## Version Management
+
+### Check Available Versions
+
+```bash
+# List chart versions
 helm search repo prometheus-community/kube-prometheus-stack --versions
 
 # Check Prometheus version in a specific chart
-# prometheus:v3.9.0 (Latest)
-helm show values prometheus-community/kube-prometheus-stack --version 80.13.0 | grep -B2 -A2 "prometheus/prometheus"
+helm show values prometheus-community/kube-prometheus-stack --version 77.10.0 | grep -A2 "prometheus/prometheus"
 
-# Check all default images that will be deployed
-# prometheus:v3.5.0 (LTS)
-helm template prometheus prometheus-community/kube-prometheus-stack --version 77.10.0 | grep "image:" | sort -u
-
-# get default values
-helm show values prometheus-community/kube-prometheus-stack > default-values.yaml
+# Get default values for reference
+helm show values prometheus-community/kube-prometheus-stack --version 77.10.0 > default-values.yaml
 ```
 
-> **Note:** The `appVersion` in chart metadata is the Prometheus Operator version, not Prometheus itself.
+### Version Mapping (Prometheus 3.x)
 
-Version mapping reference: [ArtifactHub](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)
+| Chart Version | Prometheus | Grafana | Alertmanager | Type   |
+|---------------|------------|---------|--------------|--------|
+| 80.13.0       | v3.9.0     | 12.3.1  | v0.28.0      | Latest |
+| 77.10.0       | v3.5.0     | 11.4.0  | v0.28.0      | LTS    |
 
-## Override Component Versions
+> **Note:** The chart's `appVersion` is the Prometheus Operator version, not Prometheus itself.
 
-To install a specific Prometheus version (e.g., v3.5.0 LTS), override the image tag:
+### Verify Installed Versions
+
+```bash
+# Prometheus
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 \
+  -c prometheus -- prometheus --version
+
+# Grafana
+kubectl exec -n prometheus deploy/prometheus-grafana -c grafana -- grafana-server -v
+
+# Alertmanager
+kubectl exec -n prometheus alertmanager-prometheus-kube-prometheus-alertmanager-0 \
+  -c alertmanager -- alertmanager --version
+
+# All images
+kubectl get pods -n prometheus -o jsonpath="{range .items[*]}{.metadata.name}{'\t'}{range .spec.containers[*]}{.image}{'\n'}{end}{end}"
+```
+
+### Override Component Versions
+
+Add to your version file (e.g., `versions/v3.5.0-lts/values.yaml`):
 
 ```yaml
-# values.yaml
 prometheus:
   prometheusSpec:
     image:
       registry: quay.io
       repository: prometheus/prometheus
       tag: v3.5.0
-```
 
-```bash
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus --create-namespace \
-  -f values.yaml
+grafana:
+  image:
+    tag: 11.4.0
+
+alertmanager:
+  alertmanagerSpec:
+    image:
+      tag: v0.28.0
 ```
 
 Or inline:
 ```bash
 helm install prometheus prometheus-community/kube-prometheus-stack \
   -n prometheus --create-namespace \
+  -f base/values.yaml \
+  -f environments/dev/values.yaml \
   --set prometheus.prometheusSpec.image.tag=v3.5.0
 ```
 
-### Other Components
-
-```yaml
-# Override Grafana version
-grafana:
-  image:
-    tag: 11.4.0
-
-# Override Alertmanager version
-alertmanager:
-  alertmanagerSpec:
-    image:
-      tag: v0.28.0
-
-# Override Node Exporter version
-prometheus-node-exporter:
-  image:
-    tag: v1.9.0
-```
-
-Check available versions:
-- [Prometheus releases](https://github.com/prometheus/prometheus/releases)
-- [Grafana releases](https://github.com/grafana/grafana/releases)
-- [Alertmanager releases](https://github.com/prometheus/alertmanager/releases)
-
-## Verify Installed Versions
-
-After installation, check what versions are running:
+## Upgrade
 
 ```bash
-# Check Prometheus version
-kubectl get prometheus -n prometheus -o jsonpath='{.items[*].spec.version}'
-
-# Or from the running pod
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- prometheus --version
-
-# Check Grafana version
-kubectl exec -n prometheus deploy/prometheus-grafana -c grafana -- grafana-server -v
-
-# Check Alertmanager version
-kubectl exec -n prometheus alertmanager-prometheus-kube-prometheus-alertmanager-0 -c alertmanager -- alertmanager --version
-
-# Check all pod images at once
-kubectl get pods -n prometheus -o jsonpath="{range .items[*]}{.metadata.name}{'\t'}{range .spec.containers[*]}{.image}{'\n'}{end}{end}"
-```
-
-## Quick Start
-
-### 1. Add Helm Repository
-
-```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
-```
 
-### 2. Install with Default Configuration
-
-```bash
-# Create namespace
-kubectl create namespace prometheus
-
-# Install
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus
-```
-
-### 3. Verify Installation
-
-```bash
-# Check pods
-kubectl get pods -n prometheus
-
-# Expected output:
-# NAME                                                     READY   STATUS    RESTARTS   AGE
-# alertmanager-prometheus-kube-prometheus-alertmanager-0   2/2     Running   0          2m
-# prometheus-grafana-xxx                                   3/3     Running   0          2m
-# prometheus-kube-prometheus-operator-xxx                  1/1     Running   0          2m
-# prometheus-kube-state-metrics-xxx                        1/1     Running   0          2m
-# prometheus-prometheus-kube-prometheus-prometheus-0       2/2     Running   0          2m
-# prometheus-prometheus-node-exporter-xxx                  1/1     Running   0          2m
-```
-
-### 4. Access Prometheus UI
-
-```bash
-# Port-forward
-kubectl port-forward -n prometheus svc/prometheus-kube-prometheus-prometheus 9090:9090
-
-# Open browser
-open http://localhost:9090
-```
-
-### 5. Access Grafana
-
-```bash
-# Port-forward
-kubectl port-forward -n prometheus svc/prometheus-grafana 3000:80
-
-# Get admin password
-kubectl get secret -n prometheus prometheus-grafana \
-  -o jsonpath="{.data.admin-password}" | base64 --decode
-echo
-
-# Open browser (username: admin)
-open http://localhost:3000
-```
-
-## Folder Structure
-
-This repository organizes Helm values for multi-version and multi-environment deployments:
-
-```
-kube-prometheus-stack/
-├── README.md                           # This file
-├── base/
-│   └── values.yaml                     # Common settings (retention, resources, etc.)
-├── versions/
-│   ├── v3.5.0-lts/
-│   │   ├── values.yaml                 # LTS version override
-│   │   ├── default-values.yaml         # Chart defaults for reference
-│   │   └── README.md                   # LTS release notes
-│   └── v3.9.0-latest/
-│       ├── values.yaml                 # Latest version override
-│       ├── default-values.yaml         # Chart defaults for reference
-│       └── README.md                   # Latest release notes
-└── environments/
-    ├── minikube/
-    │   └── values.yaml                 # Minikube-specific (fixes PV permissions)
-    ├── dev/
-    │   └── values.yaml                 # Minimal resources
-    ├── staging/
-    │   └── values.yaml                 # Moderate resources
-    └── prod/
-        └── values.yaml                 # HA, production-grade resources
-```
-
-## Version-Specific Installation
-
-### Install on Minikube
-
-Minikube requires special `securityContext` settings to fix hostpath PV permission issues:
-
-```bash
-# v3.5.0 LTS on Minikube
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
-  -f environments/minikube/values.yaml
-  --timeout 15m
-
-# v3.9.0 Latest on Minikube
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f versions/v3.9.0-latest/values.yaml \
-  -f environments/minikube/values.yaml
-  --timeout 15m
-```
-
-### Install v3.5.0 LTS (Recommended for Production)
-
-```bash
-# Development (non-minikube)
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
-  -f environments/dev/values.yaml
-  --timeout 15m
-
-# Production
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
-  -f environments/prod/values.yaml
-  --timeout 15m
-```
-
-### Install v3.9.0 Latest
-
-```bash
-# Development (non-minikube)
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f versions/v3.9.0-latest/values.yaml \
-  -f environments/dev/values.yaml
-  --timeout 15m
-
-# Staging
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f versions/v3.9.0-latest/values.yaml \
-  -f environments/staging/values.yaml
-  --timeout 15m
-```
-
-### Using Specific Chart Version
-
-Alternatively, use the chart version directly (includes matching Prometheus version):
-
-```bash
-# v3.5.0 LTS (chart 77.10.0)
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  --version 77.10.0 \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f environments/dev/values.yaml
-  --timeout 15m
-
-# v3.9.0 Latest (chart 80.13.0)
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  --version 80.13.0 \
-  -n prometheus --create-namespace \
-  -f base/values.yaml \
-  -f environments/dev/values.yaml
-  --timeout 15m
-```
-
-### Version Mapping (Prometheus 3.x)
-
-| Chart Version | Prometheus Version | Type   |
-|---------------|--------------------|--------|
-| 80.13.0       | v3.9.0             | Latest |
-| 77.10.0       | v3.5.0             | LTS    |
-
-## Custom Installation
-
-### Using Values File
-
-Create `values.yaml`:
-
-```yaml
-# values.yaml
-prometheus:
-  prometheusSpec:
-    retention: 15d
-    resources:
-      requests:
-        cpu: 2
-        memory: 4Gi
-      limits:
-        cpu: 4
-        memory: 8Gi
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 50Gi
-
-grafana:
-  enabled: true
-  adminPassword: "your-secure-password"
-
-alertmanager:
-  enabled: true
-```
-
-Install with custom values:
-
-```bash
-helm install prometheus prometheus-community/kube-prometheus-stack \
+helm upgrade prometheus prometheus-community/kube-prometheus-stack \
   -n prometheus \
-  -f values.yaml
+  -f base/values.yaml \
+  -f versions/v3.5.0-lts/values.yaml \
+  -f environments/dev/values.yaml \
+  --timeout 15m
 ```
 
-### AWS EKS Specific Configuration
+## AWS EKS Configuration
 
-#### Prerequisites: EBS CSI Driver and gp3 StorageClass
-
-EKS requires the EBS CSI driver for dynamic volume provisioning:
+### Prerequisites: EBS CSI Driver
 
 ```bash
-# Verify EBS CSI driver is installed
+# Verify EBS CSI driver
 kubectl get pods -n kube-system | grep ebs-csi
 
-# If not installed, enable the EKS addon
+# If not installed
 aws eks create-addon \
-  --cluster-name <your-cluster-name> \
+  --cluster-name <cluster-name> \
   --addon-name aws-ebs-csi-driver \
-  --region <your-region>
+  --region <region>
 ```
 
-Create gp3 StorageClass (recommended over gp2 for better performance):
+### Create gp3 StorageClass
 
 ```bash
 kubectl apply -f - <<EOF
@@ -382,56 +254,11 @@ reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 EOF
-
-# Verify
-kubectl get sc gp3
-```
-
-> **Note**: `WaitForFirstConsumer` ensures volumes are created in the same AZ as the pod, preventing AZ mismatch issues.
-
-#### EKS Values Example
-
-For EKS with EBS storage:
-
-```yaml
-# eks-values.yaml
-prometheus:
-  prometheusSpec:
-    retention: 15d
-    resources:
-      requests:
-        cpu: 2
-        memory: 4Gi
-      limits:
-        cpu: 4
-        memory: 8Gi
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: gp3  # EKS gp3 storage class
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 50Gi
-
-# Enable service monitors for AWS services
-serviceMonitor:
-  enabled: true
-```
-
-Install:
-
-```bash
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus \
-  -f eks-values.yaml
 ```
 
 ## Configuration Examples
 
-### 1. Enable Remote Write to Mimir
-
-Create `remote-write-values.yaml`:
+### Remote Write to Mimir
 
 ```yaml
 prometheus:
@@ -445,15 +272,7 @@ prometheus:
           maxShards: 200
 ```
 
-Apply:
-
-```bash
-helm upgrade prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus \
-  -f remote-write-values.yaml
-```
-
-### 2. Stateless Forwarder Mode (Minimal Retention)
+### Stateless Forwarder (Minimal Retention)
 
 ```yaml
 prometheus:
@@ -467,7 +286,7 @@ prometheus:
           X-Scope-OrgID: demo
 ```
 
-### 3. High Availability Setup
+### High Availability
 
 ```yaml
 prometheus:
@@ -478,209 +297,84 @@ prometheus:
       requests:
         cpu: 4
         memory: 8Gi
-      limits:
-        cpu: 8
-        memory: 16Gi
 
 alertmanager:
   alertmanagerSpec:
     replicas: 3
 ```
 
-## Disable ServiceMonitors (Control Scrape Targets)
+## Disable ServiceMonitors
 
-By default, kube-prometheus-stack scrapes many Kubernetes components. You can disable specific targets to reduce noise or resource usage.
+See [FAQ.md - How to exclude services from scraping](../../docs/FAQ.md#how-to-exclude-services-from-scraping) for all 5 methods.
 
-### View Current Targets
-
-```bash
-# Port-forward and open targets page
-kubectl port-forward -n prometheus svc/prometheus-kube-prometheus-prometheus 9090:9090
-open http://localhost:9090/targets
-```
-
-### Disable Kubernetes Component Scraping
+### Disable Kubernetes Components
 
 ```yaml
-# Disable API Server scraping (job="apiserver")
 kubeApiServer:
   enabled: false
-
-# Disable CoreDNS scraping (job="coredns")
 coreDns:
   enabled: false
-
-# Disable kubelet scraping (job="kubelet", includes cadvisor and probes)
 kubelet:
   enabled: false
-
-# Disable etcd scraping (job="kube-etcd")
 kubeEtcd:
   enabled: false
-
-# Disable kube-controller-manager scraping
 kubeControllerManager:
   enabled: false
-
-# Disable kube-scheduler scraping
 kubeScheduler:
   enabled: false
-
-# Disable kube-proxy scraping
 kubeProxy:
   enabled: false
 ```
 
-### Disable Stack Component Scraping
+### Disable Stack Components
 
 ```yaml
-# Disable kube-state-metrics entirely (job="kube-state-metrics")
 kube-state-metrics:
   enabled: false
 
-# Disable node-exporter entirely (job="node-exporter")
 prometheus-node-exporter:
   enabled: false
 
-# Disable Prometheus Operator self-monitoring (job="prometheus-kube-prometheus-operator")
 prometheusOperator:
   serviceMonitor:
     selfMonitor: false
 
-# Disable Alertmanager self-monitoring
-alertmanager:
-  serviceMonitor:
-    selfMonitor: false
-
-# Disable Prometheus self-monitoring
-prometheus:
-  serviceMonitor:
-    selfMonitor: false
-
-# Disable Grafana monitoring
 grafana:
   serviceMonitor:
     enabled: false
 ```
 
-### Minimal Scraping Example (Local Dev/Minikube)
-
-For local development, you might only want node-exporter and self-monitoring:
-
-```yaml
-# Disable all Kubernetes component scraping
-kubeApiServer:
-  enabled: false
-coreDns:
-  enabled: false
-kubelet:
-  enabled: false
-kubeEtcd:
-  enabled: false
-kubeControllerManager:
-  enabled: false
-kubeScheduler:
-  enabled: false
-kubeProxy:
-  enabled: false
-
-# Disable kube-state-metrics
-kube-state-metrics:
-  enabled: false
-
-# Disable operator self-monitoring
-prometheusOperator:
-  serviceMonitor:
-    selfMonitor: false
-```
-
-### Advanced: ServiceMonitor Selectors
-
-Control which ServiceMonitors Prometheus will scrape using label selectors:
+### ServiceMonitor Selectors
 
 ```yaml
 prometheus:
   prometheusSpec:
-    # Only scrape ServiceMonitors with specific labels
     serviceMonitorSelector:
       matchLabels:
         prometheus: main
-
-    # Only scrape PodMonitors with specific labels
-    podMonitorSelector:
-      matchLabels:
-        prometheus: main
-
-    # Scrape ServiceMonitors from all namespaces (default)
     serviceMonitorNamespaceSelector: {}
-
-    # Or limit to specific namespaces
-    serviceMonitorNamespaceSelector:
-      matchLabels:
-        monitoring: enabled
-```
-
-### List All ServiceMonitors
-
-```bash
-# List all ServiceMonitors in the cluster
-kubectl get servicemonitors -A
-
-# View a specific ServiceMonitor
-kubectl get servicemonitor -n prometheus prometheus-kube-prometheus-kubelet -o yaml
-```
-
-## Upgrade
-
-```bash
-# Update repo
-helm repo update
-
-# Check available versions
-helm search repo prometheus-community/kube-prometheus-stack --versions
-
-# Upgrade
-helm upgrade prometheus prometheus-community/kube-prometheus-stack \
-  -n prometheus \
-  -f values.yaml
 ```
 
 ## Multiple Instances
 
-To run multiple Prometheus instances in different namespaces (e.g., dev and prod), you must use unique release names and override resource names to avoid ClusterRole conflicts:
+To run multiple Prometheus instances, use unique names:
 
 ```bash
-# Install in a new namespace with unique names
 helm install prometheus-dev prometheus-community/kube-prometheus-stack \
   -n prometheus-dev --create-namespace \
   -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
   -f environments/dev/values.yaml \
   --set fullnameOverride=prometheus-dev \
   --set grafana.fullnameOverride=grafana-dev \
   --set prometheusOperator.fullnameOverride=prometheus-operator-dev
 ```
 
-Or add to your environment values file:
-
-```yaml
-# environments/dev/values.yaml
-fullnameOverride: prometheus-dev
-grafana:
-  fullnameOverride: grafana-dev
-prometheusOperator:
-  fullnameOverride: prometheus-operator-dev
-```
-
-> **Note**: ClusterRoles and ClusterRoleBindings are cluster-wide resources. Without unique names, Helm will fail with ownership metadata errors when installing a second instance.
-
 ## Uninstall
 
 ```bash
-# Uninstall release
 helm uninstall prometheus -n prometheus
 
-# Delete CRDs (optional, removes all Prometheus resources)
+# Delete CRDs (optional)
 kubectl delete crd alertmanagerconfigs.monitoring.coreos.com
 kubectl delete crd alertmanagers.monitoring.coreos.com
 kubectl delete crd podmonitors.monitoring.coreos.com
@@ -690,158 +384,45 @@ kubectl delete crd prometheusrules.monitoring.coreos.com
 kubectl delete crd servicemonitors.monitoring.coreos.com
 kubectl delete crd thanosrulers.monitoring.coreos.com
 
-# Delete namespace
 kubectl delete namespace prometheus
 ```
 
 ## Troubleshooting
 
-### Check Prometheus Status
+See [FAQ.md](../../docs/FAQ.md) for detailed troubleshooting commands and operational guides.
+
+### Quick Checks
 
 ```bash
-# Check pods
 kubectl get pods -n prometheus
-
-# Check Prometheus CRD
 kubectl get prometheus -n prometheus
-
-# Check logs
 kubectl logs -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus --tail=100
-```
-
-### Check Resource Usage
-
-```bash
-# CPU and Memory
-kubectl top pod -n prometheus
-
-# Storage
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  df -h /prometheus
-```
-
-### Check Targets
-
-```bash
-# Port-forward
-kubectl port-forward -n prometheus svc/prometheus-kube-prometheus-prometheus 9090:9090
-
-# Open targets page
-open http://localhost:9090/targets
 ```
 
 ### Common Issues
 
-**1. Pod stuck in Pending:**
-```bash
-# Check events
-kubectl describe pod -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Pod Pending | PVC not bound | Check StorageClass, EBS CSI driver |
+| OOMKilled | Memory too low | Increase memory limits |
+| Scrape timeout | Target slow/unreachable | Check target health, network |
+| Remote write lag | Queue backing up | Increase shards, check Mimir |
 
-# Common causes:
-# - Insufficient resources
-# - PVC not bound
-# - Node selector mismatch
-```
+## Resource Sizing
 
-**2. High memory usage:**
-```bash
-# Check active series
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/query?query=prometheus_tsdb_head_series' 2>/dev/null
+See [FAQ.md - Resource Sizing Guidelines](../../docs/FAQ.md#resource-sizing-guidelines) for detailed sizing with formulas.
 
-# Reduce retention or increase memory
-```
-
-**3. Remote write failing:**
-```bash
-# Check failed samples
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/query?query=prometheus_remote_storage_samples_failed_total' 2>/dev/null
-
-# Check logs for errors
-kubectl logs -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus | grep -i error
-```
-
-## Monitoring Prometheus
-
-### Key Metrics
-
-```bash
-# Active series
-prometheus_tsdb_head_series
-
-# Scrape duration
-prometheus_target_interval_length_seconds
-
-# Remote write rate
-rate(prometheus_remote_storage_samples_total[5m])
-
-# Memory usage
-process_resident_memory_bytes
-```
-
-### Alerts
-
-Pre-configured alerts are available in Prometheus rules:
-
-```bash
-# List all rules
-kubectl get prometheusrules -n prometheus
-
-# View specific rule
-kubectl get prometheusrules -n prometheus prometheus-kube-prometheus-prometheus-operator -o yaml
-```
-
-## Best Practices
-
-### Resource Planning
-
-| Active Series | CPU Request | Memory Request | Storage |
-|---------------|-------------|----------------|---------|
-| < 100K        | 1 core      | 2Gi            | 10Gi    |
-| 100K - 500K   | 2 cores     | 4Gi            | 25Gi    |
-| 500K - 1M     | 4 cores     | 8Gi            | 50Gi    |
-| 1M - 5M       | 8 cores     | 16Gi           | 100Gi   |
-| > 5M          | 16+ cores   | 32Gi+          | 200Gi+  |
-
-### Retention Strategy
-
-- **Development**: 7 days
-- **Production**: 15-30 days
-- **Long-term**: Use remote write to Mimir/Thanos
-
-### High Cardinality
-
-If you have high cardinality (millions of series):
-
-1. Enable remote write to Mimir
-2. Reduce local retention to 2h
-3. Increase memory limits
-4. Consider metric relabeling to drop unnecessary labels
+| Active Series | CPU | Memory | Storage |
+|---------------|-----|--------|---------|
+| < 100K | 1 | 2Gi | 10Gi |
+| 100K - 500K | 2 | 4Gi | 25Gi |
+| 500K - 1M | 4 | 8Gi | 50Gi |
+| 1M - 5M | 8 | 16Gi | 100Gi |
+| > 5M | 16+ | 32Gi+ | 200Gi+ |
 
 ## References
 
 - [kube-prometheus-stack Chart](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
 - [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator)
 - [Prometheus Documentation](https://prometheus.io/docs/)
-- [AWS EKS Best Practices](https://aws.github.io/aws-eks-best-practices/cost_optimization/cost_opt_observability/)
-
-## Version Compatibility
-
-| Chart Version | Prometheus Version | Kubernetes Version |
-|---------------|--------------------|--------------------|
-| 55.x          | 2.49.x             | 1.19+              |
-| 54.x          | 2.48.x             | 1.19+              |
-| 53.x          | 2.47.x             | 1.19+              |
-| 52.x          | 2.46.x             | 1.19+              |
-| 51.x          | 2.45.x             | 1.19+              |
-
-Check current versions:
-```bash
-helm search repo prometheus-community/kube-prometheus-stack
-```
-
-## Support
-
-- GitHub Issues: https://github.com/prometheus-community/helm-charts/issues
-- Slack: #prometheus-operator on Kubernetes Slack
+- [ArtifactHub - Version Mapping](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack)
