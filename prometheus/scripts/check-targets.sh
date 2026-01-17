@@ -12,11 +12,11 @@ PROM_SVC="${PROM_SVC:-prometheus-kube-prometheus-prometheus}"
 PROM_API_PREFIX=""
 
 # Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+NC=$'\033[0m'
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -41,9 +41,9 @@ done
 cleanup() { [[ -n "$PF_PID" ]] && kill $PF_PID 2>/dev/null; }
 trap cleanup EXIT
 
-echo -e "${GREEN}╔═══════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Prometheus Scrape Targets           ║${NC}"
-echo -e "${GREEN}╚═══════════════════════════════════════╝${NC}"
+echo "${GREEN}╔═══════════════════════════════════════╗${NC}"
+echo "${GREEN}║   Prometheus Scrape Targets           ║${NC}"
+echo "${GREEN}╚═══════════════════════════════════════╝${NC}"
 echo ""
 
 # Setup port-forward
@@ -55,16 +55,16 @@ PF_PID=$!
 for i in {1..30}; do
     if curl -s --connect-timeout 2 "http://localhost:${LOCAL_PORT}/prometheus/api/v1/targets" 2>/dev/null | grep -q '"status":"success"'; then
         PROM_API_PREFIX="/prometheus"
-        echo -e "${GREEN}✓${NC} Connected (API: /prometheus/api/v1)"
+        printf "${GREEN}✓${NC} Connected (API: /prometheus/api/v1)\n"
         break
     fi
     if curl -s --connect-timeout 2 "http://localhost:${LOCAL_PORT}/api/v1/targets" 2>/dev/null | grep -q '"status":"success"'; then
         PROM_API_PREFIX=""
-        echo -e "${GREEN}✓${NC} Connected (API: /api/v1)"
+        printf "${GREEN}✓${NC} Connected (API: /api/v1)\n"
         break
     fi
     sleep 1
-    [[ $i -eq 30 ]] && { echo -e "${RED}✗ Connection failed${NC}"; exit 1; }
+    [[ $i -eq 30 ]] && { echo "${RED}✗ Connection failed${NC}"; exit 1; }
 done
 
 BASE_URL="http://localhost:${LOCAL_PORT}${PROM_API_PREFIX}"
@@ -79,21 +79,23 @@ TARGETS=$(curl -s "${BASE_URL}/api/v1/targets" 2>/dev/null | sanitize_json)
 #############################################
 # Summary
 #############################################
-echo -e "\n${BLUE}═══ Target Summary ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Target Summary ═══${NC}"
 TOTAL=$(echo "$TARGETS" | jq '.data.activeTargets | length' 2>/dev/null || echo "0")
 UP=$(echo "$TARGETS" | jq '[.data.activeTargets[] | select(.health == "up")] | length' 2>/dev/null || echo "0")
 DOWN=$(echo "$TARGETS" | jq '[.data.activeTargets[] | select(.health == "down")] | length' 2>/dev/null || echo "0")
 UNKNOWN=$(echo "$TARGETS" | jq '[.data.activeTargets[] | select(.health == "unknown")] | length' 2>/dev/null || echo "0")
 
-echo -e "  Total:   $TOTAL"
-echo -e "  Up:      ${GREEN}$UP${NC}"
-[[ "$DOWN" -gt 0 ]] && echo -e "  Down:    ${RED}$DOWN${NC}" || echo -e "  Down:    ${GREEN}0${NC}"
-[[ "$UNKNOWN" -gt 0 ]] && echo -e "  Unknown: ${YELLOW}$UNKNOWN${NC}"
+printf "  Total:   $TOTAL\n"
+echo "  Up:      ${GREEN}$UP${NC}"
+[[ "$DOWN" -gt 0 ]] && echo "  Down:    ${RED}$DOWN${NC}" || echo "  Down:    ${GREEN}0${NC}"
+[[ "$UNKNOWN" -gt 0 ]] && echo "  Unknown: ${YELLOW}$UNKNOWN${NC}"
 
 #############################################
 # By Job
 #############################################
-echo -e "\n${BLUE}═══ Targets by Job ═══${NC}"
+printf "\n"
+echo "${BLUE}═══ Targets by Job ═══${NC}"
 printf "%-40s %6s %6s %6s\n" "Job" "Total" "Up" "Down"
 printf "%-40s %6s %6s %6s\n" "---" "-----" "----" "----"
 
@@ -120,7 +122,8 @@ done
 # Down Targets Detail
 #############################################
 if [[ "$DOWN" -gt 0 ]]; then
-    echo -e "\n${BLUE}═══ Down Targets (Details) ═══${NC}"
+    printf "\n"
+echo "${BLUE}═══ Down Targets (Details) ═══${NC}"
     echo "$TARGETS" | jq -r '
       .data.activeTargets[] | select(.health == "down") |
       "Job: \(.labels.job)\n  Instance: \(.labels.instance)\n  Error: \(.lastError)\n  Last Scrape: \(.lastScrape)\n"
@@ -131,7 +134,8 @@ fi
 # Scrape Duration Stats
 #############################################
 if [[ -z "$DOWN_ONLY" ]]; then
-    echo -e "\n${BLUE}═══ Scrape Duration (Top 10 Slowest) ═══${NC}"
+    printf "\n"
+echo "${BLUE}═══ Scrape Duration (Top 10 Slowest) ═══${NC}"
     printf "%-40s %-20s %12s\n" "Job" "Instance" "Duration"
     printf "%-40s %-20s %12s\n" "---" "--------" "--------"
 
@@ -144,4 +148,5 @@ if [[ -z "$DOWN_ONLY" ]]; then
     done
 fi
 
-echo -e "\n${GREEN}✓ Target analysis complete${NC}\n"
+printf "\n"
+echo "${GREEN}✓ Target analysis complete${NC}"
