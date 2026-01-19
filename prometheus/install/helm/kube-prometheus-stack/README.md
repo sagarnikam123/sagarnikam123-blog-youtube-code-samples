@@ -95,9 +95,9 @@ open http://localhost:3000
 
 ```bash
 helm install prometheus prometheus-community/kube-prometheus-stack \
+  --version 77.10.0 \
   -n prometheus --create-namespace \
   -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
   -f environments/minikube/values.yaml \
   --timeout 15m
 ```
@@ -106,10 +106,10 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 
 ```bash
 helm install prometheus prometheus-community/kube-prometheus-stack \
+  --version 77.10.0 \
   -n prometheus --create-namespace \
   -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
-  -f environments/dev/values.yaml \
+  -f environments/dev/scnx-global-dev-aps1-eks.yaml \
   --timeout 15m
 ```
 
@@ -117,25 +117,27 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 
 ```bash
 helm install prometheus prometheus-community/kube-prometheus-stack \
+  --version 77.10.0 \
   -n prometheus --create-namespace \
   -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
-  -f environments/prod/values.yaml \
+  -f environments/prod/scnx-dts01-eks.yaml \
   --timeout 15m
 ```
 
-### Using Latest Version
+### Using Latest Version (v3.9.0)
 
-Replace `v3.5.0-lts` with `v3.9.0-latest`:
+Replace `--version 77.10.0` with `--version 80.13.0`:
 
 ```bash
 helm install prometheus prometheus-community/kube-prometheus-stack \
+  --version 80.13.0 \
   -n prometheus --create-namespace \
   -f base/values.yaml \
-  -f versions/v3.9.0-latest/values.yaml \
   -f environments/dev/values.yaml \
   --timeout 15m
 ```
+
+> **Note:** The `versions/` folder contains `default-values.yaml` for reference only. Use `-f versions/<version>/values.yaml` only when you need to override the default Prometheus version bundled with the chart.
 
 ## Version Management
 
@@ -181,7 +183,7 @@ kubectl get pods -n prometheus -o jsonpath="{range .items[*]}{.metadata.name}{'\
 
 ### Override Component Versions
 
-Add to your version file (e.g., `versions/v3.5.0-lts/values.yaml`):
+Add to your environment values file or use inline:
 
 ```yaml
 prometheus:
@@ -201,7 +203,7 @@ alertmanager:
       tag: v0.28.0
 ```
 
-Or inline:
+Inline:
 ```bash
 helm install prometheus prometheus-community/kube-prometheus-stack \
   -n prometheus --create-namespace \
@@ -216,9 +218,9 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 helm repo update
 
 helm upgrade prometheus prometheus-community/kube-prometheus-stack \
+  --version 77.10.0 \
   -n prometheus \
   -f base/values.yaml \
-  -f versions/v3.5.0-lts/values.yaml \
   -f environments/dev/values.yaml \
   --timeout 15m
 ```
@@ -374,13 +376,15 @@ helm install prometheus-dev prometheus-community/kube-prometheus-stack \
 ```bash
 helm uninstall prometheus -n prometheus
 
-# Delete CRDs (optional)
+# Delete CRDs (optional - only if you want to completely remove Prometheus Operator)
 kubectl delete crd alertmanagerconfigs.monitoring.coreos.com
 kubectl delete crd alertmanagers.monitoring.coreos.com
 kubectl delete crd podmonitors.monitoring.coreos.com
 kubectl delete crd probes.monitoring.coreos.com
+kubectl delete crd prometheusagents.monitoring.coreos.com
 kubectl delete crd prometheuses.monitoring.coreos.com
 kubectl delete crd prometheusrules.monitoring.coreos.com
+kubectl delete crd scrapeconfigs.monitoring.coreos.com
 kubectl delete crd servicemonitors.monitoring.coreos.com
 kubectl delete crd thanosrulers.monitoring.coreos.com
 
