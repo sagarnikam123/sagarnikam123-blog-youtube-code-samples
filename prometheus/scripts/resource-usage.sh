@@ -103,18 +103,21 @@ while IFS='|' read -r name cpu_req cpu_lim mem_req mem_lim; do
         fi
     fi
 
-    # Calculate utilization %
+    # Calculate utilization % based on LIMIT (not request)
+    # This shows how close to OOM/throttling the pod is
     cpu_req_int=${cpu_req%.*}
+    cpu_lim_int=${cpu_lim%.*}
     mem_req_int=${mem_req%.*}
+    mem_lim_int=${mem_lim%.*}
 
-    if [[ "$cpu_req_int" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$cpu_use" -gt 0 ]]; then
-        cpu_pct=$((cpu_use * 100 / cpu_req_int))
+    if [[ "$cpu_lim_int" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$cpu_use" -gt 0 ]]; then
+        cpu_pct=$((cpu_use * 100 / cpu_lim_int))
     else
         cpu_pct="-"
     fi
 
-    if [[ "$mem_req_int" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$mem_use" -gt 0 ]]; then
-        mem_pct=$((mem_use * 100 / mem_req_int))
+    if [[ "$mem_lim_int" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$mem_use" -gt 0 ]]; then
+        mem_pct=$((mem_use * 100 / mem_lim_int))
     else
         mem_pct="-"
     fi
@@ -179,15 +182,15 @@ if [[ -f "$TOTALS_FILE" && -s "$TOTALS_FILE" ]]; then
     TOTAL_MEM_LIM=$(echo "$TOTALS" | awk '{print $6}')
     TOTAL_MEM_USE=$(echo "$TOTALS" | awk '{print $7}')
 
-    # Calculate total utilization
-    if [[ "$TOTAL_CPU_REQ" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$TOTAL_CPU_USE" -gt 0 ]]; then
-        TOTAL_CPU_PCT=$((TOTAL_CPU_USE * 100 / TOTAL_CPU_REQ))
+    # Calculate total utilization based on LIMIT
+    if [[ "$TOTAL_CPU_LIM" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$TOTAL_CPU_USE" -gt 0 ]]; then
+        TOTAL_CPU_PCT=$((TOTAL_CPU_USE * 100 / TOTAL_CPU_LIM))
     else
         TOTAL_CPU_PCT="-"
     fi
 
-    if [[ "$TOTAL_MEM_REQ" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$TOTAL_MEM_USE" -gt 0 ]]; then
-        TOTAL_MEM_PCT=$((TOTAL_MEM_USE * 100 / TOTAL_MEM_REQ))
+    if [[ "$TOTAL_MEM_LIM" -gt 0 && "$METRICS_AVAILABLE" == "true" && "$TOTAL_MEM_USE" -gt 0 ]]; then
+        TOTAL_MEM_PCT=$((TOTAL_MEM_USE * 100 / TOTAL_MEM_LIM))
     else
         TOTAL_MEM_PCT="-"
     fi
