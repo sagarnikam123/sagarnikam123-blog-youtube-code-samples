@@ -294,20 +294,80 @@ fi
 #############################################
 printf "\n"
 echo "${BLUE}═══ 8. Pod Health Summary ═══${NC}"
-TOTAL_PODS=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=prometheus --no-headers 2>/dev/null | wc -l | tr -d ' ')
-RUNNING_PODS=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
 
-if [[ "$TOTAL_PODS" -gt 0 ]]; then
-    printf "  Total Pods:   $TOTAL_PODS\n"
-    echo "  Running:      ${GREEN}$RUNNING_PODS${NC}"
+# Get pod counts by component using correct labels
+PROM_TOTAL=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=prometheus --no-headers 2>/dev/null | wc -l | tr -d ' ')
+PROM_RUNNING=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
 
-    if [[ "$RUNNING_PODS" -eq "$TOTAL_PODS" ]]; then
+AM_TOTAL=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=alertmanager --no-headers 2>/dev/null | wc -l | tr -d ' ')
+AM_RUNNING=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=alertmanager --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+GRAFANA_TOTAL=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=grafana --no-headers 2>/dev/null | wc -l | tr -d ' ')
+GRAFANA_RUNNING=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=grafana --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+# Operator uses app=kube-prometheus-stack-operator label
+OPERATOR_TOTAL=$(kubectl get pods -n "$NAMESPACE" -l app=kube-prometheus-stack-operator --no-headers 2>/dev/null | wc -l | tr -d ' ')
+OPERATOR_RUNNING=$(kubectl get pods -n "$NAMESPACE" -l app=kube-prometheus-stack-operator --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+NODE_EXP_TOTAL=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=prometheus-node-exporter --no-headers 2>/dev/null | wc -l | tr -d ' ')
+NODE_EXP_RUNNING=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=prometheus-node-exporter --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+KSM_TOTAL=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=kube-state-metrics --no-headers 2>/dev/null | wc -l | tr -d ' ')
+KSM_RUNNING=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=kube-state-metrics --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+# Calculate component total
+COMPONENT_TOTAL=$((PROM_TOTAL + AM_TOTAL + GRAFANA_TOTAL + OPERATOR_TOTAL + NODE_EXP_TOTAL + KSM_TOTAL))
+COMPONENT_RUNNING=$((PROM_RUNNING + AM_RUNNING + GRAFANA_RUNNING + OPERATOR_RUNNING + NODE_EXP_RUNNING + KSM_RUNNING))
+
+# All pods in namespace (for comparison)
+TOTAL_PODS=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+RUNNING_PODS=$(kubectl get pods -n "$NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+# Print component status
+print_component_status() {
+    local name="$1"
+    local running="$2"
+    local total="$3"
+    if [[ "$total" -eq 0 ]]; then
+        return
+    fi
+    if [[ "$running" -eq "$total" ]]; then
+        printf "  %-20s ${GREEN}%s/%s${NC}\n" "$name:" "$running" "$total"
+    else
+        printf "  %-20s ${RED}%s/%s${NC}\n" "$name:" "$running" "$total"
+    fi
+}
+
+print_component_status "Prometheus" "$PROM_RUNNING" "$PROM_TOTAL"
+print_component_status "Alertmanager" "$AM_RUNNING" "$AM_TOTAL"
+print_component_status "Grafana" "$GRAFANA_RUNNING" "$GRAFANA_TOTAL"
+print_component_status "Operator" "$OPERATOR_RUNNING" "$OPERATOR_TOTAL"
+print_component_status "Node Exporter" "$NODE_EXP_RUNNING" "$NODE_EXP_TOTAL"
+print_component_status "Kube State Metrics" "$KSM_RUNNING" "$KSM_TOTAL"
+echo "  ────────────────────────────"
+printf "  %-20s %s/%s\n" "Total:" "$COMPONENT_RUNNING" "$COMPONENT_TOTAL"
+
+# Show if there are unlabeled pods
+if [[ "$TOTAL_PODS" -ne "$COMPONENT_TOTAL" ]]; then
+    OTHER_PODS=$((TOTAL_PODS - COMPONENT_TOTAL))
+    printf "  ${YELLOW}%-20s %s${NC}\n" "Other pods:" "$OTHER_PODS"
+fi
+
+if [[ "$COMPONENT_TOTAL" -gt 0 ]]; then
+    if [[ "$COMPONENT_RUNNING" -eq "$COMPONENT_TOTAL" ]]; then
         echo "  ${GREEN}✓ All pods healthy${NC}"
     else
-        echo "  ${YELLOW}⚠ Some pods not running${NC}"
+        NOT_RUNNING=$((COMPONENT_TOTAL - COMPONENT_RUNNING))
+        echo "  ${RED}✗ $NOT_RUNNING pod(s) not running${NC}"
+        # Show non-running pods
+        kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -v "Running" | while read -r line; do
+            POD_NAME=$(echo "$line" | awk '{print $1}')
+            POD_STATUS=$(echo "$line" | awk '{print $3}')
+            echo "    ${YELLOW}- $POD_NAME ($POD_STATUS)${NC}"
+        done
     fi
 else
-    echo "  ${YELLOW}⚠ No Prometheus pods found with label app.kubernetes.io/name=prometheus${NC}"
+    echo "  ${YELLOW}⚠ No pods found in namespace $NAMESPACE${NC}"
 fi
 
 #############################################
