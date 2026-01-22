@@ -2,9 +2,118 @@
 
 Common questions and troubleshooting for Prometheus on Kubernetes.
 
-## How to find the number of targets Prometheus is scraping?
+## Table of Contents
 
-### Method 1: Using kubectl exec
+1. [Getting Started](#getting-started)
+   - [How to check Prometheus version?](#how-to-check-prometheus-version)
+   - [How to get current Prometheus configuration?](#how-to-get-current-prometheus-configuration)
+   - [How to check Prometheus logs?](#how-to-check-prometheus-logs)
+   - [How to reload Prometheus configuration?](#how-to-reload-prometheus-configuration)
+
+2. [Targets & Scraping](#targets--scraping)
+   - [How to find the number of targets?](#how-to-find-the-number-of-targets-prometheus-is-scraping)
+   - [How to check which targets are down?](#how-to-check-which-targets-are-down)
+   - [How to check scrape duration?](#how-to-check-scrape-duration)
+   - [How to list all ServiceMonitors?](#how-to-list-all-servicemonitors)
+   - [How to exclude namespaces/services from scraping?](#how-to-exclude-namespacesservices-from-scraping)
+
+3. [Resources & Sizing](#resources--sizing)
+   - [How to check Prometheus resource usage?](#how-to-check-prometheus-resource-usage)
+   - [How to check and modify Prometheus resources?](#how-to-check-and-modify-prometheus-resources)
+   - [Prometheus Sizing Guidelines](#resource-sizing-guidelines)
+   - [Alertmanager Sizing Guidelines](#alertmanager-sizing-guidelines)
+   - [Grafana Sizing Guidelines](#grafana-sizing-guidelines)
+   - [Complete Stack Sizing Examples](#complete-stack-sizing-examples)
+
+4. [Storage](#storage)
+   - [How to check PVC status?](#how-to-check-pvc-status)
+   - [How to setup EKS storage (gp3)?](#how-to-setup-eks-storage-gp3-storageclass)
+   - [How to check Prometheus retention?](#how-to-check-prometheus-retention)
+
+5. [Remote Write](#remote-write)
+   - [How to check if remote_write is enabled?](#how-to-check-if-remote_write-is-enabled)
+   - [How to verify remote_write is working?](#how-to-verify-remote_write-is-working)
+
+6. [Cardinality & Performance](#cardinality--performance)
+   - [How to analyze cardinality?](#how-to-analyze-cardinality-high-series-count)
+
+7. [Advanced Features](#advanced-features)
+   - [How to enable exemplars?](#how-to-enable-exemplars)
+
+8. [Troubleshooting](#troubleshooting)
+   - [How to troubleshoot external URL not accessible?](#how-to-troubleshoot-external-url-not-accessible)
+   - [How to check why pods are not scheduling?](#how-to-check-why-pods-are-not-scheduling)
+   - [How to access Grafana?](#how-to-access-grafana)
+
+9. [Quick Reference](#quick-reference---common-commands)
+
+---
+
+## Getting Started
+
+### How to check Prometheus version?
+
+```bash
+# Via Prometheus API
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/status/buildinfo' 2>/dev/null | jq -r '.data.version'
+
+# Via container image
+kubectl get pod prometheus-prometheus-kube-prometheus-prometheus-0 -n prometheus \
+  -o jsonpath='{.spec.containers[?(@.name=="prometheus")].image}' | cut -d: -f2
+```
+
+### How to get current Prometheus configuration?
+
+```bash
+# Get full config as YAML
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml'
+
+# Save config to file
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml' > prometheus-config.yaml
+
+# Get remote write config
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml' | grep -A 30 "remote_write:"
+
+# Get runtime flags
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/status/flags' 2>/dev/null | jq '.data'
+```
+
+### How to check Prometheus logs?
+
+```bash
+# Prometheus server logs
+kubectl logs -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus --tail=100
+
+# Config reloader logs
+kubectl logs -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c config-reloader --tail=100
+
+# Prometheus operator logs
+kubectl logs -n prometheus -l app.kubernetes.io/name=prometheus-operator --tail=100
+```
+
+### How to reload Prometheus configuration?
+
+```bash
+# Trigger config reload via API
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget --post-data='' -qO- http://localhost:9090/-/reload
+
+# Or kill the config-reloader sidecar (it will restart and reload)
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c config-reloader -- kill -HUP 1
+```
+
+---
+
+## Targets & Scraping
+
+### How to find the number of targets Prometheus is scraping?
+
+#### Method 1: Using kubectl exec
 
 ```bash
 # Get total count of active targets
@@ -17,7 +126,7 @@ kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
   jq -r '.data.activeTargets | group_by(.labels.job) | .[] | "\(.[0].labels.job): \(length)"'
 ```
 
-### Method 2: Using port-forward
+#### Method 2: Using port-forward
 
 ```bash
 # Port-forward to Prometheus
@@ -30,17 +139,16 @@ curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length'
 open http://localhost:9090/targets
 ```
 
-### Method 3: Using PromQL
+#### Method 3: Using PromQL
 
 ```bash
-# Query via API
 kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
   wget -qO- 'http://localhost:9090/api/v1/query?query=count(up)' 2>/dev/null | jq '.data.result[0].value[1]'
 ```
 
 Or run in Prometheus UI: `count(up)`
 
-## How to check which targets are down?
+### How to check which targets are down?
 
 ```bash
 # List unhealthy targets
@@ -51,7 +159,160 @@ kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
 
 Or run in Prometheus UI: `up == 0`
 
-## How to check Prometheus resource usage?
+### How to check scrape duration?
+
+```bash
+# Average scrape duration by job
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/query?query=scrape_duration_seconds' 2>/dev/null | \
+  jq -r '.data.result[] | "\(.metric.job): \(.value[1])s"'
+```
+
+### How to list all ServiceMonitors?
+
+```bash
+# List all ServiceMonitors in the cluster
+kubectl get servicemonitors -A
+
+# List ServiceMonitors in prometheus namespace
+kubectl get servicemonitors -n prometheus
+
+# View details of a specific ServiceMonitor
+kubectl get servicemonitor -n prometheus prometheus-kube-prometheus-prometheus -o yaml
+
+# List all scrape jobs
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/targets' 2>/dev/null | \
+  jq -r '.data.activeTargets | group_by(.scrapePool) | .[] | .[0].scrapePool' | sort
+
+# Count targets per job
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/targets' 2>/dev/null | \
+  jq -r '.data.activeTargets | group_by(.scrapePool) | .[] | "\(.[0].scrapePool): \(length)"'
+```
+
+### How to exclude namespaces/services from scraping?
+
+When scraping all namespaces (`serviceMonitorSelectorNilUsesHelmValues: false`), you may want to exclude specific namespaces, services, or metrics. Here are 6 methods:
+
+#### Method 1: Exclude by Namespace (Selector)
+
+```yaml
+prometheus:
+  prometheusSpec:
+    # Only scrape from namespaces with label "monitoring: enabled"
+    serviceMonitorNamespaceSelector:
+      matchLabels:
+        monitoring: enabled
+
+    # Or exclude specific namespaces using matchExpressions
+    serviceMonitorNamespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kube-public
+            - castai-agent
+```
+
+#### Method 2: Exclude by ServiceMonitor Labels
+
+```yaml
+prometheus:
+  prometheusSpec:
+    # Only scrape ServiceMonitors with specific label
+    serviceMonitorSelector:
+      matchLabels:
+        prometheus: main
+
+    # Or exclude ServiceMonitors with certain labels
+    serviceMonitorSelector:
+      matchExpressions:
+        - key: exclude-from-prometheus
+          operator: DoesNotExist
+```
+
+#### Method 3: Exclude using relabelConfigs (Most Flexible)
+
+```yaml
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigs:
+      - job_name: 'custom-job'
+        relabel_configs:
+          # Drop targets from specific namespaces
+          - source_labels: [__meta_kubernetes_namespace]
+            regex: 'kube-system|castai-agent|karpenter'
+            action: drop
+          # Drop targets with specific labels
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: 'some-app-to-exclude'
+            action: drop
+```
+
+#### Method 4: Exclude Metrics (metric_relabel_configs)
+
+Drop specific metrics after scraping:
+
+```yaml
+# In ServiceMonitor or additionalScrapeConfigs
+metricRelabelings:
+  # Drop high-cardinality metrics
+  - sourceLabels: [__name__]
+    regex: 'go_.*|process_.*'
+    action: drop
+  # Drop metrics with specific labels
+  - sourceLabels: [pod]
+    regex: '.*-canary-.*'
+    action: drop
+```
+
+#### Method 5: Disable Specific Kubernetes Components
+
+```yaml
+kubeApiServer:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+coreDns:
+  enabled: false
+kubelet:
+  enabled: false
+```
+
+#### Method 6: Delete/Label Specific ServiceMonitor
+
+```bash
+# Delete ServiceMonitor
+kubectl delete servicemonitor -n analytics analytics-policy-management-service
+
+# Or add label to exclude (if using selector)
+kubectl label servicemonitor -n analytics analytics-policy-management-service exclude-from-prometheus=true
+```
+
+#### Quick Reference: What to Exclude
+
+| What to Exclude | Method |
+|-----------------|--------|
+| Entire namespace | `serviceMonitorNamespaceSelector` |
+| Specific ServiceMonitor | `serviceMonitorSelector` or delete it |
+| Specific pods/targets | `relabel_configs` with `action: drop` |
+| Specific metrics | `metric_relabel_configs` with `action: drop` |
+| K8s components | Set `kubeApiServer.enabled: false`, etc. |
+| By label | `matchExpressions` with `DoesNotExist` |
+
+---
+
+## Resources & Sizing
+
+### How to check Prometheus resource usage?
 
 ```bash
 # CPU and Memory
@@ -67,130 +328,10 @@ kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
   jq '.data.result[0].value[1]'
 ```
 
-## How to check scrape duration?
+### How to check and modify Prometheus resources?
 
-```bash
-# Average scrape duration by job
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/query?query=scrape_duration_seconds' 2>/dev/null | \
-  jq -r '.data.result[] | "\(.metric.job): \(.value[1])s"'
-```
+#### Check Actual Resource Usage
 
-## How to list all ServiceMonitors?
-
-```bash
-# List all ServiceMonitors in the cluster
-kubectl get servicemonitors -A
-
-# List ServiceMonitors in prometheus namespace
-kubectl get servicemonitors -n prometheus
-
-# View details of a specific ServiceMonitor
-kubectl get servicemonitor -n prometheus prometheus-kube-prometheus-prometheus -o yaml
-```
-
-## How to reload Prometheus configuration?
-
-```bash
-# Trigger config reload via API
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget --post-data='' -qO- http://localhost:9090/-/reload
-
-# Or kill the config-reloader sidecar (it will restart and reload)
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c config-reloader -- kill -HUP 1
-```
-
-## How to check Prometheus logs?
-
-```bash
-# Prometheus server logs
-kubectl logs -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus --tail=100
-
-# Config reloader logs
-kubectl logs -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c config-reloader --tail=100
-
-# Prometheus operator logs
-kubectl logs -n prometheus -l app.kubernetes.io/name=prometheus-operator --tail=100
-```
-
-## How to access Grafana?
-
-```bash
-# Port-forward
-kubectl port-forward -n prometheus svc/prometheus-grafana 3000:80
-
-# Get credentials
-echo "Username: admin"
-echo "Password: $(kubectl get secret -n prometheus prometheus-grafana -o jsonpath='{.data.admin-password}' | base64 --decode)"
-
-# Open browser
-open http://localhost:3000
-```
-
-## How to check PVC status?
-
-```bash
-# List PVCs
-kubectl get pvc -n prometheus
-
-# Describe PVC for details
-kubectl describe pvc prometheus-prometheus-kube-prometheus-prometheus-db-prometheus-prometheus-kube-prometheus-prometheus-0 -n prometheus
-```
-
-## How to check why pods are not scheduling?
-
-```bash
-# Describe pod for events
-kubectl describe pod -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 | grep -A20 Events
-
-# Check node taints
-kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints
-
-# Check pod tolerations
-kubectl get pod -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -o jsonpath='{.spec.tolerations}' | jq
-```
-
-
-## How to check Prometheus version?
-
-```bash
-# Via Prometheus API
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/buildinfo' 2>/dev/null | jq -r '.data.version'
-
-# Via container image
-kubectl get pod prometheus-prometheus-kube-prometheus-prometheus-0 -n prometheus \
-  -o jsonpath='{.spec.containers[?(@.name=="prometheus")].image}' | cut -d: -f2
-```
-
-## How to check Prometheus retention?
-
-```bash
-# Check CRD
-kubectl get prometheus prometheus-kube-prometheus-prometheus -n prometheus -o jsonpath='{.spec.retention}'
-
-# Check from API
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/flags' 2>/dev/null | \
-  jq -r '.data["storage.tsdb.retention.time"]'
-
-# Change retention
-kubectl patch prometheus prometheus-kube-prometheus-prometheus -n prometheus \
-  --type=merge -p '{"spec":{"retention":"7d"}}'
-```
-
-### Common Retention Values
-
-| Use Case | Retention |
-|----------|-----------|
-| Stateless Forwarder | `2h` |
-| Development | `3d` - `7d` |
-| Default | `15d` |
-| Production | `15d` - `30d` |
-
-## How to check and modify Prometheus resources?
-
-### Check Actual Resource Usage
 ```bash
 # Memory and CPU from kubectl top
 kubectl top pod prometheus-prometheus-kube-prometheus-prometheus-0 -n prometheus --containers
@@ -206,13 +347,15 @@ kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
   jq -r '.data.result[0].value[1] | tonumber / 1024 / 1024 / 1024 | "TSDB Storage: \(.) GB"'
 ```
 
-### Check Configured Limits
+#### Check Configured Limits
+
 ```bash
 kubectl get pod prometheus-prometheus-kube-prometheus-prometheus-0 -n prometheus \
   -o jsonpath='{.spec.containers[?(@.name=="prometheus")].resources}' | jq .
 ```
 
-### Modify Resources
+#### Modify Resources
+
 ```bash
 # Update limits only
 kubectl patch prometheus prometheus-kube-prometheus-prometheus -n prometheus \
@@ -234,7 +377,7 @@ kubectl patch prometheus prometheus-kube-prometheus-prometheus -n prometheus \
 
 #### Memory Sizing (Primary Factor)
 
-Memory is the most critical resource for Prometheus. The rule of thumb:
+Memory is the most critical resource for Prometheus:
 
 | Active Series | Memory Request | Memory Limit | Notes |
 |---------------|----------------|--------------|-------|
@@ -264,8 +407,6 @@ CPU scales with scrape targets and query load:
 
 #### Storage Sizing
 
-Storage depends on retention, series count, and sample rate:
-
 | Active Series | Retention | Estimated Storage |
 |---------------|-----------|-------------------|
 | 100K | 15d | 5-10 GB |
@@ -287,19 +428,7 @@ When using remote_write to Mimir/Cortex/Thanos:
 | CPU | +10-30% for encoding/sending |
 | Network | ~1-2 KB/sample (compressed) |
 
-#### Quick Sizing Examples
-
-| Environment | Series | Targets | Retention | CPU | Memory | Storage |
-|-------------|--------|---------|-----------|-----|--------|---------|
-| Dev/Test | 50K | 50 | 3d | 200m/500m | 512Mi/1Gi | 10Gi |
-| Small Prod | 200K | 100 | 15d | 500m/1 | 2Gi/4Gi | 50Gi |
-| Medium Prod | 1M | 500 | 15d | 1/2 | 4Gi/8Gi | 100Gi |
-| Large Prod | 5M | 1000 | 30d | 2/4 | 16Gi/32Gi | 500Gi |
-| Enterprise | 10M+ | 2000+ | 30d | 4/8 | 32Gi/64Gi | 1Ti+ |
-
 #### Monitoring Your Sizing
-
-Use these metrics to validate sizing:
 
 ```bash
 # Check if memory is sufficient
@@ -325,25 +454,234 @@ predict_linear(prometheus_tsdb_storage_blocks_bytes[7d], 30*24*3600)  # 30-day p
 | Scrape timeouts | CPU or network | Increase CPU, check network |
 | Remote write lag | CPU or shards | Increase CPU, adjust shards |
 
-## How to check scrape targets and jobs?
+### Alertmanager Sizing Guidelines
 
-```bash
-# List all scrape jobs
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/targets' 2>/dev/null | \
-  jq -r '.data.activeTargets | group_by(.scrapePool) | .[] | .[0].scrapePool' | sort
+| Alert Volume | Replicas | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|--------------|----------|-------------|-----------|----------------|--------------|
+| < 100 alerts | 1 | 50m | 100m | 64Mi | 128Mi |
+| 100 - 500 alerts | 2 | 100m | 200m | 128Mi | 256Mi |
+| 500 - 1000 alerts | 3 | 100m | 200m | 256Mi | 512Mi |
+| 1000+ alerts | 3 | 200m | 500m | 512Mi | 1Gi |
 
-# Count targets per job
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/targets' 2>/dev/null | \
-  jq -r '.data.activeTargets | group_by(.scrapePool) | .[] | "\(.[0].scrapePool): \(length)"'
+**Notes:**
+- Use 3 replicas for HA in production
+- Memory scales with alert history retention (default: 120h)
+- CPU spikes during notification bursts
 
-# View full scrape config
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml' | head -100
+```yaml
+alertmanager:
+  alertmanagerSpec:
+    replicas: 3
+    retention: 120h
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
 ```
 
-## How to check if remote_write is enabled?
+### Grafana Sizing Guidelines
+
+| Users | Dashboards | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|-------|------------|-------------|-----------|----------------|--------------|
+| < 10 | Simple | 100m | 200m | 128Mi | 256Mi |
+| 10 - 50 | Moderate | 200m | 500m | 256Mi | 512Mi |
+| 50 - 100 | Complex | 500m | 1 | 512Mi | 1Gi |
+| 100+ | Heavy | 1 | 2 | 1Gi | 2Gi |
+
+**Notes:**
+- Memory increases with concurrent dashboard renders
+- CPU spikes during dashboard loads and query execution
+- Enable persistence for dashboard/user data (10Gi typically sufficient)
+
+```yaml
+grafana:
+  replicas: 1  # Use 2+ for HA with shared database
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 10Gi
+```
+
+### Node Exporter & Kube-State-Metrics Sizing
+
+| Component | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|-----------|-------------|-----------|----------------|--------------|
+| Node Exporter | 50m | 100m | 32Mi | 64Mi |
+| Kube-State-Metrics | 100m | 200m | 128Mi | 256Mi |
+
+**Note:** Kube-State-Metrics memory scales with cluster size (pods, services, etc.)
+
+### Complete Stack Sizing Examples
+
+#### Small Environment (Dev/Test)
+```yaml
+# ~50K series, 50 targets, 10 users
+prometheus:
+  prometheusSpec:
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits: { cpu: 500m, memory: 1Gi }
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { cpu: 100m, memory: 128Mi }
+grafana:
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 200m, memory: 256Mi }
+```
+
+#### Medium Environment (Production)
+```yaml
+# ~500K series, 200 targets, 50 users
+prometheus:
+  prometheusSpec:
+    resources:
+      requests: { cpu: 1, memory: 4Gi }
+      limits: { cpu: 2, memory: 8Gi }
+alertmanager:
+  alertmanagerSpec:
+    replicas: 3
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: 200m, memory: 512Mi }
+grafana:
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+```
+
+#### Large Environment (Enterprise)
+```yaml
+# ~5M series, 1000 targets, 100+ users
+prometheus:
+  prometheusSpec:
+    resources:
+      requests: { cpu: 4, memory: 16Gi }
+      limits: { cpu: 8, memory: 32Gi }
+alertmanager:
+  alertmanagerSpec:
+    replicas: 3
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits: { cpu: 500m, memory: 1Gi }
+grafana:
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits: { cpu: 1, memory: 1Gi }
+```
+
+---
+
+## Storage
+
+### How to check PVC status?
+
+```bash
+# List PVCs
+kubectl get pvc -n prometheus
+
+# Describe PVC for details
+kubectl describe pvc prometheus-prometheus-kube-prometheus-prometheus-db-prometheus-prometheus-kube-prometheus-prometheus-0 -n prometheus
+```
+
+### How to setup EKS storage (gp3 StorageClass)?
+
+EKS requires the EBS CSI driver and a StorageClass for dynamic volume provisioning.
+
+#### Prerequisites: EBS CSI Driver
+
+```bash
+# Check if EBS CSI driver is installed
+kubectl get pods -n kube-system | grep ebs-csi
+
+# If not installed, enable the EKS addon
+aws eks create-addon \
+  --cluster-name <your-cluster-name> \
+  --addon-name aws-ebs-csi-driver \
+  --region <your-region>
+```
+
+#### Create gp3 StorageClass
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  fsType: ext4
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+EOF
+```
+
+#### Common PVC Issues
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `storageclass "gp3" not found` | StorageClass doesn't exist | Create gp3 StorageClass |
+| `unbound immediate PersistentVolumeClaims` | PVC can't bind | Check StorageClass, EBS CSI driver |
+| `waiting for first consumer` | Normal with `WaitForFirstConsumer` | Pod needs to be scheduled first |
+| `volume node affinity conflict` | AZ mismatch | Use `WaitForFirstConsumer` binding mode |
+
+#### gp2 vs gp3 Comparison
+
+| Feature | gp2 | gp3 |
+|---------|-----|-----|
+| Baseline IOPS | 3 IOPS/GB (min 100) | 3000 IOPS (included) |
+| Max IOPS | 16,000 | 16,000 |
+| Throughput | 250 MB/s | 125-1000 MB/s |
+| Cost | Higher for small volumes | 20% cheaper |
+
+**Recommendation**: Use gp3 for all new deployments.
+
+### How to check Prometheus retention?
+
+```bash
+# Check CRD
+kubectl get prometheus prometheus-kube-prometheus-prometheus -n prometheus -o jsonpath='{.spec.retention}'
+
+# Check from API
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+  wget -qO- 'http://localhost:9090/api/v1/status/flags' 2>/dev/null | \
+  jq -r '.data["storage.tsdb.retention.time"]'
+
+# Change retention
+kubectl patch prometheus prometheus-kube-prometheus-prometheus -n prometheus \
+  --type=merge -p '{"spec":{"retention":"7d"}}'
+```
+
+#### Common Retention Values
+
+| Use Case | Retention |
+|----------|-----------|
+| Stateless Forwarder | `2h` |
+| Development | `3d` - `7d` |
+| Default | `15d` |
+| Production | `15d` - `30d` |
+
+---
+
+## Remote Write
+
+### How to check if remote_write is enabled?
 
 ```bash
 # Check the Prometheus config directly
@@ -358,7 +696,7 @@ kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
 kubectl get prometheus prometheus-kube-prometheus-prometheus -n prometheus -o yaml | grep -A 30 "remoteWrite"
 ```
 
-## How to verify remote_write is working?
+### How to verify remote_write is working?
 
 ```bash
 # Total samples sent
@@ -387,9 +725,22 @@ kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
   jq -r '.data.result[] | "Lag: \(.value[1]) seconds"'
 ```
 
-## How to analyze cardinality (high series count)?
+#### Remote Write Health Reference
 
-### Quick Summary
+| Metric | Healthy | Warning | Critical |
+|--------|---------|---------|----------|
+| Pending Samples | < 10,000 | 10K - 100K | > 100K |
+| Failed Samples | 0 | < 100 | > 100 |
+| Lag (seconds) | < 60 | 60 - 300 | > 300 |
+
+---
+
+## Cardinality & Performance
+
+### How to analyze cardinality (high series count)?
+
+#### Quick Summary
+
 ```bash
 PROM_POD="prometheus-prometheus-kube-prometheus-prometheus-0"
 
@@ -419,7 +770,7 @@ kubectl exec -n prometheus $PROM_POD -c prometheus -- \
   jq -r '"Histogram buckets: \(.data.result[0].value[1])"'
 ```
 
-### Common High-Cardinality Culprits
+#### Common High-Cardinality Culprits
 
 | Pattern | Issue | Solution |
 |---------|-------|----------|
@@ -428,105 +779,26 @@ kubectl exec -n prometheus $PROM_POD -c prometheus -- \
 | `container_*` | Pod churn | Filter by namespace |
 | `*_by_id` | Unique IDs | Use labeldrop |
 
-## How to exclude services from scraping?
+---
 
-### Method 1: Delete ServiceMonitor (quick, temporary)
+## Advanced Features
 
-```bash
-# List ServiceMonitors
-kubectl get servicemonitors -n prometheus
-
-# Delete specific one
-kubectl delete servicemonitor <name> -n prometheus
-```
-
-**Note:** Recreated on next `helm upgrade`
-
-### Method 2: Disable via Helm values (permanent)
-
-See [README.md - Disable ServiceMonitors](../install/helm/kube-prometheus-stack/README.md#disable-servicemonitors) for Helm configuration.
-
-### Method 3: Use relabelings to drop targets
-
-Drop specific services or namespaces using relabel configs:
-
-```yaml
-prometheus:
-  prometheusSpec:
-    additionalScrapeConfigs:
-      - job_name: 'my-job'
-        relabel_configs:
-          # Drop specific service by name
-          - source_labels: [__meta_kubernetes_service_name]
-            regex: 'my-service-to-exclude'
-            action: drop
-          # Drop by namespace
-          - source_labels: [__meta_kubernetes_namespace]
-            regex: 'kube-system|logging|monitoring'
-            action: drop
-```
-
-### Method 4: Use ServiceMonitor selectors (recommended for multi-team)
-
-```yaml
-prometheus:
-  prometheusSpec:
-    serviceMonitorSelector:
-      matchLabels:
-        prometheus: main
-    serviceMonitorNamespaceSelector: {}
-```
-
-Then label ServiceMonitors you want scraped:
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: my-app
-  labels:
-    prometheus: main  # Will be scraped
-```
-
-### Method 5: Use annotation on Service
-
-```yaml
-# Service with skip annotation
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-service
-  annotations:
-    prometheus.io/scrape: "false"
-```
-
-### Quick Reference: What to use when
-
-| Scenario | Method |
-|----------|--------|
-| Disable built-in K8s components | Helm values |
-| Disable stack components | Helm values |
-| Exclude specific namespace | Relabel config |
-| Multi-team setup | ServiceMonitor selectors |
-| App-level control | Service annotation |
-| Quick testing | Delete ServiceMonitor |
-
-## How to enable exemplars?
+### How to enable exemplars?
 
 Exemplars link metrics to traces, enabling correlation between Prometheus metrics and distributed tracing systems (Jaeger, Tempo, etc.).
 
-### Enable via Helm values
+#### Enable via Helm values
 
 ```yaml
-# values.yaml
 prometheus:
   prometheusSpec:
     enableFeatures:
-      - exemplar-storage        # Store exemplars in TSDB
+      - exemplar-storage
     exemplars:
-      maxSize: 100000           # Max exemplars to store (default: 100000)
+      maxSize: 100000
 ```
 
-### Enable via kubectl patch
+#### Enable via kubectl patch
 
 ```bash
 kubectl patch prometheus prometheus-kube-prometheus-prometheus -n prometheus \
@@ -538,55 +810,15 @@ kubectl patch prometheus prometheus-kube-prometheus-prometheus -n prometheus \
   }'
 ```
 
-### Verify exemplars are enabled
+#### Verify exemplars are enabled
 
 ```bash
 # Check feature flags
 kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
   wget -qO- 'http://localhost:9090/api/v1/status/flags' 2>/dev/null | jq '.data["enable-feature"]'
-
-# Query exemplars API
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/query_exemplars?query=http_request_duration_seconds_bucket&start=2024-01-01T00:00:00Z&end=2024-12-31T23:59:59Z' 2>/dev/null | jq .
 ```
 
-### Requirements for exemplars to work
-
-1. **Application must expose exemplars** - Use OpenTelemetry SDK or Prometheus client libraries that support exemplars
-2. **Metrics must be histograms or counters** - Exemplars attach to these metric types
-3. **Include trace_id label** - Exemplars typically contain `trace_id` for linking to traces
-
-### Example: Go application with exemplars
-
-```go
-import (
-    "github.com/prometheus/client_golang/prometheus"
-    "github.com/prometheus/client_golang/prometheus/promauto"
-)
-
-var httpDuration = promauto.NewHistogramVec(
-    prometheus.HistogramOpts{
-        Name: "http_request_duration_seconds",
-        Help: "HTTP request duration with exemplars",
-    },
-    []string{"method", "path"},
-)
-
-// Record with exemplar
-httpDuration.WithLabelValues("GET", "/api").
-    (prometheus.ExemplarObserver).ObserveWithExemplar(
-        duration.Seconds(),
-        prometheus.Labels{"trace_id": traceID},
-    )
-```
-
-### Query exemplars in Grafana
-
-1. Add Prometheus datasource with exemplars enabled
-2. In Explore, toggle "Exemplars" button
-3. Click on exemplar dots to jump to trace
-
-### Memory considerations
+#### Memory considerations
 
 | maxSize | Memory (~) | Use Case |
 |---------|------------|----------|
@@ -594,6 +826,148 @@ httpDuration.WithLabelValues("GET", "/api").
 | 100000 | ~10MB | Default |
 | 500000 | ~50MB | High traffic |
 | 1000000 | ~100MB | Very high traffic |
+
+---
+
+## Troubleshooting
+
+### How to troubleshoot external URL not accessible?
+
+If Prometheus/Grafana ingress is created but the external URL is not accessible, follow these steps:
+
+#### Step 1: Verify Ingress is Created
+
+```bash
+kubectl get ingress -n prometheus
+kubectl describe ingress -n prometheus prometheus-kube-prometheus-prometheus
+```
+
+Check that ADDRESS is populated (should show Load Balancer hostname).
+
+#### Step 2: Check DNS Resolution
+
+```bash
+# Check if DNS resolves
+nslookup scnx-global-demo-use2-eks.securonix.net
+dig scnx-global-demo-use2-eks.securonix.net
+
+# If NXDOMAIN - DNS record doesn't exist
+```
+
+#### Step 3: Check External-DNS
+
+```bash
+# Check if external-dns pods are running
+kubectl get pods -A | grep external-dns
+
+# Check external-dns logs for your hostname
+kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=200 | grep -i "your-hostname"
+
+# Check for errors
+kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns --tail=100 | grep -i "error\|fail"
+
+# For internal ingress, check internal external-dns
+kubectl logs -n external-dns external-dns-internal-xxx --tail=100 | grep -i "error\|fail"
+```
+
+#### Step 4: Verify Annotations
+
+External-dns may filter by annotations. Check what filter is configured:
+
+```bash
+# Check external-dns configuration
+kubectl get deployment -n external-dns external-dns-internal -o yaml | grep -A20 "args:"
+```
+
+If you see `--annotation-filter=kubernetes.io/ingress.class in (nginx-internal)`, your ingress needs this annotation:
+
+```yaml
+ingress:
+  annotations:
+    kubernetes.io/ingress.class: nginx-internal  # Required for external-dns
+    external-dns.alpha.kubernetes.io/hostname: your-hostname.domain.com
+```
+
+#### Step 5: Check for TXT/CNAME Conflicts
+
+External-dns creates TXT records for ownership tracking. Conflicts can block all updates:
+
+```bash
+# Check Route53 for conflicting records
+aws route53 list-resource-record-sets --hosted-zone-id YOUR_ZONE_ID \
+  --query "ResourceRecordSets[?contains(Name, 'conflicting-hostname')]"
+```
+
+Error example:
+```
+InvalidChangeBatch: RRSet of type TXT with DNS name xxx.domain.com is not permitted
+because a conflicting RRSet of type CNAME with the same DNS name already exists
+```
+
+Fix: Delete the conflicting TXT or CNAME record in Route53.
+
+#### Step 6: Create DNS Record Manually (Workaround)
+
+If external-dns isn't working, create the record manually:
+
+```bash
+# Get the Load Balancer address from ingress
+kubectl get ingress -n prometheus -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
+
+# Create CNAME in Route53
+aws route53 change-resource-record-sets \
+  --hosted-zone-id YOUR_ZONE_ID \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "your-hostname.domain.com",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "your-load-balancer.region.elb.amazonaws.com"}]
+      }
+    }]
+  }'
+```
+
+#### Common Issues
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| DNS not resolving | `NXDOMAIN` | Check external-dns or create record manually |
+| Annotation filter | External-dns ignores ingress | Add `kubernetes.io/ingress.class` annotation |
+| TXT/CNAME conflict | External-dns batch fails | Delete conflicting records in Route53 |
+| Wrong external-dns | Using internal LB | Check `external-dns-internal` logs |
+| Ingress no ADDRESS | Empty ADDRESS field | Check ingress controller is running |
+
+---
+
+### How to check why pods are not scheduling?
+
+```bash
+# Describe pod for events
+kubectl describe pod -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 | grep -A20 Events
+
+# Check node taints
+kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints
+
+# Check pod tolerations
+kubectl get pod -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -o jsonpath='{.spec.tolerations}' | jq
+```
+
+### How to access Grafana?
+
+```bash
+# Port-forward
+kubectl port-forward -n prometheus svc/prometheus-grafana 3000:80
+
+# Get credentials
+echo "Username: admin"
+echo "Password: $(kubectl get secret -n prometheus prometheus-grafana -o jsonpath='{.data.admin-password}' | base64 --decode)"
+
+# Open browser
+open http://localhost:3000
+```
 
 ---
 
@@ -614,7 +988,7 @@ kubectl exec -n prometheus $PROM_POD -c prometheus -- \
 
 # Remote write rate (samples/sec)
 kubectl exec -n prometheus $PROM_POD -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/query?query=sum(rate(prometheus_remote_storage_samples_total[30m]))' 2>/dev/null | \
+  wget -qO- 'http://localhost:9090/api/v1/query?query=sum(rate(prometheus_remote_storage_samples_total[15m]))' 2>/dev/null | \
   jq -r '.data.result[0].value[1]'
 
 # Pending samples
@@ -628,36 +1002,10 @@ kubectl exec -n prometheus $PROM_POD -c prometheus -- \
   jq -r '.data.result[0].value[1]'
 
 # List ServiceMonitors
-kubectl get servicemonitors -n prometheus
+kubectl get servicemonitors -A
 
 # List scrape targets by job
 kubectl exec -n prometheus $PROM_POD -c prometheus -- \
   wget -qO- 'http://localhost:9090/api/v1/targets' 2>/dev/null | \
   jq -r '.data.activeTargets | group_by(.scrapePool) | .[] | "\(.[0].scrapePool): \(length)"'
-```
-
-
-## How to get current Prometheus configuration?
-
-```bash
-# Get full config as YAML
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml'
-
-# Save config to file
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml' > prometheus-config.yaml
-
-# Get specific sections
-# Remote write config
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml' | grep -A 30 "remote_write:"
-
-# Scrape configs
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/config' 2>/dev/null | jq -r '.data.yaml' | grep -A 10 "scrape_configs:"
-
-# Get runtime flags
-kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
-  wget -qO- 'http://localhost:9090/api/v1/status/flags' 2>/dev/null | jq '.data'
 ```
