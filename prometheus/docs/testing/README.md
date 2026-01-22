@@ -57,18 +57,32 @@ The Prometheus Testing Framework provides automated testing capabilities to vali
 
 ## Quick Start
 
+**Working Directory**: All commands must be run from the repository root:
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+cd /Users/snikam/Documents/git/sagarnikam123-blog-youtube-code-samples/prometheus
+```
 
-# Run sanity tests against local Docker deployment
-python3 -m tests.cli run --type sanity --platform docker
+**Install dependencies:**
+```bash
+pip install -r tests/requirements.txt
+```
+
+**Run tests:**
+```bash
+# Run sanity tests against local Minikube deployment
+python3 -m tests.cli run --type sanity --platform minikube
 
 # Run all tests on Minikube
 python3 -m tests.cli run --platform minikube
 
 # Run load tests with custom k6 options
-python3 -m tests.cli run --type load --platform eks --k6-vus 100 --k6-duration 30m
+python3 -m tests.cli run --type load --platform minikube --k6-vus 100 --k6-duration 30m
+
+# Check Prometheus status
+python3 -m tests.cli status --platform minikube
+
+# View framework info
+python3 -m tests.cli info
 ```
 
 See [Getting Started](./getting-started.md) for detailed setup instructions.
