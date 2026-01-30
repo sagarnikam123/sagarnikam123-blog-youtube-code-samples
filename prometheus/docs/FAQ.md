@@ -15,6 +15,9 @@ Common questions and troubleshooting for Prometheus on Kubernetes.
    - [How to check which targets are down?](#how-to-check-which-targets-are-down)
    - [How to check scrape duration?](#how-to-check-scrape-duration)
    - [How to list all ServiceMonitors?](#how-to-list-all-servicemonitors)
+   - [How to enable ServiceMonitor for a namespace?](#how-to-enable-servicemonitor-for-a-namespace)
+   - [How to enable PodMonitor for a namespace?](#how-to-enable-podmonitor-for-a-namespace)
+   - [ServiceMonitor vs PodMonitor - When to use which?](#servicemonitor-vs-podmonitor---when-to-use-which)
    - [How to exclude namespaces/services from scraping?](#how-to-exclude-namespacesservices-from-scraping)
 
 3. [Resources & Sizing](#resources--sizing)
@@ -189,6 +192,397 @@ kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
 kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
   wget -qO- 'http://localhost:9090/api/v1/targets' 2>/dev/null | \
   jq -r '.data.activeTargets | group_by(.scrapePool) | .[] | "\(.[0].scrapePool): \(length)"'
+```
+
+### How to enable ServiceMonitor for a namespace?
+
+This guide walks through enabling Prometheus to scrape metrics from a namespace using ServiceMonitor (e.g., `warpstream`).
+
+Use ServiceMonitor when a Service exists that exposes the metrics port.
+
+#### Step 1: Check if Already Being Scraped
+
+```bash
+# Check targets API
+curl -s "https://<prometheus-url>/prometheus/api/v1/targets" | jq '.data.activeTargets[] | select(.labels.namespace == "warpstream")'
+
+# Or in Grafana Explore
+up{namespace="warpstream"}
+
+# Or check Prometheus UI
+# Navigate to: https://<prometheus-url>/prometheus/targets?search=warpstream
+```
+
+If empty, the namespace is not being scraped.
+
+#### Step 2: Check Existing ServiceMonitor
+
+```bash
+# Check all ServiceMonitors across all namespaces
+kubectl get servicemonitor -A
+
+# Check specifically in warpstream namespace
+kubectl get servicemonitor -n warpstream
+```
+
+If "No resources found", you need to create one.
+
+#### Step 3: Check Services in the Namespace
+
+```bash
+kubectl get svc -n warpstream
+```
+
+Example output:
+
+```
+NAME                        TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)             AGE
+warpstream-agent            ClusterIP      172.20.197.188   <none>        9092/TCP,8080/TCP   182d
+warpstream-agent-headless   ClusterIP      None             <none>        9092/TCP,8080/TCP   182d
+warpstream-agent-kafka      LoadBalancer   172.20.60.194    <elb-url>     9093:30867/TCP      182d
+```
+
+Get service labels:
+
+```bash
+kubectl get svc warpstream-agent -n warpstream --show-labels
+```
+
+Example output:
+
+```
+NAME               TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)             AGE    LABELS
+warpstream-agent   ClusterIP   172.20.35.252   <none>        9092/TCP,8080/TCP   49d   app.kubernetes.io/instance=warpstream-agent,app.kubernetes.io/managed-by=Helm,app.kubernetes.io/name=warpstream-agent,app.kubernetes.io/version=v720,helm.sh/chart=warpstream-agent-0.15.78,prometheus=true
+```
+
+#### Step 4: Check Pods
+
+```bash
+kubectl get pods -n warpstream -o wide
+```
+
+Ensure pods are in `Running` state.
+
+#### Step 5: Check Metrics Endpoint Accessibility
+
+Test if the `/metrics` endpoint is exposed:
+
+```bash
+kubectl run curl-test --rm -it --restart=Never --image=curlimages/curl -- curl -s http://warpstream-agent.warpstream.svc:8080/metrics | head -20
+```
+
+If you see Prometheus metrics output (lines starting with `# HELP`, `# TYPE`), the endpoint is working.
+
+#### Step 6: Check Prometheus ServiceMonitor Selector
+
+Find what label selector your Prometheus operator uses:
+
+```bash
+kubectl get prometheus -n prometheus -o jsonpath='{.items[0].spec.serviceMonitorSelector}' | jq
+```
+
+- If `{}` (empty), Prometheus picks up all ServiceMonitors.
+- If specific labels are required, add them to your ServiceMonitor metadata.
+
+Also check namespace selector:
+
+```bash
+kubectl get prometheus -n prometheus -o jsonpath='{.items[0].spec.serviceMonitorNamespaceSelector}' | jq
+```
+
+- If `{}` (empty), Prometheus watches all namespaces.
+
+#### Step 7: Check Port Name
+
+Get the port names for the service:
+
+```bash
+kubectl get svc warpstream-agent -n warpstream -o jsonpath='{.spec.ports}' | jq
+```
+
+Example output:
+
+```json
+[
+  {"name": "kafka", "port": 9092, "protocol": "TCP", "targetPort": "kafka"},
+  {"name": "http", "port": 8080, "protocol": "TCP", "targetPort": "http"}
+]
+```
+
+The metrics port (8080) has name `http`.
+
+#### Step 8: Create ServiceMonitor
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: warpstream-agent
+  namespace: warpstream
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: warpstream-agent
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+```
+
+Apply it:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: warpstream-agent
+  namespace: warpstream
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: warpstream-agent
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+EOF
+```
+
+#### Step 9: Verify ServiceMonitor
+
+Check ServiceMonitor was created:
+
+```bash
+kubectl get servicemonitor -n warpstream
+```
+
+Wait ~30 seconds, then verify Prometheus is scraping:
+
+```bash
+curl -s "https://<prometheus-url>/prometheus/api/v1/targets" | jq '.data.activeTargets[] | select(.labels.namespace == "warpstream")'
+```
+
+Or in Grafana Explore:
+
+```promql
+up{namespace="warpstream"}
+```
+
+You should now see warpstream targets with value `1` (healthy).
+
+#### Troubleshooting
+
+If ServiceMonitor is created but targets don't appear:
+
+```bash
+# Check Prometheus operator logs
+kubectl logs -n prometheus -l app.kubernetes.io/name=prometheus-operator --tail=100 | grep -i "warpstream\|error"
+
+# Force Prometheus config reload
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- kill -HUP 1
+
+# Check if service labels match ServiceMonitor selector
+kubectl get svc -n warpstream -l app.kubernetes.io/name=warpstream-agent
+```
+
+### How to enable PodMonitor for a namespace?
+
+Use PodMonitor when pods expose metrics directly without a Service exposing the metrics port.
+
+Example: `spark-operator` exposes metrics on pod port 10254, but only has a webhook Service on port 443 (no metrics Service).
+
+#### Step 1: Check Services (confirm no metrics Service)
+
+```bash
+kubectl get svc -n spark-operator
+```
+
+Example output:
+
+```
+NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+spark-operator-webhook   ClusterIP   172.20.230.112   <none>        443/TCP   330d
+```
+
+Only webhook service exists — no metrics port exposed via Service.
+
+#### Step 2: Check Pod Ports
+
+```bash
+kubectl get pod -n spark-operator -l app.kubernetes.io/name=spark-operator -o jsonpath='{.items[0].spec.containers[*].ports}' | jq
+```
+
+Example output:
+
+```json
+[
+  {"containerPort": 10254, "name": "metrics", "protocol": "TCP"}
+]
+```
+
+Metrics are exposed on pod port 10254 with name `metrics`.
+
+#### Step 3: Check Pod Labels
+
+```bash
+kubectl get pod -n spark-operator -l app.kubernetes.io/name=spark-operator -o jsonpath='{.items[0].metadata.labels}' | jq
+```
+
+Example output:
+
+```json
+{
+  "app.kubernetes.io/instance": "spark-operator",
+  "app.kubernetes.io/name": "spark-operator",
+  "pod-template-hash": "6b8c5ddd74"
+}
+```
+
+#### Step 4: Verify Metrics Endpoint
+
+```bash
+kubectl exec -n spark-operator deploy/spark-operator -- curl -s http://localhost:10254/metrics | head -15
+```
+
+Example output:
+
+```
+# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0.000136673
+...
+```
+
+#### Step 5: Check Prometheus PodMonitor Selector
+
+```bash
+kubectl get prometheus -n prometheus -o jsonpath='{.items[0].spec.podMonitorSelector}' | jq
+kubectl get prometheus -n prometheus -o jsonpath='{.items[0].spec.podMonitorNamespaceSelector}' | jq
+```
+
+- If `{}` (empty), Prometheus picks up all PodMonitors from all namespaces.
+
+#### Step 6: Create PodMonitor
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: spark-operator
+  namespace: spark-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spark-operator
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+```
+
+Apply it:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: spark-operator
+  namespace: spark-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spark-operator
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+EOF
+```
+
+#### Step 7: Verify PodMonitor
+
+```bash
+kubectl get podmonitor -n spark-operator
+```
+
+Wait ~30 seconds, then verify:
+
+```bash
+curl -s "https://<prometheus-url>/prometheus/api/v1/targets" | jq '.data.activeTargets[] | select(.labels.namespace == "spark-operator")'
+```
+
+Or in Grafana Explore:
+
+```promql
+up{namespace="spark-operator"}
+```
+
+#### Troubleshooting
+
+If PodMonitor is created but targets don't appear:
+
+```bash
+# Check if podMonitorSelectorNilUsesHelmValues is false
+kubectl get prometheus -n prometheus -o yaml | grep -i podmonitor
+
+# Force Prometheus config reload
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c prometheus -- kill -HUP 1
+
+# Check Prometheus operator logs
+kubectl logs -n prometheus -l app.kubernetes.io/name=prometheus-operator --tail=100 | grep -i "podmonitor\|error"
+```
+
+### ServiceMonitor vs PodMonitor - When to use which?
+
+| Criteria | ServiceMonitor | PodMonitor |
+|----------|----------------|------------|
+| Metrics exposed via Service | ✅ Use this | ❌ |
+| Metrics exposed only on Pod (no Service) | ❌ | ✅ Use this |
+| Service exists but metrics on different port | Create new Service or | ✅ Use this |
+| Multiple pods behind a Service | ✅ Use this | Works but less efficient |
+| Sidecar containers with metrics | ❌ | ✅ Use this |
+| DaemonSets without Service | ❌ | ✅ Use this |
+
+#### Examples
+
+| Application | Has Metrics Service? | Recommendation |
+|-------------|---------------------|----------------|
+| warpstream-agent | Yes (port 8080 `http`) | ServiceMonitor |
+| spark-operator | No (only webhook on 443, metrics on pod:10254) | PodMonitor |
+| nginx-ingress | Yes (metrics port) | ServiceMonitor |
+| node-exporter | Yes (DaemonSet with Service) | ServiceMonitor |
+| Custom sidecar | No | PodMonitor |
+
+#### Key Differences
+
+```yaml
+# ServiceMonitor - targets Service endpoints
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: warpstream-agent  # Matches Service labels
+  endpoints:                                     # Note: "endpoints"
+    - port: http
+
+# PodMonitor - targets Pods directly
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spark-operator    # Matches Pod labels
+  podMetricsEndpoints:                          # Note: "podMetricsEndpoints"
+    - port: metrics
+```
+
+#### Decision Flow
+
+```
+Does a Service exist that exposes the metrics port?
+├── Yes → Use ServiceMonitor (e.g., warpstream-agent)
+└── No
+    ├── Can you create a metrics Service? → Create Service + ServiceMonitor
+    └── No / Don't want to → Use PodMonitor (e.g., spark-operator)
 ```
 
 ### How to exclude namespaces/services from scraping?
