@@ -1,0 +1,140 @@
+# =============================================================================
+# Kong Prometheus Configuration for SkyWalking
+# =============================================================================
+# Kong has built-in Prometheus plugin - enable it to expose metrics
+#
+# This file shows how to:
+#   1. Enable Prometheus plugin in Kong
+#   2. Configure metrics endpoint
+#
+# Reference: https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-kong-monitoring/
+# =============================================================================
+
+# =============================================================================
+# Option 1: Kong Helm Values (if using Helm)
+# =============================================================================
+# Add to your Kong Helm values.yaml:
+#
+# env:
+#   plugins: bundled,prometheus
+#
+# serviceMonitor:
+#   enabled: true
+#
+# =============================================================================
+
+# =============================================================================
+# Option 2: Enable Prometheus Plugin via Kong Admin API
+# =============================================================================
+# After Kong is running, enable the Prometheus plugin globally:
+#
+# curl -X POST http://kong-admin:8001/plugins \
+#   -d "name=prometheus" \
+#   -d "config.per_consumer=false" \
+#   -d "config.status_code_metrics=true" \
+#   -d "config.latency_metrics=true" \
+#   -d "config.bandwidth_metrics=true" \
+#   -d "config.upstream_health_metrics=true"
+#
+# =============================================================================
+
+---
+# =============================================================================
+# Kong ConfigMap with Prometheus enabled
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config-example
+  namespace: kong  # Change to your Kong namespace
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: gateway-monitoring
+data:
+  # Kong declarative configuration (DB-less mode)
+  kong.yaml: |
+    _format_version: "3.0"
+
+    # Enable Prometheus plugin globally
+    plugins:
+      - name: prometheus
+        config:
+          per_consumer: false
+          status_code_metrics: true
+          latency_metrics: true
+          bandwidth_metrics: true
+          upstream_health_metrics: true
+
+---
+# =============================================================================
+# Kong Service with metrics port exposed
+# =============================================================================
+# Kong exposes metrics on the Admin API port (8001) at /metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-metrics
+  namespace: kong  # Change to your Kong namespace
+  labels:
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: gateway-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: admin
+      port: 8001
+      targetPort: 8001
+  selector:
+    app.kubernetes.io/name: kong
+
+---
+# =============================================================================
+# Example: Kong Deployment with Prometheus enabled
+# =============================================================================
+# Uncomment if you need a test Kong instance
+# =============================================================================
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: kong
+#   namespace: kong
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app.kubernetes.io/name: kong
+#   template:
+#     metadata:
+#       labels:
+#         app.kubernetes.io/name: kong
+#     spec:
+#       containers:
+#         - name: kong
+#           image: kong:3.5
+#           env:
+#             - name: KONG_DATABASE
+#               value: "off"
+#             - name: KONG_PROXY_LISTEN
+#               value: "0.0.0.0:8000"
+#             - name: KONG_ADMIN_LISTEN
+#               value: "0.0.0.0:8001"
+#             - name: KONG_PLUGINS
+#               value: "bundled,prometheus"
+#             - name: KONG_STATUS_LISTEN
+#               value: "0.0.0.0:8100"
+#             - name: KONG_DECLARATIVE_CONFIG
+#               value: "/kong/kong.yaml"
+#           ports:
+#             - name: proxy
+#               containerPort: 8000
+#             - name: admin
+#               containerPort: 8001
+#             - name: status
+#               containerPort: 8100
+#           volumeMounts:
+#             - name: config
+#               mountPath: /kong
+#       volumes:
+#         - name: config
+#           configMap:
+#             name: kong-config-example

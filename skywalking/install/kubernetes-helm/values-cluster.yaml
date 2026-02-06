@@ -1,0 +1,119 @@
+# =============================================================================
+# Apache SkyWalking Helm Chart - Cluster Mode with BanyanDB
+# =============================================================================
+# Production high-availability deployment
+# Install: helm install skywalking oci://registry-1.docker.io/apache/skywalking-helm -f values-cluster.yaml
+# =============================================================================
+
+# =============================================================================
+# OAP Server - Cluster Configuration
+# =============================================================================
+oap:
+  name: oap
+  image:
+    repository: skywalking.docker.scarf.sh/apache/skywalking-oap-server
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  # Storage type - using BanyanDB
+  storageType: banyandb
+
+  # Multiple replicas for HA
+  replicas: 3
+
+  # Service ports
+  ports:
+    grpc: 11800
+    rest: 12800
+
+  service:
+    type: ClusterIP
+
+  # Higher resources for production
+  javaOpts: -Xmx2g -Xms2g
+
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "2Gi"
+    limits:
+      cpu: "4000m"
+      memory: "4Gi"
+
+  # Pod anti-affinity for HA
+  antiAffinity: "hard"
+
+# =============================================================================
+# UI - Multiple Replicas
+# =============================================================================
+ui:
+  name: ui
+  replicas: 2
+  image:
+    repository: skywalking.docker.scarf.sh/apache/skywalking-ui
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    externalPort: 80
+    internalPort: 8080
+
+  # Enable ingress for external access
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: nginx
+    path: /
+    hosts:
+      - skywalking.local
+
+# =============================================================================
+# Elasticsearch - DISABLED
+# =============================================================================
+elasticsearch:
+  enabled: false
+
+# =============================================================================
+# BanyanDB - Production Configuration
+# =============================================================================
+banyandb:
+  enabled: true
+  image:
+    repository: apache/skywalking-banyandb
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+
+  # Standalone mode for single-node BanyanDB
+  standalone:
+    enabled: true
+
+  # Cluster mode (enable for BanyanDB cluster)
+  cluster:
+    enabled: false
+    # liaison:
+    #   replicas: 2
+    # data:
+    #   replicas: 3
+
+  # Higher resources for production
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "2Gi"
+    limits:
+      cpu: "4000m"
+      memory: "4Gi"
+
+  # Persistence with larger storage
+  storage:
+    enabled: true
+    persistentVolumeClaim:
+      storageClassName: ""
+      size: 100Gi
+
+# =============================================================================
+# Satellite (Optional)
+# =============================================================================
+satellite:
+  enabled: false

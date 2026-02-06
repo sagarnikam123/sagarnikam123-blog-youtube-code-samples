@@ -1,0 +1,101 @@
+# =============================================================================
+# SkyWalking Java Agent Injection (SwAgent) Custom Resource
+# =============================================================================
+# Official sample: https://github.com/apache/skywalking-swck/blob/master/operator/config/samples/swagent.yaml
+# This enables automatic Java agent injection into pods
+# =============================================================================
+
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: SwAgent
+metadata:
+  name: swagent-default
+spec:
+  # Container matcher (empty = match all containers)
+  containerMatcher: ''
+
+  # Label selector for pods to inject
+  selector:
+    matchLabels:
+      swck-java-agent-injected: "true"
+
+  # Java sidecar configuration
+  javaSidecar:
+    name: swagent-java
+    image: apache/skywalking-java-agent:9.3.0-java17
+    env:
+      - name: SW_LOGGING_LEVEL
+        value: "INFO"
+      - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+        value: "skywalking-oap:11800"
+
+  # Shared volume name for agent files
+  sharedVolumeName: "sky-agent"
+
+---
+# =============================================================================
+# SwAgent with Optional Plugins
+# =============================================================================
+
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: SwAgent
+metadata:
+  name: swagent-with-plugins
+spec:
+  containerMatcher: ''
+  selector:
+    matchLabels:
+      swck-java-agent-injected: "true"
+
+  javaSidecar:
+    name: swagent-java
+    image: apache/skywalking-java-agent:9.3.0-java17
+    env:
+      - name: SW_LOGGING_LEVEL
+        value: "DEBUG"
+      - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+        value: "skywalking-oap:11800"
+
+  sharedVolumeName: "sky-agent"
+
+  # Optional plugins to enable
+  optionalPlugins:
+    - "webflux"
+    - "cloud-gateway-2.1.x"
+    - "trace-ignore"
+
+---
+# =============================================================================
+# Example: Deployment with Agent Injection
+# =============================================================================
+# Add these labels/annotations to your deployment to enable injection:
+#   labels:
+#     swck-java-agent-injected: "true"
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  labels:
+    app: demo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+        # Enable SkyWalking agent injection
+        swck-java-agent-injected: "true"
+    spec:
+      containers:
+        - name: demo-app
+          image: your-java-app:latest
+          ports:
+            - containerPort: 8080
+          env:
+            # Override service name
+            - name: SW_AGENT_NAME
+              value: "demo-app"

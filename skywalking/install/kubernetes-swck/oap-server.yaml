@@ -1,0 +1,38 @@
+# =============================================================================
+# SkyWalking OAPServer Custom Resource
+# =============================================================================
+# Official: https://github.com/apache/skywalking-swck/blob/master/operator/config/samples/default.yaml
+# SkyWalking: https://github.com/apache/skywalking
+# Note: OAPServer uses 'config' field for env vars (not 'env')
+# =============================================================================
+
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: OAPServer
+metadata:
+  name: skywalking
+spec:
+  # OAP Server version
+  version: 10.3.0
+
+  # Number of OAP replicas
+  instances: 1
+
+  # Container image
+  image: apache/skywalking-oap-server:10.3.0
+
+  # Environment configuration for BanyanDB storage
+  # Update banyandb-banyandb-grpc to match your BanyanDB service name
+  config:
+    - name: SW_STORAGE
+      value: banyandb
+    - name: SW_STORAGE_BANYANDB_TARGETS
+      value: "banyandb-banyandb-grpc:17912"
+    - name: SW_HEALTH_CHECKER
+      value: "default"
+    - name: JAVA_OPTS
+      value: "-Xms512m -Xmx1g"
+
+  # Service configuration
+  service:
+    template:
+      type: ClusterIP

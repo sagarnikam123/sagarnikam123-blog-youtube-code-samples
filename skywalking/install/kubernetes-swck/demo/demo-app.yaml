@@ -1,0 +1,87 @@
+# =============================================================================
+# Demo Application with SkyWalking Java Agent Auto-Injection
+# =============================================================================
+# This deploys a simple Spring Boot app instrumented by SWCK's SwAgent
+# =============================================================================
+
+---
+# SwAgent CR - enables Java agent auto-injection
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: SwAgent
+metadata:
+  name: demo-agent
+spec:
+  # Selector for pods to inject
+  selector:
+    matchLabels:
+      swck-java-agent-injected: "true"
+
+  # Java agent configuration
+  javaSidecar:
+    name: swck-java-agent
+    image: apache/skywalking-java-agent:9.3.0-java17
+    env:
+      - name: SW_AGENT_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.labels['app']
+      - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+        value: "skywalking-oap-oap:11800"
+      - name: SW_LOGGING_OUTPUT
+        value: "CONSOLE"
+      - name: SW_AGENT_TRACE_IGNORE_PATH
+        value: "/health,/actuator/**"
+
+---
+# Demo Spring Boot Application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  labels:
+    app: demo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+        # This label triggers SWCK agent injection
+        swck-java-agent-injected: "true"
+    spec:
+      containers:
+        - name: app
+          # Using a public Spring Boot demo image
+          image: ghcr.io/pavolloffay/spring-petclinic:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/sky/agent/skywalking-agent.jar"
+            - name: SW_AGENT_NAME
+              value: "demo-app"
+            - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+              value: "skywalking-oap-oap:11800"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app
+spec:
+  selector:
+    app: demo-app
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

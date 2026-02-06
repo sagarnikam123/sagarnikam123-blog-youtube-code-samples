@@ -1,0 +1,135 @@
+# =============================================================================
+# OTel Collector Scrape Configs for Gateway Monitoring
+# =============================================================================
+# Add these scrape configs to your OTel Collector ConfigMap
+# to enable Gateway monitoring in SkyWalking UI
+#
+# Menu locations:
+#   - Gateway → NGINX
+#   - Gateway → APISIX
+#   - Gateway → Kong
+#
+# Prerequisites:
+#   1. Enable gateway rules in OAP:
+#      SW_OTEL_RECEIVER_ENABLED_OC_RULES: "nginx,apisix,kong,..."
+#   2. Deploy the respective exporters/enable metrics
+# =============================================================================
+
+# Add these to your otel-collector ConfigMap under receivers.prometheus.config.scrape_configs:
+
+# =============================================================================
+# NGINX Monitoring
+# =============================================================================
+# Requires: nginx-prometheus-exporter deployed
+# Menu: Gateway → NGINX
+#
+# - job_name: 'nginx-monitoring'
+#   scrape_interval: 15s
+#   static_configs:
+#     - targets: ['nginx-exporter.skywalking:9113']
+#   relabel_configs:
+#     - source_labels: [__address__]
+#       target_label: service
+#       regex: '(.+):.*'
+#       replacement: 'nginx::nginx'
+#     - target_label: layer
+#       replacement: NGINX
+
+# =============================================================================
+# APISIX Monitoring
+# =============================================================================
+# Requires: APISIX with Prometheus plugin enabled
+# Menu: Gateway → APISIX
+#
+# - job_name: 'apisix-monitoring'
+#   scrape_interval: 15s
+#   static_configs:
+#     - targets: ['apisix-metrics.apisix:9091']
+#   relabel_configs:
+#     - source_labels: [__address__]
+#       target_label: service
+#       regex: '(.+):.*'
+#       replacement: 'apisix::apisix'
+#     - target_label: layer
+#       replacement: APISIX
+
+# =============================================================================
+# Kong Monitoring
+# =============================================================================
+# Requires: Kong with Prometheus plugin enabled
+# Menu: Gateway → Kong
+#
+# - job_name: 'kong-monitoring'
+#   scrape_interval: 15s
+#   metrics_path: /metrics
+#   static_configs:
+#     - targets: ['kong-metrics.kong:8001']
+#   relabel_configs:
+#     - source_labels: [__address__]
+#       target_label: service
+#       regex: '(.+):.*'
+#       replacement: 'kong::kong'
+#     - target_label: layer
+#       replacement: KONG
+
+# =============================================================================
+# Complete Example ConfigMap
+# =============================================================================
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-gateway-config
+  namespace: skywalking
+  labels:
+    app.kubernetes.io/name: otel-collector
+    app.kubernetes.io/component: gateway-monitoring
+data:
+  gateway-scrape-configs.yaml: |
+    # =================================================================
+    # GATEWAY MONITORING
+    # Required for: Gateway menu in SkyWalking UI
+    # =================================================================
+
+    # Nginx Monitoring
+    # Menu: Gateway → NGINX
+    - job_name: 'nginx-monitoring'
+      scrape_interval: 15s
+      static_configs:
+        - targets: ['nginx-exporter.skywalking:9113']
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: service
+          regex: '(.+):.*'
+          replacement: 'nginx::nginx'
+        - target_label: layer
+          replacement: NGINX
+
+    # APISIX Monitoring
+    # Menu: Gateway → APISIX
+    - job_name: 'apisix-monitoring'
+      scrape_interval: 15s
+      static_configs:
+        - targets: ['apisix-metrics.apisix:9091']
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: service
+          regex: '(.+):.*'
+          replacement: 'apisix::apisix'
+        - target_label: layer
+          replacement: APISIX
+
+    # Kong Monitoring
+    # Menu: Gateway → Kong
+    - job_name: 'kong-monitoring'
+      scrape_interval: 15s
+      metrics_path: /metrics
+      static_configs:
+        - targets: ['kong-metrics.kong:8001']
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: service
+          regex: '(.+):.*'
+          replacement: 'kong::kong'
+        - target_label: layer
+          replacement: KONG

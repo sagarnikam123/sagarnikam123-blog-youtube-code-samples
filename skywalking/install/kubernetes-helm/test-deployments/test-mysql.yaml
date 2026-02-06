@@ -1,0 +1,99 @@
+# =============================================================================
+# Test MySQL Deployment for Database Monitoring
+# =============================================================================
+# Deploys: MySQL + mysqld-exporter
+# Tests: Database → MySQL menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-mysql.yaml -n skywalking
+#   kubectl exec -it deploy/test-mysql -c mysql -- mysql -uroot -ptest123
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-mysql-secret
+  labels:
+    app: test-mysql
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "test123"
+  MYSQL_USER: "exporter"
+  MYSQL_PASSWORD: "exporter123"
+  # Exporter connection string
+  DATA_SOURCE_NAME: "exporter:exporter123@tcp(localhost:3306)/"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-mysql
+  labels:
+    app: test-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-mysql
+  template:
+    metadata:
+      labels:
+        app: test-mysql
+    spec:
+      containers:
+        # MySQL Server
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # MySQL Exporter (sidecar)
+        - name: mysql-exporter
+          image: prom/mysqld-exporter:v0.16.0
+          ports:
+            - name: metrics
+              containerPort: 9104
+          env:
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: test-mysql-secret
+                  key: DATA_SOURCE_NAME
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-mysql
+  labels:
+    app: test-mysql
+spec:
+  type: ClusterIP
+  ports:
+    - name: mysql
+      port: 3306
+    - name: metrics
+      port: 9104
+  selector:
+    app: test-mysql

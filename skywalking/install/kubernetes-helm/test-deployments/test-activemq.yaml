@@ -1,0 +1,113 @@
+# =============================================================================
+# Test ActiveMQ Deployment for Message Queue Monitoring
+# =============================================================================
+# Deploys: Apache ActiveMQ Classic + JMX Exporter
+# Tests: MQ → ActiveMQ menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-activemq.yaml -n skywalking
+#   kubectl port-forward svc/test-activemq 8161:8161 -n skywalking
+#   # Open http://localhost:8161/admin (admin/admin)
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-activemq-jmx-config
+  labels:
+    app: test-activemq
+data:
+  jmx-config.yaml: |
+    ---
+    hostPort: localhost:1099
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    rules:
+      - pattern: '.*'
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-activemq
+  labels:
+    app: test-activemq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-activemq
+  template:
+    metadata:
+      labels:
+        app: test-activemq
+    spec:
+      containers:
+        # ActiveMQ Classic
+        - name: activemq
+          image: apache/activemq-classic:6.1.2
+          ports:
+            - name: openwire
+              containerPort: 61616
+            - name: amqp
+              containerPort: 5672
+            - name: web
+              containerPort: 8161
+            - name: jmx
+              containerPort: 1099
+          env:
+            - name: ACTIVEMQ_JMX_REMOTE_HOST
+              value: "localhost"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # JMX Exporter sidecar
+        - name: jmx-exporter
+          image: bitnami/jmx-exporter:0.20.0
+          ports:
+            - name: metrics
+              containerPort: 9404
+          args:
+            - "9404"
+            - /config/jmx-config.yaml
+          volumeMounts:
+            - name: jmx-config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: jmx-config
+          configMap:
+            name: test-activemq-jmx-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-activemq
+  labels:
+    app: test-activemq
+spec:
+  type: ClusterIP
+  ports:
+    - name: openwire
+      port: 61616
+    - name: amqp
+      port: 5672
+    - name: web
+      port: 8161
+    - name: metrics
+      port: 9404
+  selector:
+    app: test-activemq

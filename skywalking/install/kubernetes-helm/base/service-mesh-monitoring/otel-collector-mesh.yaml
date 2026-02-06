@@ -1,0 +1,69 @@
+# =============================================================================
+# OTel Collector Scrape Configs for Service Mesh Monitoring
+# =============================================================================
+# Add these scrape configs to your OTel Collector configuration
+# for Istio control plane and data plane metrics.
+#
+# Required OAP Rules:
+#   SW_OTEL_RECEIVER_ENABLED_OC_RULES: "istio-controlplane"
+# =============================================================================
+
+# Add these jobs to your OTel Collector's prometheus receiver config:
+# receivers:
+#   prometheus:
+#     config:
+#       scrape_configs:
+
+# =============================================================================
+# Istio Control Plane (istiod) Metrics
+# Menu: Service Mesh → Control Plane
+# =============================================================================
+- job_name: 'istio-controlplane'
+  scrape_interval: 15s
+  kubernetes_sd_configs:
+    - role: pod
+      namespaces:
+        names:
+          - istio-system
+  relabel_configs:
+    # Only scrape istiod pods
+    - source_labels: [__meta_kubernetes_pod_label_app]
+      regex: istiod
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_container_port_number]
+      regex: "15014"
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_ip]
+      target_label: __address__
+      replacement: $1:15014
+    - target_label: service
+      replacement: istio-controlplane
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# Istio Data Plane (Envoy Sidecar) Metrics
+# Menu: Service Mesh → Data Plane
+# =============================================================================
+- job_name: 'istio-dataplane'
+  scrape_interval: 15s
+  kubernetes_sd_configs:
+    - role: pod
+  relabel_configs:
+    # Only scrape pods with istio sidecar
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+      regex: "true"
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_annotation_sidecar_istio_io_status]
+      regex: ".+"
+      action: keep
+    # Scrape envoy stats port
+    - source_labels: [__meta_kubernetes_pod_ip]
+      target_label: __address__
+      replacement: $1:15090
+    - source_labels: [__meta_kubernetes_namespace]
+      target_label: namespace
+    - source_labels: [__meta_kubernetes_pod_name]
+      target_label: pod
+    - target_label: cluster
+      replacement: minikube

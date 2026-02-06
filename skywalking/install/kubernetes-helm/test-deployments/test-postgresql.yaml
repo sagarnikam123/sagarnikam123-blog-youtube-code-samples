@@ -1,0 +1,97 @@
+# =============================================================================
+# Test PostgreSQL Deployment for Database Monitoring
+# =============================================================================
+# Deploys: PostgreSQL + postgres-exporter
+# Tests: Database → PostgreSQL menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-postgresql.yaml -n skywalking
+#   kubectl exec -it deploy/test-postgresql -c postgres -- psql -U postgres
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-postgresql-secret
+  labels:
+    app: test-postgresql
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "test123"
+  # Exporter connection string
+  DATA_SOURCE_NAME: "postgresql://postgres:test123@localhost:5432/postgres?sslmode=disable"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-postgresql
+  labels:
+    app: test-postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-postgresql
+  template:
+    metadata:
+      labels:
+        app: test-postgresql
+    spec:
+      containers:
+        # PostgreSQL Server
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-postgresql-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # PostgreSQL Exporter (sidecar)
+        - name: postgres-exporter
+          image: prometheuscommunity/postgres-exporter:v0.16.0
+          ports:
+            - name: metrics
+              containerPort: 9187
+          env:
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: test-postgresql-secret
+                  key: DATA_SOURCE_NAME
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-postgresql
+  labels:
+    app: test-postgresql
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+    - name: metrics
+      port: 9187
+  selector:
+    app: test-postgresql

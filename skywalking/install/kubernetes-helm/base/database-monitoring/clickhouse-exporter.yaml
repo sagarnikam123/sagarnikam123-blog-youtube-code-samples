@@ -1,0 +1,93 @@
+# =============================================================================
+# ClickHouse Prometheus Exporter for SkyWalking
+# =============================================================================
+# Exports ClickHouse metrics for SkyWalking monitoring
+#
+# Prerequisites:
+#   - ClickHouse server running
+#   - Network access to ClickHouse HTTP interface
+#
+# Required OAP Rule: clickhouse
+# SkyWalking Menu: Database → ClickHouse
+#
+# References:
+#   - https://github.com/ClickHouse/clickhouse_exporter
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-clickhouse-monitoring/
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-exporter-secret
+  labels:
+    app.kubernetes.io/name: clickhouse-exporter
+type: Opaque
+stringData:
+  CLICKHOUSE_USER: "default"
+  CLICKHOUSE_PASSWORD: "your-password"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse-exporter
+  labels:
+    app.kubernetes.io/name: clickhouse-exporter
+    app.kubernetes.io/component: database-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clickhouse-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9363"
+    spec:
+      containers:
+        - name: clickhouse-exporter
+          image: f1yegor/clickhouse-exporter:latest
+          ports:
+            - name: metrics
+              containerPort: 9363
+          env:
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-exporter-secret
+                  key: CLICKHOUSE_USER
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-exporter-secret
+                  key: CLICKHOUSE_PASSWORD
+          args:
+            - -scrape_uri=http://clickhouse-service:8123/
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-exporter
+  labels:
+    app.kubernetes.io/name: clickhouse-exporter
+    app.kubernetes.io/component: database-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9363
+      targetPort: 9363
+  selector:
+    app.kubernetes.io/name: clickhouse-exporter

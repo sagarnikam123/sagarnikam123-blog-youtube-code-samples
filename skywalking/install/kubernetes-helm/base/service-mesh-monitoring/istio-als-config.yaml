@@ -1,0 +1,120 @@
+# =============================================================================
+# Istio EnvoyFilter for SkyWalking ALS Integration
+# =============================================================================
+# Configures Envoy sidecars to send Access Log Service (ALS) data to SkyWalking
+#
+# Prerequisites:
+#   - Istio installed in the cluster
+#   - SkyWalking OAP with ALS receiver enabled
+#
+# SkyWalking Menu: Service Mesh → Services, Data Plane
+#
+# References:
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/envoy/als_setting/
+#   - https://istio.io/latest/docs/reference/config/networking/envoy-filter/
+# =============================================================================
+
+---
+# =============================================================================
+# EnvoyFilter for HTTP ALS
+# =============================================================================
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: skywalking-als-http
+  namespace: istio-system
+spec:
+  configPatches:
+    - applyTo: NETWORK_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+      patch:
+        operation: MERGE
+        value:
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            access_log:
+              - name: envoy.access_loggers.http_grpc
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+                  common_config:
+                    log_name: http-als
+                    transport_api_version: V3
+                    grpc_service:
+                      envoy_grpc:
+                        # SkyWalking OAP service address
+                        cluster_name: outbound|11800||skywalking-oap.skywalking.svc.cluster.local
+
+---
+# =============================================================================
+# EnvoyFilter for TCP ALS
+# =============================================================================
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: skywalking-als-tcp
+  namespace: istio-system
+spec:
+  configPatches:
+    - applyTo: NETWORK_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.tcp_proxy
+      patch:
+        operation: MERGE
+        value:
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+            access_log:
+              - name: envoy.access_loggers.tcp_grpc
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.TcpGrpcAccessLogConfig
+                  common_config:
+                    log_name: tcp-als
+                    transport_api_version: V3
+                    grpc_service:
+                      envoy_grpc:
+                        cluster_name: outbound|11800||skywalking-oap.skywalking.svc.cluster.local
+
+---
+# =============================================================================
+# Istio Telemetry API (Alternative to EnvoyFilter)
+# =============================================================================
+# For Istio 1.12+, you can use Telemetry API instead of EnvoyFilter
+# This is the recommended approach for newer Istio versions
+
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: skywalking-als
+  namespace: istio-system
+spec:
+  accessLogging:
+    - providers:
+        - name: skywalking
+      # Optionally filter which requests to log
+      # filter:
+      #   expression: response.code >= 400
+
+---
+# =============================================================================
+# MeshConfig Extension Provider (Required for Telemetry API)
+# =============================================================================
+# Add this to your Istio installation values or IstioOperator
+
+# meshConfig:
+#   extensionProviders:
+#     - name: skywalking
+#       envoyExtAuthzGrpc:
+#         service: skywalking-oap.skywalking.svc.cluster.local
+#         port: 11800
+#   defaultProviders:
+#     accessLogging:
+#       - skywalking

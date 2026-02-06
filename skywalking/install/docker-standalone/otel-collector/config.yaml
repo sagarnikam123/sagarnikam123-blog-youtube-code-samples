@@ -1,0 +1,309 @@
+# =============================================================================
+# OpenTelemetry Collector Configuration for SkyWalking
+# =============================================================================
+# This collector scrapes metrics from various exporters and sends them to
+# SkyWalking OAP server via OTLP protocol.
+#
+# IMPORTANT: job_name must match SkyWalking's OTel rules filter:
+#   - mysql-monitoring for MySQL
+#   - postgresql-monitoring for PostgreSQL
+#   - redis-monitoring for Redis
+#   - mongodb-monitoring for MongoDB
+#   - kafka-monitoring for Kafka
+#   - rabbitmq-monitoring for RabbitMQ
+#   - nginx-monitoring for Nginx
+#   - vm-monitoring for Linux VMs
+#   - oap-monitoring for OAP self-observability
+# =============================================================================
+
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        # -----------------------------------------------------------------------
+        # SkyWalking OAP Self-Observability
+        # -----------------------------------------------------------------------
+        - job_name: 'skywalking-so11y'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['oap:1234']
+              labels:
+                service: oap-server
+                host_name: oap-server
+
+        # -----------------------------------------------------------------------
+        # MySQL Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'mysql-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['mysqld-exporter:9104']
+              labels:
+                host_name: sample-mysql
+                service_instance_id: sample-mysql
+
+        # -----------------------------------------------------------------------
+        # PostgreSQL Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'postgresql-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['postgres-exporter:9187']
+              labels:
+                host_name: sample-postgresql
+                service_instance_id: sample-postgresql
+
+        # -----------------------------------------------------------------------
+        # Redis Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'redis-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['redis-exporter:9121']
+              labels:
+                host_name: sample-redis
+                service_instance_id: sample-redis
+
+        # -----------------------------------------------------------------------
+        # MongoDB Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'mongodb-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['mongodb-exporter:9216']
+              labels:
+                host_name: sample-mongodb
+                service_instance_id: sample-mongodb
+                cluster: sample-mongodb
+
+        # -----------------------------------------------------------------------
+        # Kafka Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'kafka-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['sample-kafka-exporter:9308']
+              labels:
+                host_name: sample-kafka
+                service_instance_id: sample-kafka
+                cluster: sample-kafka
+
+        # -----------------------------------------------------------------------
+        # RabbitMQ Monitoring (built-in Prometheus plugin)
+        # -----------------------------------------------------------------------
+        - job_name: 'rabbitmq-monitoring'
+          scrape_interval: 30s
+          metrics_path: /metrics
+          static_configs:
+            - targets: ['sample-rabbitmq:15692']
+              labels:
+                host_name: sample-rabbitmq
+                service_instance_id: sample-rabbitmq
+                cluster: sample-rabbitmq
+
+        # -----------------------------------------------------------------------
+        # Nginx Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'nginx-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['nginx-exporter:9113']
+              labels:
+                host_name: sample-nginx
+                service_instance_id: sample-nginx
+
+        # -----------------------------------------------------------------------
+        # Linux VM / Node Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'vm-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['node-exporter:9100']
+          relabel_configs:
+            - source_labels: [__address__]
+              regex: (.+)
+              target_label: node_identifier_host_name
+              replacement: docker-host
+
+        # -----------------------------------------------------------------------
+        # Elasticsearch Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'elasticsearch-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['elasticsearch-exporter:9114']
+              labels:
+                host_name: sample-elasticsearch
+                service_instance_id: sample-elasticsearch
+
+        # -----------------------------------------------------------------------
+        # BanyanDB Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'banyandb-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['banyandb:2121']
+              labels:
+                host_name: skywalking-banyandb
+                service_instance_id: skywalking-banyandb
+
+        # -----------------------------------------------------------------------
+        # APISIX Gateway Monitoring (built-in Prometheus plugin)
+        # -----------------------------------------------------------------------
+        - job_name: 'apisix-monitoring'
+          scrape_interval: 30s
+          metrics_path: /apisix/prometheus/metrics
+          static_configs:
+            - targets: ['sample-apisix:9091']
+              labels:
+                host_name: sample-apisix
+                service_instance_id: sample-apisix
+
+        # -----------------------------------------------------------------------
+        # Kong Gateway Monitoring (Status API)
+        # -----------------------------------------------------------------------
+        - job_name: 'kong-monitoring'
+          scrape_interval: 30s
+          metrics_path: /metrics
+          static_configs:
+            - targets: ['sample-kong:8001']
+              labels:
+                host_name: sample-kong
+                service_instance_id: sample-kong
+
+        # -----------------------------------------------------------------------
+        # Apache Flink Monitoring (built-in Prometheus reporter)
+        # -----------------------------------------------------------------------
+        - job_name: 'flink-jobManager-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['sample-flink-jobmanager:9249']
+              labels:
+                cluster: sample-flink
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: jobManager_node
+              replacement: $1
+          metric_relabel_configs:
+            - source_labels: [job_name]
+              action: replace
+              target_label: flink_job_name
+              replacement: $1
+            - source_labels: []
+              target_label: job_name
+              replacement: flink-jobManager-monitoring
+
+        - job_name: 'flink-taskManager-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['sample-flink-taskmanager:9249']
+              labels:
+                cluster: sample-flink
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: taskManager_node
+              replacement: $1
+          metric_relabel_configs:
+            - source_labels: [job_name]
+              action: replace
+              target_label: flink_job_name
+              replacement: $1
+            - source_labels: []
+              target_label: job_name
+              replacement: flink-taskManager-monitoring
+
+        # -----------------------------------------------------------------------
+        # Apache Pulsar Monitoring (built-in Prometheus metrics)
+        # -----------------------------------------------------------------------
+        - job_name: 'pulsar-monitoring'
+          scrape_interval: 30s
+          metrics_path: /metrics
+          static_configs:
+            - targets: ['sample-pulsar:8083']
+              labels:
+                host_name: sample-pulsar
+                service_instance_id: sample-pulsar
+                cluster: sample-pulsar
+
+        # -----------------------------------------------------------------------
+        # Apache RocketMQ Monitoring (via exporter)
+        # -----------------------------------------------------------------------
+        - job_name: 'rocketmq-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['sample-rocketmq-exporter:5557']
+              labels:
+                host_name: sample-rocketmq
+                service_instance_id: sample-rocketmq-broker
+                cluster: sample-rocketmq
+
+        # -----------------------------------------------------------------------
+        # Apache ActiveMQ Monitoring (built-in Prometheus metrics)
+        # -----------------------------------------------------------------------
+        - job_name: 'activemq-monitoring'
+          scrape_interval: 30s
+          metrics_path: /metrics
+          static_configs:
+            - targets: ['sample-activemq:8161']
+              labels:
+                host_name: sample-activemq
+                service_instance_id: sample-activemq
+                cluster: sample-activemq
+
+        # -----------------------------------------------------------------------
+        # ClickHouse Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'clickhouse-monitoring'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['skywalking-clickhouse-exporter:9116']
+              labels:
+                host_name: sample-clickhouse
+                service_instance_id: sample-clickhouse
+                cluster: sample-clickhouse
+
+        # -----------------------------------------------------------------------
+        # BookKeeper Monitoring
+        # -----------------------------------------------------------------------
+        - job_name: 'bookkeeper-monitoring'
+          scrape_interval: 30s
+          metrics_path: /metrics
+          static_configs:
+            - targets: ['sample-bookkeeper:8080']
+              labels:
+                cluster: sample-bookkeeper
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1000
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+exporters:
+  otlp:
+    endpoint: oap:11800
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [otlp]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888

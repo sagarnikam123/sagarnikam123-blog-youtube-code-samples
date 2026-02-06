@@ -1,0 +1,71 @@
+# =============================================================================
+# OTel Collector Scrape Configs for Cilium Monitoring
+# =============================================================================
+# Add these scrape configs to your OTel Collector configuration
+# for Cilium monitoring in SkyWalking.
+#
+# Required OAP Rules:
+#   SW_OTEL_RECEIVER_ENABLED_OC_RULES: "cilium-service"
+# =============================================================================
+
+# Add these jobs to your OTel Collector's prometheus receiver config:
+
+# =============================================================================
+# Cilium Agent Metrics (DaemonSet - all nodes)
+# Menu: Cilium → Cilium Service
+# =============================================================================
+- job_name: 'cilium-agent'
+  scrape_interval: 15s
+  kubernetes_sd_configs:
+    - role: pod
+      namespaces:
+        names:
+          - kube-system
+  relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_label_k8s_app]
+      regex: cilium
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_ip]
+      target_label: __address__
+      replacement: $1:9962
+    - source_labels: [__meta_kubernetes_pod_node_name]
+      target_label: node
+    - target_label: service
+      replacement: cilium::cilium-agent
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# Cilium Operator Metrics
+# =============================================================================
+- job_name: 'cilium-operator'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['cilium-operator-metrics.kube-system:9963']
+  relabel_configs:
+    - target_label: service
+      replacement: cilium::cilium-operator
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# Hubble Metrics (if Hubble is enabled)
+# =============================================================================
+- job_name: 'hubble'
+  scrape_interval: 15s
+  kubernetes_sd_configs:
+    - role: pod
+      namespaces:
+        names:
+          - kube-system
+  relabel_configs:
+    - source_labels: [__meta_kubernetes_pod_label_k8s_app]
+      regex: hubble-relay
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_ip]
+      target_label: __address__
+      replacement: $1:9965
+    - target_label: service
+      replacement: cilium::hubble
+    - target_label: cluster
+      replacement: minikube

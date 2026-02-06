@@ -1,0 +1,75 @@
+# =============================================================================
+# RocketMQ Prometheus Exporter for SkyWalking
+# =============================================================================
+# Exports RocketMQ metrics for SkyWalking monitoring
+#
+# Prerequisites:
+#   - RocketMQ cluster running (NameServer + Broker)
+#   - Network access to RocketMQ
+#
+# Required OAP Rule: rocketmq
+# SkyWalking Menu: MQ → RocketMQ
+#
+# References:
+#   - https://github.com/apache/rocketmq-exporter
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-rocketmq-monitoring/
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rocketmq-exporter
+  labels:
+    app.kubernetes.io/name: rocketmq-exporter
+    app.kubernetes.io/component: mq-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rocketmq-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rocketmq-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5557"
+    spec:
+      containers:
+        - name: rocketmq-exporter
+          image: apache/rocketmq-exporter:0.0.2
+          ports:
+            - name: metrics
+              containerPort: 5557
+          env:
+            # RocketMQ NameServer address
+            - name: rocketmq.config.namesrvAddr
+              value: "rocketmq-nameserver:9876"
+            # Enable broker metrics
+            - name: rocketmq.config.enableCollectBrokerRuntimeStats
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rocketmq-exporter
+  labels:
+    app.kubernetes.io/name: rocketmq-exporter
+    app.kubernetes.io/component: mq-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 5557
+      targetPort: 5557
+  selector:
+    app.kubernetes.io/name: rocketmq-exporter

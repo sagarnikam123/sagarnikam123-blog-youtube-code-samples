@@ -1,0 +1,170 @@
+# =============================================================================
+# Test Flink Deployment for Data Processing Monitoring
+# =============================================================================
+# Deploys: Apache Flink (Session Cluster - JobManager + TaskManager)
+# Tests: Flink menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-flink.yaml -n skywalking
+#   kubectl port-forward svc/test-flink-jobmanager 8081:8081 -n skywalking
+#   # Open http://localhost:8081 (Flink Dashboard)
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-flink-config
+  labels:
+    app: test-flink
+data:
+  flink-conf.yaml: |
+    jobmanager.rpc.address: test-flink-jobmanager
+    jobmanager.rpc.port: 6123
+    jobmanager.memory.process.size: 512m
+    taskmanager.memory.process.size: 512m
+    taskmanager.numberOfTaskSlots: 2
+    parallelism.default: 1
+
+    # Prometheus metrics
+    metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+    metrics.reporter.prom.port: 9249
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-flink-jobmanager
+  labels:
+    app: test-flink
+    component: jobmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-flink
+      component: jobmanager
+  template:
+    metadata:
+      labels:
+        app: test-flink
+        component: jobmanager
+    spec:
+      containers:
+        - name: jobmanager
+          image: flink:1.19-java11
+          args: ["jobmanager"]
+          ports:
+            - name: rpc
+              containerPort: 6123
+            - name: blob
+              containerPort: 6124
+            - name: webui
+              containerPort: 8081
+            - name: metrics
+              containerPort: 9249
+          env:
+            - name: FLINK_PROPERTIES
+              value: |
+                jobmanager.rpc.address: test-flink-jobmanager
+                metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+                metrics.reporter.prom.port: 9249
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /opt/flink/conf/flink-conf.yaml
+              subPath: flink-conf.yaml
+      volumes:
+        - name: config
+          configMap:
+            name: test-flink-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-flink-jobmanager
+  labels:
+    app: test-flink
+spec:
+  type: ClusterIP
+  ports:
+    - name: rpc
+      port: 6123
+    - name: blob
+      port: 6124
+    - name: webui
+      port: 8081
+    - name: metrics
+      port: 9249
+  selector:
+    app: test-flink
+    component: jobmanager
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-flink-taskmanager
+  labels:
+    app: test-flink
+    component: taskmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-flink
+      component: taskmanager
+  template:
+    metadata:
+      labels:
+        app: test-flink
+        component: taskmanager
+    spec:
+      containers:
+        - name: taskmanager
+          image: flink:1.19-java11
+          args: ["taskmanager"]
+          ports:
+            - name: data
+              containerPort: 6121
+            - name: rpc
+              containerPort: 6122
+            - name: metrics
+              containerPort: 9249
+          env:
+            - name: FLINK_PROPERTIES
+              value: |
+                jobmanager.rpc.address: test-flink-jobmanager
+                metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+                metrics.reporter.prom.port: 9249
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-flink-taskmanager
+  labels:
+    app: test-flink
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: metrics
+      port: 9249
+  selector:
+    app: test-flink
+    component: taskmanager

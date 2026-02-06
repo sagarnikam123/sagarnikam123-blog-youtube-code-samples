@@ -1,0 +1,833 @@
+# =============================================================================
+# Apache SkyWalking - Docker Standalone with Monitoring Features
+# =============================================================================
+# Single-node deployment with BanyanDB storage and optional monitoring
+#
+# Usage:
+#   Core only:        docker compose up -d
+#   With examples:    docker compose --profile examples up -d
+#   All services:     docker compose --profile examples --profile examples-mq --profile examples-gateway --profile examples-streaming --profile examples-data up -d
+#
+# Available profiles:
+#   - examples          : Basic sample services (MySQL, Redis, Nginx, PostgreSQL, MongoDB, Elasticsearch)
+#   - examples-mq       : Message queue samples (Kafka, RabbitMQ, Pulsar, RocketMQ, ActiveMQ)
+#   - examples-gateway  : API gateway samples (APISIX, Kong)
+#   - examples-streaming: Stream processing samples (Flink)
+#   - examples-data     : Data storage samples (ClickHouse, BookKeeper)
+#   - monitoring        : Enable all monitoring exporters (for external services)
+#   - infrastructure    : Linux VM monitoring (node-exporter)
+#
+# Individual service profiles:
+#   mysql, postgresql, redis, mongodb, elasticsearch, kafka, rabbitmq,
+#   pulsar, rocketmq, activemq, nginx, apisix, kong, flink, clickhouse, bookkeeper
+# =============================================================================
+
+services:
+  # ==========================================================================
+  # CORE SERVICES (Always Running)
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # BanyanDB Storage Backend
+  # --------------------------------------------------------------------------
+  banyandb:
+    image: apache/skywalking-banyandb:${BANYANDB_VERSION:-0.9.0}
+    container_name: skywalking-banyandb
+    restart: unless-stopped
+    ports:
+      - "${BANYANDB_GRPC_PORT:-17912}:17912"
+      - "${BANYANDB_HTTP_PORT:-17913}:17913"
+      - "${BANYANDB_METRICS_PORT:-2121}:2121"
+    volumes:
+      - banyandb-data:/data
+    command:
+      - standalone
+      - --metadata-root-path=/data
+      - --measure-root-path=/data
+      - --stream-root-path=/data
+      - --property-root-path=/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:17913/api/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - skywalking
+
+  # --------------------------------------------------------------------------
+  # SkyWalking OAP Server
+  # --------------------------------------------------------------------------
+  oap:
+    image: apache/skywalking-oap-server:${SKYWALKING_VERSION:-10.3.0}
+    container_name: skywalking-oap
+    restart: unless-stopped
+    depends_on:
+      banyandb:
+        condition: service_healthy
+    ports:
+      - "${OAP_GRPC_PORT:-11800}:11800"
+      - "${OAP_HTTP_PORT:-12800}:12800"
+    environment:
+      SW_STORAGE: banyandb
+      SW_STORAGE_BANYANDB_TARGETS: banyandb:17912
+      SW_HEALTH_CHECKER: default
+      # Self-observability - expose Prometheus metrics
+      SW_TELEMETRY: prometheus
+      SW_TELEMETRY_PROMETHEUS_HOST: 0.0.0.0
+      SW_TELEMETRY_PROMETHEUS_PORT: 1234
+      # OpenTelemetry Receiver
+      SW_OTEL_RECEIVER: default
+      SW_OTEL_RECEIVER_ENABLED_HANDLERS: otlp-metrics,otlp-logs,otlp-traces
+      # Enable OTel rules for all services
+      SW_OTEL_RECEIVER_ENABLED_OC_RULES: oap,vm,mysql,postgresql,redis,mongodb,elasticsearch,kafka,rabbitmq,pulsar,rocketmq,activemq,nginx,apisix,kong,flink,banyandb
+      # Data retention
+      SW_CORE_RECORD_DATA_TTL: ${RECORD_TTL:-3}
+      SW_CORE_METRICS_DATA_TTL: ${METRICS_TTL:-7}
+      # JVM settings
+      JAVA_OPTS: "${OAP_JAVA_OPTS:--Xms512m -Xmx1024m}"
+    volumes:
+      - ./ui-init-templates/menu.yaml:/skywalking/config/ui-initialized-templates/menu.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:12800/healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    networks:
+      - skywalking
+
+  # --------------------------------------------------------------------------
+  # SkyWalking UI
+  # --------------------------------------------------------------------------
+  ui:
+    image: apache/skywalking-ui:${SKYWALKING_VERSION:-10.3.0}
+    container_name: skywalking-ui
+    restart: unless-stopped
+    depends_on:
+      oap:
+        condition: service_healthy
+    ports:
+      - "${UI_PORT:-8080}:8080"
+    environment:
+      SW_OAP_ADDRESS: http://oap:12800
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # OPENTELEMETRY COLLECTOR
+  # ==========================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${OTEL_VERSION:-latest}
+    container_name: skywalking-otel-collector
+    restart: unless-stopped
+    profiles:
+      - monitoring
+      - examples
+      - mysql
+      - postgresql
+      - redis
+      - mongodb
+      - elasticsearch
+      - kafka
+      - rabbitmq
+      - pulsar
+      - rocketmq
+      - activemq
+      - nginx
+      - apisix
+      - kong
+      - flink
+      - banyandb
+      - infrastructure
+    depends_on:
+      oap:
+        condition: service_healthy
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+      - "${OTEL_METRICS_PORT:-8888}:8888"
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # DATABASE MONITORING EXPORTERS
+  # ==========================================================================
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:${MYSQLD_EXPORTER_VERSION:-v0.16.0}
+    container_name: skywalking-mysqld-exporter
+    restart: unless-stopped
+    profiles: [monitoring, examples, mysql]
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD:-exporterpassword}
+    command:
+      - --mysqld.address=${MYSQL_HOST:-sample-mysql}:${MYSQL_PORT:-3306}
+      - --mysqld.username=${MYSQL_USER:-exporter}
+    networks:
+      - skywalking
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:${POSTGRES_EXPORTER_VERSION:-v0.17.0}
+    container_name: skywalking-postgres-exporter
+    restart: unless-stopped
+    profiles: [monitoring, examples, postgresql]
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@${POSTGRES_HOST:-sample-postgresql}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}?sslmode=disable"
+    networks:
+      - skywalking
+
+  redis-exporter:
+    image: oliver006/redis_exporter:${REDIS_EXPORTER_VERSION:-v1.67.0}
+    container_name: skywalking-redis-exporter
+    restart: unless-stopped
+    profiles: [monitoring, examples, redis]
+    environment:
+      REDIS_ADDR: ${REDIS_HOST:-sample-redis}:${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    networks:
+      - skywalking
+
+  mongodb-exporter:
+    image: percona/mongodb_exporter:${MONGODB_EXPORTER_VERSION:-0.44.0}
+    container_name: skywalking-mongodb-exporter
+    restart: unless-stopped
+    profiles: [monitoring, examples, mongodb]
+    depends_on:
+      sample-mongodb:
+        condition: service_healthy
+    command:
+      - --mongodb.uri=mongodb://${MONGODB_HOST:-sample-mongodb}:${MONGODB_PORT:-27017}
+      - --collect-all
+      - --discovering-mode
+    networks:
+      - skywalking
+
+  elasticsearch-exporter:
+    image: quay.io/prometheuscommunity/elasticsearch-exporter:${ES_EXPORTER_VERSION:-v1.9.0}
+    container_name: skywalking-elasticsearch-exporter
+    restart: unless-stopped
+    profiles: [monitoring, examples, elasticsearch]
+    command:
+      - --es.uri=http://${ES_HOST:-sample-elasticsearch}:${ES_PORT:-9200}
+      - --es.all
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # MESSAGE QUEUE MONITORING EXPORTERS
+  # ==========================================================================
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:${KAFKA_EXPORTER_VERSION:-v1.9.0}
+    container_name: skywalking-kafka-exporter
+    restart: unless-stopped
+    profiles: [monitoring, kafka]
+    command:
+      - --kafka.server=${KAFKA_BROKERS:-kafka:9092}
+    networks:
+      - skywalking
+
+  rabbitmq-exporter:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: skywalking-rabbitmq-exporter
+    restart: unless-stopped
+    profiles: [monitoring, rabbitmq]
+    environment:
+      RABBIT_URL: http://${RABBITMQ_HOST:-rabbitmq}:${RABBITMQ_MANAGEMENT_PORT:-15672}
+      RABBIT_USER: ${RABBITMQ_USER:-guest}
+      RABBIT_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+    networks:
+      - skywalking
+
+  # Note: Pulsar has built-in Prometheus metrics at :8080/metrics
+  # Note: RocketMQ uses apache/rocketmq-exporter
+  # Note: ActiveMQ uses built-in Prometheus metrics or JMX exporter
+
+  # ==========================================================================
+  # GATEWAY MONITORING EXPORTERS
+  # ==========================================================================
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:${NGINX_EXPORTER_VERSION:-1.4.1}
+    container_name: skywalking-nginx-exporter
+    restart: unless-stopped
+    profiles: [monitoring, examples, nginx]
+    command:
+      - -nginx.scrape-uri=http://${NGINX_HOST:-sample-nginx}:${NGINX_PORT:-80}/nginx_status
+    networks:
+      - skywalking
+
+  # Note: APISIX has built-in Prometheus plugin at :9091/apisix/prometheus/metrics
+  # Note: Kong has built-in Prometheus plugin at :8001/metrics
+
+  # ==========================================================================
+  # STREAM PROCESSING MONITORING
+  # ==========================================================================
+
+  # Note: Flink has built-in Prometheus metrics at :9249/metrics
+
+  # ==========================================================================
+  # INFRASTRUCTURE MONITORING
+  # ==========================================================================
+
+  node-exporter:
+    image: prom/node-exporter:${NODE_EXPORTER_VERSION:-v1.9.0}
+    container_name: skywalking-node-exporter
+    restart: unless-stopped
+    profiles: [monitoring, infrastructure]
+    command:
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # SAMPLE SERVICES (For Testing/Demo)
+  # ==========================================================================
+
+  sample-mysql:
+    image: mysql:8.0
+    container_name: sample-mysql
+    restart: unless-stopped
+    profiles: [examples]
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: exporter
+      MYSQL_PASSWORD: exporterpassword
+    ports:
+      - "${SAMPLE_MYSQL_PORT:-3307}:3306"
+    volumes:
+      - sample-mysql-data:/var/lib/mysql
+      - ./examples/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-postgresql:
+    image: postgres:17-alpine
+    container_name: sample-postgresql
+    restart: unless-stopped
+    profiles: [examples]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    ports:
+      - "${SAMPLE_PG_PORT:-5433}:5432"
+    volumes:
+      - sample-postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-redis:
+    image: redis:7-alpine
+    container_name: sample-redis
+    restart: unless-stopped
+    profiles: [examples]
+    ports:
+      - "${SAMPLE_REDIS_PORT:-6379}:6379"
+    volumes:
+      - sample-redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-mongodb:
+    image: mongo:8
+    container_name: sample-mongodb
+    restart: unless-stopped
+    profiles: [examples]
+    ports:
+      - "${SAMPLE_MONGO_PORT:-27017}:27017"
+    volumes:
+      - sample-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+    container_name: sample-elasticsearch
+    restart: unless-stopped
+    profiles: [examples]
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "${SAMPLE_ES_PORT:-9200}:9200"
+    volumes:
+      - sample-elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-nginx:
+    image: nginx:1.27-alpine
+    container_name: sample-nginx
+    restart: unless-stopped
+    profiles: [examples]
+    ports:
+      - "${SAMPLE_NGINX_PORT:-8081}:80"
+    volumes:
+      - ./examples/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # MESSAGE QUEUE SAMPLE SERVICES
+  # ==========================================================================
+
+  sample-kafka:
+    image: apache/kafka:3.9.0
+    container_name: sample-kafka
+    restart: unless-stopped
+    profiles: [examples-mq, kafka]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://sample-kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@sample-kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "${SAMPLE_KAFKA_PORT:-9092}:9092"
+    volumes:
+      - sample-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - skywalking
+
+  sample-rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: sample-rabbitmq
+    restart: unless-stopped
+    profiles: [examples-mq, rabbitmq]
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "${SAMPLE_RABBITMQ_PORT:-5672}:5672"
+      - "${SAMPLE_RABBITMQ_MGMT_PORT:-15672}:15672"
+      - "${SAMPLE_RABBITMQ_PROM_PORT:-15692}:15692"
+    volumes:
+      - sample-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - skywalking
+
+  sample-pulsar:
+    image: apachepulsar/pulsar:4.0.2
+    container_name: sample-pulsar
+    restart: unless-stopped
+    profiles: [examples-mq, pulsar]
+    command: bin/pulsar standalone
+    ports:
+      - "${SAMPLE_PULSAR_PORT:-6650}:6650"
+      - "${SAMPLE_PULSAR_HTTP_PORT:-8082}:8080"
+    volumes:
+      - sample-pulsar-data:/pulsar/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/admin/v2/brokers/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks:
+      - skywalking
+
+  sample-rocketmq-namesrv:
+    image: rocketmqinc/rocketmq:4.4.0
+    container_name: sample-rocketmq-namesrv
+    restart: unless-stopped
+    profiles: [examples-mq, rocketmq]
+    command: sh mqnamesrv
+    ports:
+      - "${SAMPLE_ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+    volumes:
+      - sample-rocketmq-namesrv-data:/root/logs
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9876 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - skywalking
+
+  sample-rocketmq-broker:
+    image: rocketmqinc/rocketmq:4.4.0
+    container_name: sample-rocketmq-broker
+    restart: unless-stopped
+    profiles: [examples-mq, rocketmq]
+    depends_on:
+      sample-rocketmq-namesrv:
+        condition: service_healthy
+    command: sh mqbroker -n sample-rocketmq-namesrv:9876 autoCreateTopicEnable=true
+    ports:
+      - "${SAMPLE_ROCKETMQ_BROKER_PORT:-10911}:10911"
+    environment:
+      NAMESRV_ADDR: sample-rocketmq-namesrv:9876
+    volumes:
+      - sample-rocketmq-broker-data:/root/logs
+      - sample-rocketmq-broker-store:/root/store
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 10911 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - skywalking
+
+  sample-activemq:
+    image: apache/activemq-classic:6.1.5
+    container_name: sample-activemq
+    restart: unless-stopped
+    profiles: [examples-mq, activemq]
+    ports:
+      - "${SAMPLE_ACTIVEMQ_PORT:-61616}:61616"
+      - "${SAMPLE_ACTIVEMQ_WEB_PORT:-8161}:8161"
+    volumes:
+      - sample-activemq-data:/opt/apache-activemq/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u admin:admin http://localhost:8161/api/jolokia/read/org.apache.activemq:type=Broker,brokerName=localhost/BrokerVersion || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # GATEWAY SAMPLE SERVICES
+  # ==========================================================================
+
+  sample-apisix:
+    image: apache/apisix:3.11.0-debian
+    container_name: sample-apisix
+    restart: unless-stopped
+    profiles: [examples-gateway, apisix]
+    depends_on:
+      sample-apisix-etcd:
+        condition: service_healthy
+    ports:
+      - "${SAMPLE_APISIX_PORT:-9080}:9080"
+      - "${SAMPLE_APISIX_ADMIN_PORT:-9180}:9180"
+      - "${SAMPLE_APISIX_METRICS_PORT:-9091}:9091"
+    volumes:
+      - ./examples/apisix/config.yaml:/usr/local/apisix/conf/config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "apisix test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-apisix-etcd:
+    image: quay.io/coreos/etcd:v3.5.17
+    container_name: sample-apisix-etcd
+    restart: unless-stopped
+    profiles: [examples-gateway, apisix]
+    environment:
+      ETCD_ENABLE_V2: "true"
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://sample-apisix-etcd:2379
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-kong:
+    image: kong:3.9
+    container_name: sample-kong
+    restart: unless-stopped
+    profiles: [examples-gateway, kong]
+    depends_on:
+      sample-kong-db:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: sample-kong-db
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+    ports:
+      - "${SAMPLE_KONG_PROXY_PORT:-8000}:8000"
+      - "${SAMPLE_KONG_ADMIN_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-kong-db:
+    image: postgres:16-alpine
+    container_name: sample-kong-db
+    restart: unless-stopped
+    profiles: [examples-gateway, kong]
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
+      POSTGRES_DB: kong
+    volumes:
+      - sample-kong-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-kong-migration:
+    image: kong:3.9
+    container_name: sample-kong-migration
+    profiles: [examples-gateway, kong]
+    depends_on:
+      sample-kong-db:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: sample-kong-db
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    command: kong migrations bootstrap
+    restart: on-failure
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # STREAM PROCESSING SAMPLE SERVICES
+  # ==========================================================================
+
+  sample-flink-jobmanager:
+    image: flink:1.20-java17
+    container_name: sample-flink-jobmanager
+    restart: unless-stopped
+    profiles: [examples-streaming, flink]
+    command: jobmanager
+    ports:
+      - "${SAMPLE_FLINK_UI_PORT:-8084}:8081"
+      - "${SAMPLE_FLINK_METRICS_PORT:-9249}:9249"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: sample-flink-jobmanager
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.host: 0.0.0.0
+        metrics.reporter.prom.port: 9249
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-flink-taskmanager:
+    image: flink:1.20-java17
+    container_name: sample-flink-taskmanager
+    restart: unless-stopped
+    profiles: [examples-streaming, flink]
+    depends_on:
+      - sample-flink-jobmanager
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: sample-flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.host: 0.0.0.0
+        metrics.reporter.prom.port: 9249
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # DATA STORAGE SAMPLE SERVICES
+  # ==========================================================================
+
+  sample-clickhouse:
+    image: clickhouse/clickhouse-server:24.12
+    container_name: sample-clickhouse
+    restart: unless-stopped
+    profiles: [examples-data, clickhouse]
+    ports:
+      - "${SAMPLE_CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "${SAMPLE_CLICKHOUSE_TCP_PORT:-9000}:9000"
+    volumes:
+      - sample-clickhouse-data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  sample-bookkeeper:
+    image: apache/bookkeeper:4.17.1
+    container_name: sample-bookkeeper
+    restart: unless-stopped
+    profiles: [examples-data, bookkeeper]
+    environment:
+      BK_zkServers: sample-bookkeeper-zk:2181
+      BK_metadataServiceUri: zk+hierarchical://sample-bookkeeper-zk:2181/ledgers
+    depends_on:
+      sample-bookkeeper-zk:
+        condition: service_healthy
+    ports:
+      - "${SAMPLE_BOOKKEEPER_PORT:-3181}:3181"
+    volumes:
+      - sample-bookkeeper-data:/data/bookkeeper
+    networks:
+      - skywalking
+
+  sample-bookkeeper-zk:
+    image: zookeeper:3.9
+    container_name: sample-bookkeeper-zk
+    restart: unless-stopped
+    profiles: [examples-data, bookkeeper]
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_4LW_COMMANDS_WHITELIST: ruok,stat,srvr
+    volumes:
+      - sample-bookkeeper-zk-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # ADDITIONAL EXPORTERS FOR NEW SERVICES
+  # ==========================================================================
+
+  kafka-exporter-sample:
+    image: danielqsj/kafka-exporter:v1.9.0
+    container_name: skywalking-kafka-exporter
+    restart: unless-stopped
+    profiles: [examples-mq, kafka]
+    depends_on:
+      sample-kafka:
+        condition: service_healthy
+    command:
+      - --kafka.server=sample-kafka:9092
+    networks:
+      - skywalking
+
+  rabbitmq-exporter-sample:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: skywalking-rabbitmq-exporter
+    restart: unless-stopped
+    profiles: [examples-mq, rabbitmq]
+    depends_on:
+      sample-rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBIT_URL: http://sample-rabbitmq:15672
+      RABBIT_USER: guest
+      RABBIT_PASSWORD: guest
+    networks:
+      - skywalking
+
+  clickhouse-exporter:
+    image: f1yegor/clickhouse-exporter:latest
+    container_name: skywalking-clickhouse-exporter
+    restart: unless-stopped
+    profiles: [examples-data, clickhouse]
+    depends_on:
+      sample-clickhouse:
+        condition: service_healthy
+    command:
+      - -scrape_uri=http://sample-clickhouse:8123/
+    networks:
+      - skywalking
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  skywalking:
+    driver: bridge
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  banyandb-data:
+  sample-mysql-data:
+  sample-postgresql-data:
+  sample-redis-data:
+  sample-mongodb-data:
+  sample-elasticsearch-data:
+  sample-kafka-data:
+  sample-rabbitmq-data:
+  sample-pulsar-data:
+  sample-rocketmq-namesrv-data:
+  sample-rocketmq-broker-data:
+  sample-rocketmq-broker-store:
+  sample-activemq-data:
+  sample-kong-db-data:
+  sample-clickhouse-data:
+  sample-bookkeeper-data:
+  sample-bookkeeper-zk-data:

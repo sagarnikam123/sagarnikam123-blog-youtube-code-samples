@@ -1,0 +1,83 @@
+# =============================================================================
+# SkyWalking OAP Configuration for Service Mesh Monitoring
+# =============================================================================
+# Add these environment variables to your OAP deployment for mesh monitoring
+#
+# References:
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/envoy/als_setting/
+# =============================================================================
+
+# Add to your values.yaml under oap.env:
+# =============================================================================
+# ENVOY ALS CONFIGURATION
+# =============================================================================
+
+# Enable Envoy ALS HTTP analysis
+# Options: k8s-mesh, mx-mesh (for Envoy metrics service)
+SW_ENVOY_METRIC_ALS_HTTP_ANALYSIS: "k8s-mesh"
+
+# Enable Envoy ALS TCP analysis
+SW_ENVOY_METRIC_ALS_TCP_ANALYSIS: "k8s-mesh"
+
+# Kubernetes namespace for service discovery (comma-separated)
+# Leave empty to watch all namespaces
+SW_ENVOY_METRIC_ALS_K8S_NAMESPACES: ""
+
+# =============================================================================
+# SERVICE MESH LAYER CONFIGURATION
+# =============================================================================
+
+# Enable service mesh layer
+SW_CORE_ENABLE_ENDPOINT_NAME_GROUPING_BY_OPENAPI: "true"
+
+# =============================================================================
+# EXAMPLE: Complete OAP env section for Service Mesh
+# =============================================================================
+# oap:
+#   env:
+#     # Storage
+#     SW_STORAGE: banyandb
+#
+#     # Envoy ALS
+#     SW_ENVOY_METRIC_ALS_HTTP_ANALYSIS: "k8s-mesh"
+#     SW_ENVOY_METRIC_ALS_TCP_ANALYSIS: "k8s-mesh"
+#
+#     # OTel Receiver for Istio metrics
+#     SW_OTEL_RECEIVER: "default"
+#     SW_OTEL_RECEIVER_ENABLED_HANDLERS: "otlp-metrics"
+#     SW_OTEL_RECEIVER_ENABLED_OC_RULES: "istio-controlplane"
+#
+#     # Telemetry
+#     SW_TELEMETRY: "prometheus"
+
+---
+# =============================================================================
+# RBAC for Kubernetes Service Discovery
+# =============================================================================
+# OAP needs permissions to discover services for ALS analysis
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: skywalking-oap-mesh
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: skywalking-oap-mesh
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: skywalking-oap-mesh
+subjects:
+  - kind: ServiceAccount
+    name: skywalking-oap
+    namespace: skywalking

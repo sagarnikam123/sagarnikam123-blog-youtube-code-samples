@@ -1,0 +1,42 @@
+# =============================================================================
+# Fuzzy-Train Log Generator
+# =============================================================================
+# Generates fake logs for testing SkyWalking log collection
+# https://github.com/sagarnikam123/fuzzy-train
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fuzzy-train
+  labels:
+    app: fuzzy-train
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fuzzy-train
+  template:
+    metadata:
+      labels:
+        app: fuzzy-train
+    spec:
+      containers:
+        - name: fuzzy-train
+          image: sagarnikam123/fuzzy-train:latest
+          args:
+            - "--log-format"
+            - "JSON"
+            - "--lines-per-second"
+            - "2"
+            - "--min-log-length"
+            - "50"
+            - "--max-log-length"
+            - "150"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

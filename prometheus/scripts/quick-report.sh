@@ -1,0 +1,178 @@
+#!/bin/bash
+
+#############################################
+# Prometheus Quick Report Generator
+# Generates a markdown report of current status
+#############################################
+
+# Configuration
+NAMESPACE="${NAMESPACE:-prometheus}"
+LOCAL_PORT="${LOCAL_PORT:-9090}"
+PROM_SVC="${PROM_SVC:-prometheus-kube-prometheus-prometheus}"
+PROM_API_PREFIX=""
+
+TIMESTAMP=$(date -u +"%Y-%m-%d_%H-%M-UTC")
+REPORT_DIR="${REPORT_DIR:-../results}"
+mkdir -p "$REPORT_DIR"
+
+CLUSTER_NAME=$(kubectl config current-context 2>/dev/null | sed 's/.*cluster\///' | sed 's/.*\///')
+REPORT_FILE="$REPORT_DIR/prometheus_report_${CLUSTER_NAME}_${TIMESTAMP}.md"
+
+echo "Generating Prometheus report..."
+
+# Cleanup
+cleanup() { [[ -n "$PF_PID" ]] && kill $PF_PID 2>/dev/null; }
+trap cleanup EXIT
+
+# Setup port-forward
+PROM_PORT=$(kubectl get svc -n "$NAMESPACE" "$PROM_SVC" -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || echo "9090")
+kubectl port-forward -n "$NAMESPACE" svc/"$PROM_SVC" ${LOCAL_PORT}:${PROM_PORT} >/dev/null 2>&1 &
+PF_PID=$!
+
+# Auto-detect API path
+for i in {1..30}; do
+    if curl -s --connect-timeout 2 "http://localhost:${LOCAL_PORT}/prometheus/api/v1/status/buildinfo" 2>/dev/null | grep -q '"status":"success"'; then
+        PROM_API_PREFIX="/prometheus"
+        break
+    fi
+    if curl -s --connect-timeout 2 "http://localhost:${LOCAL_PORT}/api/v1/status/buildinfo" 2>/dev/null | grep -q '"status":"success"'; then
+        PROM_API_PREFIX=""
+        break
+    fi
+    sleep 1
+done
+
+BASE_URL="http://localhost:${LOCAL_PORT}${PROM_API_PREFIX}"
+
+# Gather data
+K8S_VERSION=$(kubectl version --short 2>/dev/null | grep Server | awk '{print $3}' || echo "unknown")
+NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+POD_STATUS=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null)
+TOTAL_PODS=$(echo "$POD_STATUS" | wc -l | tr -d ' ')
+RUNNING_PODS=$(echo "$POD_STATUS" | grep -c "Running" || echo "0")
+
+BUILD_INFO=$(curl -s "${BASE_URL}/api/v1/status/buildinfo" 2>/dev/null)
+VERSION=$(echo "$BUILD_INFO" | jq -r '.data.version // "unknown"')
+
+TSDB=$(curl -s "${BASE_URL}/api/v1/status/tsdb" 2>/dev/null)
+ACTIVE_SERIES=$(echo "$TSDB" | jq -r '.data.headStats.numSeries // 0')
+
+TARGETS=$(curl -s "${BASE_URL}/api/v1/targets" 2>/dev/null)
+TOTAL_TARGETS=$(echo "$TARGETS" | jq '.data.activeTargets | length // 0')
+UP_TARGETS=$(echo "$TARGETS" | jq '[.data.activeTargets[] | select(.health == "up")] | length // 0')
+DOWN_TARGETS=$(echo "$TARGETS" | jq '[.data.activeTargets[] | select(.health == "down")] | length // 0')
+
+ALERTS=$(curl -s "${BASE_URL}/api/v1/alerts" 2>/dev/null)
+FIRING_ALERTS=$(echo "$ALERTS" | jq '[.data.alerts[] | select(.state == "firing")] | length // 0')
+
+RULES=$(curl -s "${BASE_URL}/api/v1/rules" 2>/dev/null)
+TOTAL_RULES=$(echo "$RULES" | jq '[.data.groups[].rules[]] | length // 0')
+
+# Generate report
+cat > "$REPORT_FILE" << EOF
+# Prometheus Status Report
+
+**Generated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+## 📊 Cluster Information
+
+| Property | Value |
+|----------|-------|
+| Cluster | $CLUSTER_NAME |
+| Kubernetes | $K8S_VERSION |
+| Nodes | $NODE_COUNT |
+| Namespace | $NAMESPACE |
+
+## 📈 Prometheus Status
+
+| Metric | Value |
+|--------|-------|
+| Version | $VERSION |
+| Active Series | $(printf "%'d" "$ACTIVE_SERIES") |
+| Total Rules | $TOTAL_RULES |
+
+## 🎯 Scrape Targets
+
+| Status | Count |
+|--------|-------|
+| Total | $TOTAL_TARGETS |
+| Up | $UP_TARGETS |
+| Down | $DOWN_TARGETS |
+
+EOF
+
+if [[ "$DOWN_TARGETS" -gt 0 ]]; then
+    cat >> "$REPORT_FILE" << EOF
+
+### Down Targets
+
+\`\`\`
+$(echo "$TARGETS" | jq -r '.data.activeTargets[] | select(.health == "down") | "- \(.labels.job): \(.lastError)"' | head -10)
+\`\`\`
+
+EOF
+fi
+
+cat >> "$REPORT_FILE" << EOF
+
+## 🚨 Alerts
+
+| Status | Count |
+|--------|-------|
+| Firing | $FIRING_ALERTS |
+
+EOF
+
+if [[ "$FIRING_ALERTS" -gt 0 ]]; then
+    cat >> "$REPORT_FILE" << EOF
+
+### Firing Alerts
+
+\`\`\`
+$(echo "$ALERTS" | jq -r '.data.alerts[] | select(.state == "firing") | "- \(.labels.alertname) [\(.labels.severity // "unknown")]"' | head -10)
+\`\`\`
+
+EOF
+fi
+
+cat >> "$REPORT_FILE" << EOF
+
+## 🏥 Pod Status
+
+| Metric | Value |
+|--------|-------|
+| Total Pods | $TOTAL_PODS |
+| Running | $RUNNING_PODS |
+
+\`\`\`
+$POD_STATUS
+\`\`\`
+
+## 🎯 Overall Status
+
+EOF
+
+if [[ "$RUNNING_PODS" -eq "$TOTAL_PODS" && "$DOWN_TARGETS" -eq 0 && "$FIRING_ALERTS" -eq 0 ]]; then
+    echo "✅ **HEALTHY** - All systems operational" >> "$REPORT_FILE"
+elif [[ "$FIRING_ALERTS" -gt 0 ]]; then
+    echo "🔴 **ALERTS FIRING** - $FIRING_ALERTS alert(s) require attention" >> "$REPORT_FILE"
+elif [[ "$DOWN_TARGETS" -gt 0 ]]; then
+    echo "⚠️ **DEGRADED** - $DOWN_TARGETS target(s) down" >> "$REPORT_FILE"
+else
+    echo "⚠️ **ISSUES** - $((TOTAL_PODS - RUNNING_PODS)) pod(s) not running" >> "$REPORT_FILE"
+fi
+
+cat >> "$REPORT_FILE" << EOF
+
+---
+*Report generated by prometheus-scripts*
+EOF
+
+echo "✓ Report generated: $REPORT_FILE"
+echo ""
+echo "Summary:"
+echo "  Pods: $RUNNING_PODS/$TOTAL_PODS running"
+echo "  Targets: $UP_TARGETS/$TOTAL_TARGETS up"
+echo "  Firing Alerts: $FIRING_ALERTS"
+echo "  Active Series: $(printf "%'d" "$ACTIVE_SERIES")"

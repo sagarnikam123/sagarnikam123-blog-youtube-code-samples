@@ -1,0 +1,24 @@
+# =============================================================================
+# SkyWalking BanyanDB Custom Resource
+# =============================================================================
+# Official sample: https://github.com/apache/skywalking-swck/blob/master/operator/config/samples/banyandb.yaml
+# BanyanDB: https://github.com/apache/skywalking-banyandb
+# =============================================================================
+
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: BanyanDB
+metadata:
+  name: banyandb
+spec:
+  # BanyanDB version - compatible with SkyWalking 10.3.0
+  version: 0.9.0
+
+  # Number of instances
+  counts: 1
+
+  # Container image
+  image: apache/skywalking-banyandb:0.9.0
+
+  # BanyanDB configuration (standalone mode)
+  config:
+    - "standalone"

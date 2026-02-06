@@ -1,0 +1,48 @@
+# =============================================================================
+# Self-Observability Services for SkyWalking
+# =============================================================================
+# Exposes Prometheus metrics endpoints for OAP, BanyanDB, and Satellite
+# These services are scraped by OTel Collector for Self-Observability menu
+# =============================================================================
+
+---
+# OAP Prometheus Metrics Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: skywalking-oap-metrics
+  namespace: skywalking
+  labels:
+    app.kubernetes.io/name: skywalking-oap
+    app.kubernetes.io/component: self-observability
+spec:
+  type: ClusterIP
+  ports:
+    - name: prometheus
+      port: 1234
+      targetPort: 1234
+  selector:
+    app: skywalking
+    component: oap
+
+---
+# Satellite Prometheus Metrics Service
+# Note: Satellite already exposes port 1234 in its service
+# This is a dedicated service for clarity
+apiVersion: v1
+kind: Service
+metadata:
+  name: skywalking-satellite-metrics
+  namespace: skywalking
+  labels:
+    app.kubernetes.io/name: skywalking-satellite
+    app.kubernetes.io/component: self-observability
+spec:
+  type: ClusterIP
+  ports:
+    - name: prometheus
+      port: 1234
+      targetPort: 1234
+  selector:
+    app: skywalking
+    component: satellite

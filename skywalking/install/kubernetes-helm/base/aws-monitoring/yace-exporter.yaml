@@ -1,0 +1,196 @@
+# =============================================================================
+# YACE - Yet Another CloudWatch Exporter for SkyWalking
+# =============================================================================
+# Exports AWS CloudWatch metrics for API Gateway and DynamoDB
+#
+# Prerequisites:
+#   - EKS cluster with IRSA enabled
+#   - IAM role with CloudWatch read permissions (see iam-policy.json)
+#   - Service account annotated with IAM role ARN
+#
+# Required OAP Rules: aws-gateway, aws-dynamodb
+# SkyWalking Menu: Gateway → AWS API Gateway, Database → DynamoDB
+#
+# References:
+#   - https://github.com/nerdswords/yet-another-cloudwatch-exporter
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-aws-api-gateway-monitoring/
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-aws-dynamodb-monitoring/
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: yace-cloudwatch-exporter
+  labels:
+    app.kubernetes.io/name: yace-cloudwatch-exporter
+  annotations:
+    # Replace with your IAM role ARN created via eksctl or Terraform
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/YACECloudWatchExporterRole"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yace-config
+  labels:
+    app.kubernetes.io/name: yace-cloudwatch-exporter
+data:
+  config.yaml: |
+    apiVersion: v1alpha1
+
+    # Scrape interval for CloudWatch metrics
+    discovery:
+      exportedTagsOnMetrics:
+        AWS/ApiGateway:
+          - ApiName
+          - Stage
+        AWS/DynamoDB:
+          - TableName
+
+      jobs:
+        # =====================================================================
+        # AWS API Gateway Metrics
+        # SkyWalking Menu: Gateway → AWS API Gateway
+        # =====================================================================
+        - type: AWS/ApiGateway
+          regions:
+            - us-east-1
+            # Add your regions here
+            # - us-west-2
+            # - eu-west-1
+          period: 300
+          length: 300
+          delay: 120
+          nilToZero: true
+          metrics:
+            - name: Count
+              statistics: [Sum]
+            - name: 4XXError
+              statistics: [Sum]
+            - name: 5XXError
+              statistics: [Sum]
+            - name: Latency
+              statistics: [Average, p50, p90, p99]
+            - name: IntegrationLatency
+              statistics: [Average, p50, p90, p99]
+            - name: CacheHitCount
+              statistics: [Sum]
+            - name: CacheMissCount
+              statistics: [Sum]
+
+        # =====================================================================
+        # AWS DynamoDB Metrics
+        # SkyWalking Menu: Database → DynamoDB
+        # =====================================================================
+        - type: AWS/DynamoDB
+          regions:
+            - us-east-1
+            # Add your regions here
+          period: 300
+          length: 300
+          delay: 120
+          nilToZero: true
+          metrics:
+            # Read/Write Capacity
+            - name: ConsumedReadCapacityUnits
+              statistics: [Sum, Average]
+            - name: ConsumedWriteCapacityUnits
+              statistics: [Sum, Average]
+            - name: ProvisionedReadCapacityUnits
+              statistics: [Average]
+            - name: ProvisionedWriteCapacityUnits
+              statistics: [Average]
+            # Throttling
+            - name: ReadThrottledRequests
+              statistics: [Sum]
+            - name: WriteThrottledRequests
+              statistics: [Sum]
+            # Latency
+            - name: SuccessfulRequestLatency
+              statistics: [Average, p50, p90, p99]
+            # Errors
+            - name: SystemErrors
+              statistics: [Sum]
+            - name: UserErrors
+              statistics: [Sum]
+            # Item counts
+            - name: ReturnedItemCount
+              statistics: [Sum, Average]
+            - name: ReturnedBytes
+              statistics: [Sum, Average]
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yace-cloudwatch-exporter
+  labels:
+    app.kubernetes.io/name: yace-cloudwatch-exporter
+    app.kubernetes.io/component: aws-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: yace-cloudwatch-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: yace-cloudwatch-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+    spec:
+      serviceAccountName: yace-cloudwatch-exporter
+      containers:
+        - name: yace
+          image: ghcr.io/nerdswords/yet-another-cloudwatch-exporter:v0.62.0
+          ports:
+            - name: metrics
+              containerPort: 5000
+          args:
+            - --config.file=/config/config.yaml
+            - --listen-address=:5000
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      volumes:
+        - name: config
+          configMap:
+            name: yace-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yace-cloudwatch-exporter
+  labels:
+    app.kubernetes.io/name: yace-cloudwatch-exporter
+    app.kubernetes.io/component: aws-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 5000
+      targetPort: 5000
+  selector:
+    app.kubernetes.io/name: yace-cloudwatch-exporter

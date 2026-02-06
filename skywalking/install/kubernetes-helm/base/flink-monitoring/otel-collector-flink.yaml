@@ -1,0 +1,67 @@
+# =============================================================================
+# OTel Collector Scrape Configs for Flink Monitoring
+# =============================================================================
+# Add these scrape configs to your OTel Collector configuration
+# to enable Flink monitoring in SkyWalking.
+#
+# Required OAP Rules:
+#   SW_OTEL_RECEIVER_ENABLED_OC_RULES: "flink"
+# =============================================================================
+
+# Add these jobs to your OTel Collector's prometheus receiver config:
+# receivers:
+#   prometheus:
+#     config:
+#       scrape_configs:
+
+# =============================================================================
+# Flink JobManager Metrics
+# Menu: Flink → JobManager
+# =============================================================================
+- job_name: 'flink-jobmanager'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['flink-jobmanager-metrics:9249']
+  relabel_configs:
+    - target_label: service
+      replacement: flink::flink-jobmanager
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# Flink TaskManager Metrics
+# Menu: Flink → TaskManager
+# =============================================================================
+- job_name: 'flink-taskmanager'
+  scrape_interval: 15s
+  # Use Kubernetes SD for dynamic TaskManager discovery
+  kubernetes_sd_configs:
+    - role: pod
+      namespaces:
+        names:
+          - flink
+  relabel_configs:
+    # Only scrape pods with flink taskmanager label
+    - source_labels: [__meta_kubernetes_pod_label_component]
+      regex: taskmanager
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_ip]
+      target_label: __address__
+      replacement: $1:9249
+    - target_label: service
+      replacement: flink::flink-taskmanager
+    - target_label: cluster
+      replacement: minikube
+    - source_labels: [__meta_kubernetes_pod_name]
+      target_label: pod
+
+# =============================================================================
+# Alternative: Static TaskManager Config (if not using K8s SD)
+# =============================================================================
+# - job_name: 'flink-taskmanager-static'
+#   scrape_interval: 15s
+#   static_configs:
+#     - targets: ['flink-taskmanager-0:9249', 'flink-taskmanager-1:9249']
+#   relabel_configs:
+#     - target_label: service
+#       replacement: flink::flink-taskmanager

@@ -1,0 +1,117 @@
+# =============================================================================
+# MySQL/MariaDB Prometheus Exporter for SkyWalking
+# =============================================================================
+# Exports MySQL/MariaDB metrics for SkyWalking monitoring
+#
+# Prerequisites:
+#   - MySQL/MariaDB database running
+#   - Database user with monitoring privileges
+#
+# Required OAP Rule: mysql (or mariadb)
+# SkyWalking Menu: Database → MySQL/MariaDB
+#
+# References:
+#   - https://github.com/prometheus/mysqld_exporter
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-mysql-monitoring/
+# =============================================================================
+
+---
+# Create monitoring user in MySQL first:
+# CREATE USER 'exporter'@'%' IDENTIFIED BY 'your-password';
+# GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'%';
+# FLUSH PRIVILEGES;
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-exporter-secret
+  # Deploy in same namespace as your MySQL or in skywalking namespace
+  labels:
+    app.kubernetes.io/name: mysql-exporter
+type: Opaque
+stringData:
+  # Format: user:password@protocol(host:port)/
+  DATA_SOURCE_NAME: "exporter:your-password@tcp(mysql-service:3306)/"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-exporter
+  labels:
+    app.kubernetes.io/name: mysql-exporter
+    app.kubernetes.io/component: database-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mysql-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mysql-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9104"
+    spec:
+      containers:
+        - name: mysqld-exporter
+          image: prom/mysqld-exporter:v0.16.0
+          ports:
+            - name: metrics
+              containerPort: 9104
+          env:
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-exporter-secret
+                  key: DATA_SOURCE_NAME
+          args:
+            - --collect.info_schema.tables
+            - --collect.info_schema.innodb_metrics
+            - --collect.global_status
+            - --collect.global_variables
+            - --collect.slave_status
+            - --collect.binlog_size
+            - --collect.perf_schema.eventsstatements
+            - --collect.perf_schema.eventsstatementssum
+            - --collect.perf_schema.eventswaits
+            - --collect.auto_increment.columns
+            - --collect.info_schema.processlist
+            - --collect.info_schema.query_response_time
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9104
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9104
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-exporter
+  labels:
+    app.kubernetes.io/name: mysql-exporter
+    app.kubernetes.io/component: database-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9104
+      targetPort: 9104
+  selector:
+    app.kubernetes.io/name: mysql-exporter

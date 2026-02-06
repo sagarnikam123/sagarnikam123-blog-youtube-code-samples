@@ -1,0 +1,165 @@
+# =============================================================================
+# Nginx Prometheus Exporter for SkyWalking
+# =============================================================================
+# Exports Nginx metrics for SkyWalking Gateway → NGINX menu
+#
+# Prerequisites:
+#   - Nginx with stub_status module enabled
+#   - Add to nginx.conf:
+#     server {
+#       location /nginx_status {
+#         stub_status on;
+#         allow 127.0.0.1;
+#         allow 10.0.0.0/8;  # Allow from pods
+#         deny all;
+#       }
+#     }
+#
+# Reference: https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-nginx-monitoring/
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-exporter
+  namespace: skywalking
+  labels:
+    app.kubernetes.io/name: nginx-exporter
+    app.kubernetes.io/component: gateway-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nginx-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9113"
+    spec:
+      containers:
+        - name: nginx-exporter
+          image: nginx/nginx-prometheus-exporter:1.1.0
+          args:
+            # Update this to point to your Nginx stub_status endpoint
+            - -nginx.scrape-uri=http://nginx.default.svc:80/nginx_status
+          ports:
+            - name: metrics
+              containerPort: 9113
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9113
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9113
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-exporter
+  namespace: skywalking
+  labels:
+    app.kubernetes.io/name: nginx-exporter
+    app.kubernetes.io/component: gateway-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9113
+      targetPort: 9113
+  selector:
+    app.kubernetes.io/name: nginx-exporter
+
+---
+# =============================================================================
+# Example: Nginx Deployment with stub_status enabled
+# =============================================================================
+# Uncomment and customize if you need a test Nginx instance
+# =============================================================================
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: nginx-config
+#   namespace: default
+# data:
+#   nginx.conf: |
+#     events {
+#       worker_connections 1024;
+#     }
+#     http {
+#       server {
+#         listen 80;
+#
+#         location / {
+#           root /usr/share/nginx/html;
+#           index index.html;
+#         }
+#
+#         # Stub status for metrics
+#         location /nginx_status {
+#           stub_status on;
+#           allow 127.0.0.1;
+#           allow 10.0.0.0/8;
+#           deny all;
+#         }
+#       }
+#     }
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: nginx
+#   namespace: default
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: nginx
+#   template:
+#     metadata:
+#       labels:
+#         app: nginx
+#     spec:
+#       containers:
+#         - name: nginx
+#           image: nginx:1.25
+#           ports:
+#             - containerPort: 80
+#           volumeMounts:
+#             - name: config
+#               mountPath: /etc/nginx/nginx.conf
+#               subPath: nginx.conf
+#       volumes:
+#         - name: config
+#           configMap:
+#             name: nginx-config
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: nginx
+#   namespace: default
+# spec:
+#   type: ClusterIP
+#   ports:
+#     - port: 80
+#       targetPort: 80
+#   selector:
+#     app: nginx

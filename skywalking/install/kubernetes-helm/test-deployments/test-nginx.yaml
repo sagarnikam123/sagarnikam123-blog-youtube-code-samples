@@ -1,0 +1,111 @@
+# =============================================================================
+# Test Nginx Deployment for Gateway Monitoring
+# =============================================================================
+# Deploys: Nginx + nginx-prometheus-exporter
+# Tests: Gateway → NGINX menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-nginx.yaml -n skywalking
+#   kubectl port-forward svc/test-nginx 8080:80 -n skywalking
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-nginx-config
+  labels:
+    app: test-nginx
+data:
+  nginx.conf: |
+    events {
+      worker_connections 1024;
+    }
+    http {
+      server {
+        listen 80;
+
+        location / {
+          return 200 'Hello from test-nginx\n';
+          add_header Content-Type text/plain;
+        }
+
+        # Stub status for metrics
+        location /nginx_status {
+          stub_status on;
+          allow all;
+        }
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-nginx
+  labels:
+    app: test-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-nginx
+  template:
+    metadata:
+      labels:
+        app: test-nginx
+    spec:
+      containers:
+        # Nginx Server
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+        # Nginx Exporter (sidecar)
+        - name: nginx-exporter
+          image: nginx/nginx-prometheus-exporter:1.4.0
+          ports:
+            - name: metrics
+              containerPort: 9113
+          args:
+            - --nginx.scrape-uri=http://localhost:80/nginx_status
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: config
+          configMap:
+            name: test-nginx-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-nginx
+  labels:
+    app: test-nginx
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+    - name: metrics
+      port: 9113
+  selector:
+    app: test-nginx

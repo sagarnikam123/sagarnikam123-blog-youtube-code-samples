@@ -1,0 +1,44 @@
+# =============================================================================
+# Sample MySQL Service for Testing SkyWalking Monitoring
+# =============================================================================
+# This creates a sample MySQL instance that can be monitored by SkyWalking.
+#
+# Usage:
+#   1. Start MySQL: docker compose -f examples/mysql/docker-compose.yml up -d
+#   2. Update .env with MySQL credentials
+#   3. Enable MySQL monitoring: docker compose --profile mysql up -d
+#   4. Check SkyWalking UI for MySQL dashboard
+# =============================================================================
+
+services:
+  mysql:
+    image: mysql:9.2
+    container_name: sample-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: exporter
+      MYSQL_PASSWORD: exporterpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+networks:
+  skywalking:
+    external: true
+    name: docker-standalone_skywalking
+
+volumes:
+  mysql-data:

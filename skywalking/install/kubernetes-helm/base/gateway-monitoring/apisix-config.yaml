@@ -1,0 +1,113 @@
+# =============================================================================
+# APISIX Prometheus Configuration for SkyWalking
+# =============================================================================
+# APISIX has built-in Prometheus metrics support - no external exporter needed
+#
+# This file shows how to:
+#   1. Enable Prometheus plugin in APISIX
+#   2. Configure metrics endpoint
+#
+# Reference: https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-apisix-monitoring/
+# =============================================================================
+
+# =============================================================================
+# Option 1: APISIX Helm Values (if using Helm)
+# =============================================================================
+# Add to your APISIX Helm values.yaml:
+#
+# apisix:
+#   prometheus:
+#     enabled: true
+#     path: /apisix/prometheus/metrics
+#     metricPrefix: apisix_
+#     containerPort: 9091
+#
+# =============================================================================
+
+# =============================================================================
+# Option 2: APISIX ConfigMap (if deploying manually)
+# =============================================================================
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apisix-config-example
+  namespace: apisix  # Change to your APISIX namespace
+  labels:
+    app.kubernetes.io/name: apisix
+    app.kubernetes.io/component: gateway-monitoring
+data:
+  config.yaml: |
+    # APISIX configuration with Prometheus enabled
+    apisix:
+      node_listen: 9080
+      enable_admin: true
+      admin_key:
+        - name: admin
+          key: your-admin-key
+          role: admin
+
+    # Enable Prometheus plugin globally
+    plugins:
+      - prometheus
+      - real-ip
+      - server-info
+      - request-id
+
+    # Prometheus plugin configuration
+    plugin_attr:
+      prometheus:
+        export_uri: /apisix/prometheus/metrics
+        export_addr:
+          ip: 0.0.0.0
+          port: 9091
+        metric_prefix: apisix_
+
+    # Enable server-info for additional metrics
+    plugin_attr:
+      server-info:
+        report_interval: 60
+        report_ttl: 3600
+
+---
+# =============================================================================
+# APISIX Service with Prometheus port exposed
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: apisix-metrics
+  namespace: apisix  # Change to your APISIX namespace
+  labels:
+    app.kubernetes.io/name: apisix
+    app.kubernetes.io/component: gateway-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: prometheus
+      port: 9091
+      targetPort: 9091
+  selector:
+    app.kubernetes.io/name: apisix
+
+---
+# =============================================================================
+# Example: Enable Prometheus on specific routes
+# =============================================================================
+# You can also enable Prometheus per-route via APISIX Admin API:
+#
+# curl -X PUT http://apisix-admin:9180/apisix/admin/routes/1 \
+#   -H "X-API-KEY: your-admin-key" \
+#   -d '{
+#     "uri": "/api/*",
+#     "upstream": {
+#       "type": "roundrobin",
+#       "nodes": {
+#         "backend-service:8080": 1
+#       }
+#     },
+#     "plugins": {
+#       "prometheus": {}
+#     }
+#   }'
+# =============================================================================

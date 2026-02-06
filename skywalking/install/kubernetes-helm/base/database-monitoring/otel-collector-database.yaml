@@ -1,0 +1,113 @@
+# =============================================================================
+# OTel Collector Scrape Configs for Database Monitoring
+# =============================================================================
+# Add these scrape configs to your OTel Collector configuration
+# to enable database monitoring in SkyWalking.
+#
+# Required OAP Rules:
+#   SW_OTEL_RECEIVER_ENABLED_OC_RULES: "mysql,mariadb,postgresql,redis,elasticsearch,mongodb,bookkeeper,clickhouse"
+# =============================================================================
+
+# Add these jobs to your OTel Collector's prometheus receiver config:
+# receivers:
+#   prometheus:
+#     config:
+#       scrape_configs:
+
+# =============================================================================
+# MySQL/MariaDB Metrics
+# Menu: Database → MySQL/MariaDB
+# =============================================================================
+- job_name: 'mysql'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['mysql-exporter:9104']
+  relabel_configs:
+    - target_label: service
+      replacement: mysql::mysql-service
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# PostgreSQL Metrics
+# Menu: Database → PostgreSQL
+# =============================================================================
+- job_name: 'postgresql'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['postgresql-exporter:9187']
+  relabel_configs:
+    - target_label: service
+      replacement: postgresql::postgresql-service
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# Redis Metrics
+# Menu: Database → Redis
+# =============================================================================
+- job_name: 'redis'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['redis-exporter:9121']
+  relabel_configs:
+    - target_label: service
+      replacement: redis::redis-service
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# Elasticsearch Metrics
+# Menu: Database → Elasticsearch
+# =============================================================================
+- job_name: 'elasticsearch'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['elasticsearch-exporter:9114']
+  relabel_configs:
+    - target_label: service
+      replacement: elasticsearch::elasticsearch-service
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# MongoDB Metrics
+# Menu: Database → MongoDB
+# =============================================================================
+- job_name: 'mongodb'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['mongodb-exporter:9216']
+  relabel_configs:
+    - target_label: service
+      replacement: mongodb::mongodb-service
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# BookKeeper Metrics
+# Menu: Database → BookKeeper
+# =============================================================================
+- job_name: 'bookkeeper'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['bookkeeper-metrics:8000']
+  relabel_configs:
+    - target_label: service
+      replacement: bookkeeper::bookkeeper-cluster
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# ClickHouse Metrics
+# Menu: Database → ClickHouse
+# =============================================================================
+- job_name: 'clickhouse'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['clickhouse-exporter:9363']
+  relabel_configs:
+    - target_label: service
+      replacement: clickhouse::clickhouse-service
+    - target_label: cluster
+      replacement: minikube

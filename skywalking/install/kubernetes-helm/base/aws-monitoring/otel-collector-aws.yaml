@@ -1,0 +1,55 @@
+# =============================================================================
+# OTel Collector Scrape Configs for AWS Monitoring
+# =============================================================================
+# Add these scrape configs to your OTel Collector configuration
+# to enable AWS API Gateway and DynamoDB monitoring in SkyWalking.
+#
+# Required OAP Rules:
+#   SW_OTEL_RECEIVER_ENABLED_OC_RULES: "aws-gateway,aws-dynamodb"
+# =============================================================================
+
+# Add these jobs to your OTel Collector's prometheus receiver config:
+# receivers:
+#   prometheus:
+#     config:
+#       scrape_configs:
+
+# =============================================================================
+# AWS API Gateway Metrics
+# Menu: Gateway → AWS API Gateway
+# =============================================================================
+- job_name: 'aws-api-gateway'
+  scrape_interval: 60s
+  scrape_timeout: 30s
+  static_configs:
+    - targets: ['yace-cloudwatch-exporter:5000']
+  relabel_configs:
+    - target_label: service
+      replacement: aws-api-gateway
+    - target_label: cluster
+      replacement: eks-production
+  metric_relabel_configs:
+    # Keep only API Gateway metrics
+    - source_labels: [__name__]
+      regex: 'aws_apigateway_.*'
+      action: keep
+
+# =============================================================================
+# AWS DynamoDB Metrics
+# Menu: Database → DynamoDB
+# =============================================================================
+- job_name: 'aws-dynamodb'
+  scrape_interval: 60s
+  scrape_timeout: 30s
+  static_configs:
+    - targets: ['yace-cloudwatch-exporter:5000']
+  relabel_configs:
+    - target_label: service
+      replacement: aws-dynamodb
+    - target_label: cluster
+      replacement: eks-production
+  metric_relabel_configs:
+    # Keep only DynamoDB metrics
+    - source_labels: [__name__]
+      regex: 'aws_dynamodb_.*'
+      action: keep

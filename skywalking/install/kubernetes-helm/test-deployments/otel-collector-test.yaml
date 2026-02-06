@@ -1,0 +1,182 @@
+# =============================================================================
+# OTel Collector Config for Test Deployments
+# =============================================================================
+# Scrapes metrics from all test deployments and forwards to SkyWalking OAP
+#
+# Usage:
+#   kubectl apply -f otel-collector-test.yaml -n skywalking
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-test-config
+  labels:
+    app: otel-collector-test
+data:
+  config.yaml: |
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            # Gateway Tests
+            - job_name: 'test-nginx'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-nginx:9113']
+              relabel_configs:
+                - target_label: service
+                  replacement: nginx::test-nginx
+
+            # Database Tests
+            - job_name: 'test-mysql'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-mysql:9104']
+              relabel_configs:
+                - target_label: service
+                  replacement: mysql::test-mysql
+
+            - job_name: 'test-postgresql'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-postgresql:9187']
+              relabel_configs:
+                - target_label: service
+                  replacement: postgresql::test-postgresql
+
+            - job_name: 'test-redis'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-redis:9121']
+              relabel_configs:
+                - target_label: service
+                  replacement: redis::test-redis
+
+            - job_name: 'test-mongodb'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-mongodb:9216']
+              relabel_configs:
+                - target_label: service
+                  replacement: mongodb::test-mongodb
+
+            - job_name: 'test-elasticsearch'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-elasticsearch:9114']
+              relabel_configs:
+                - target_label: service
+                  replacement: elasticsearch::test-elasticsearch
+
+            # Message Queue Tests
+            - job_name: 'test-kafka'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-kafka:9308']
+              relabel_configs:
+                - target_label: service
+                  replacement: kafka::test-kafka
+
+            - job_name: 'test-rabbitmq'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-rabbitmq:15692']
+              relabel_configs:
+                - target_label: service
+                  replacement: rabbitmq::test-rabbitmq
+
+            - job_name: 'test-pulsar'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-pulsar:8080']
+              relabel_configs:
+                - target_label: service
+                  replacement: pulsar::test-pulsar
+
+            - job_name: 'test-activemq'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-activemq:9404']
+              relabel_configs:
+                - target_label: service
+                  replacement: activemq::test-activemq
+
+            - job_name: 'test-rocketmq'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-rocketmq:5557']
+              relabel_configs:
+                - target_label: service
+                  replacement: rocketmq::test-rocketmq
+
+            # Data Processing Tests
+            - job_name: 'test-flink-jobmanager'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-flink-jobmanager:9249']
+              relabel_configs:
+                - target_label: service
+                  replacement: flink::test-flink-jobmanager
+
+            - job_name: 'test-flink-taskmanager'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['test-flink-taskmanager:9249']
+              relabel_configs:
+                - target_label: service
+                  replacement: flink::test-flink-taskmanager
+
+    processors:
+      batch:
+        timeout: 10s
+
+    exporters:
+      otlp:
+        endpoint: skywalking-oap:11800
+        tls:
+          insecure: true
+
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus]
+          processors: [batch]
+          exporters: [otlp]
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector-test
+  labels:
+    app: otel-collector-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector-test
+  template:
+    metadata:
+      labels:
+        app: otel-collector-test
+    spec:
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.121.0
+          args: ["--config=/etc/otel/config.yaml"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otel
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-test-config

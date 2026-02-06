@@ -1,0 +1,121 @@
+# =============================================================================
+# BookKeeper Prometheus Configuration for SkyWalking
+# =============================================================================
+# BookKeeper has built-in Prometheus metrics support
+#
+# Prerequisites:
+#   - BookKeeper cluster running
+#   - Prometheus metrics enabled in BookKeeper config
+#
+# Required OAP Rule: bookkeeper
+# SkyWalking Menu: Database → BookKeeper
+#
+# References:
+#   - https://bookkeeper.apache.org/docs/admin/metrics
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-bookkeeper-monitoring/
+# =============================================================================
+
+---
+# =============================================================================
+# BookKeeper Configuration (bk_server.conf)
+# =============================================================================
+# Add these settings to your BookKeeper configuration to enable Prometheus metrics
+#
+# # Enable Prometheus metrics
+# prometheusStatsHttpPort=8000
+# enableStatistics=true
+#
+# # Stats provider
+# statsProviderClass=org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bookkeeper-prometheus-config
+  labels:
+    app.kubernetes.io/name: bookkeeper
+    app.kubernetes.io/component: database-monitoring
+data:
+  # Example BookKeeper configuration snippet for Prometheus
+  bk_server_prometheus.conf: |
+    # Prometheus Metrics Configuration
+    # Add these to your existing bk_server.conf
+
+    # Enable statistics
+    enableStatistics=true
+
+    # Prometheus stats provider
+    statsProviderClass=org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
+
+    # HTTP port for Prometheus metrics endpoint
+    prometheusStatsHttpPort=8000
+
+    # Metrics prefix (optional)
+    prometheusStatsLatencyRolloverSeconds=60
+
+---
+# =============================================================================
+# BookKeeper Service for Metrics Scraping
+# =============================================================================
+# If BookKeeper is deployed as StatefulSet, create a headless service
+# or use the existing service with metrics port exposed
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookkeeper-metrics
+  labels:
+    app.kubernetes.io/name: bookkeeper
+    app.kubernetes.io/component: database-monitoring
+spec:
+  type: ClusterIP
+  # Use None for headless service if scraping individual pods
+  # clusterIP: None
+  ports:
+    - name: metrics
+      port: 8000
+      targetPort: 8000
+  selector:
+    # Adjust selector to match your BookKeeper deployment
+    app.kubernetes.io/name: bookkeeper
+
+---
+# =============================================================================
+# Example: BookKeeper StatefulSet with Prometheus Enabled
+# =============================================================================
+# This is a reference configuration. Adjust based on your BookKeeper deployment.
+#
+# apiVersion: apps/v1
+# kind: StatefulSet
+# metadata:
+#   name: bookkeeper
+# spec:
+#   serviceName: bookkeeper
+#   replicas: 3
+#   selector:
+#     matchLabels:
+#       app.kubernetes.io/name: bookkeeper
+#   template:
+#     metadata:
+#       labels:
+#         app.kubernetes.io/name: bookkeeper
+#       annotations:
+#         prometheus.io/scrape: "true"
+#         prometheus.io/port: "8000"
+#     spec:
+#       containers:
+#         - name: bookkeeper
+#           image: apache/bookkeeper:4.16.4
+#           ports:
+#             - name: bookie
+#               containerPort: 3181
+#             - name: metrics
+#               containerPort: 8000
+#           env:
+#             - name: BK_statsProviderClass
+#               value: "org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider"
+#             - name: BK_prometheusStatsHttpPort
+#               value: "8000"
+#             - name: BK_enableStatistics
+#               value: "true"

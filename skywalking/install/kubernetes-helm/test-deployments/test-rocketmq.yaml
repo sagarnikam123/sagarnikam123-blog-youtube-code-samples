@@ -1,0 +1,171 @@
+# =============================================================================
+# Test RocketMQ Deployment for Message Queue Monitoring
+# =============================================================================
+# Deploys: Apache RocketMQ (NameServer + Broker) + Exporter
+# Tests: MQ → RocketMQ menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-rocketmq.yaml -n skywalking
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-rocketmq-nameserver
+  labels:
+    app: test-rocketmq
+    component: nameserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-rocketmq
+      component: nameserver
+  template:
+    metadata:
+      labels:
+        app: test-rocketmq
+        component: nameserver
+    spec:
+      containers:
+        - name: nameserver
+          image: apache/rocketmq:5.2.0
+          command: ["sh", "mqnamesrv"]
+          ports:
+            - name: namesrv
+              containerPort: 9876
+          env:
+            - name: JAVA_OPT
+              value: "-Xms256m -Xmx256m"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-rocketmq-nameserver
+  labels:
+    app: test-rocketmq
+spec:
+  type: ClusterIP
+  ports:
+    - name: namesrv
+      port: 9876
+  selector:
+    app: test-rocketmq
+    component: nameserver
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-rocketmq-broker
+  labels:
+    app: test-rocketmq
+    component: broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-rocketmq
+      component: broker
+  template:
+    metadata:
+      labels:
+        app: test-rocketmq
+        component: broker
+    spec:
+      containers:
+        - name: broker
+          image: apache/rocketmq:5.2.0
+          command: ["sh", "-c", "mqbroker -n test-rocketmq-nameserver:9876 autoCreateTopicEnable=true"]
+          ports:
+            - name: broker
+              containerPort: 10911
+          env:
+            - name: JAVA_OPT
+              value: "-Xms256m -Xmx256m"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-rocketmq-broker
+  labels:
+    app: test-rocketmq
+spec:
+  type: ClusterIP
+  ports:
+    - name: broker
+      port: 10911
+  selector:
+    app: test-rocketmq
+    component: broker
+
+---
+# RocketMQ Exporter
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-rocketmq-exporter
+  labels:
+    app: test-rocketmq
+    component: exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-rocketmq
+      component: exporter
+  template:
+    metadata:
+      labels:
+        app: test-rocketmq
+        component: exporter
+    spec:
+      containers:
+        - name: exporter
+          image: apache/rocketmq-exporter:0.0.2
+          ports:
+            - name: metrics
+              containerPort: 5557
+          env:
+            - name: rocketmq.config.namesrvAddr
+              value: "test-rocketmq-nameserver:9876"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-rocketmq
+  labels:
+    app: test-rocketmq
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 5557
+  selector:
+    app: test-rocketmq
+    component: exporter

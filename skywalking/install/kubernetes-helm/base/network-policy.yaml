@@ -1,0 +1,182 @@
+# =============================================================================
+# Network Policies for SkyWalking
+# =============================================================================
+# Restricts network traffic to only required communication paths
+# Apply after namespace creation:
+#   kubectl apply -f base/network-policy.yaml
+# =============================================================================
+
+---
+# Default deny all ingress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: skywalking
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# Allow OAP to receive traffic from agents and UI
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-oap-ingress
+  namespace: skywalking
+spec:
+  podSelector:
+    matchLabels:
+      app: skywalking
+      component: oap
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from UI
+    - from:
+        - podSelector:
+            matchLabels:
+              app: skywalking
+              component: ui
+      ports:
+        - protocol: TCP
+          port: 12800
+    # Allow from any namespace (for agents)
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 11800  # gRPC for agents
+        - protocol: TCP
+          port: 12800  # REST API
+    # Allow from OTel Collector
+    - from:
+        - podSelector:
+            matchLabels:
+              app: otel-collector
+      ports:
+        - protocol: TCP
+          port: 11800
+    # Allow Prometheus scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 1234
+
+---
+# Allow UI to receive traffic from Ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ui-ingress
+  namespace: skywalking
+spec:
+  podSelector:
+    matchLabels:
+      app: skywalking
+      component: ui
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ALB Ingress Controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/name: aws-load-balancer-controller
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow from any (for NodePort/LoadBalancer access)
+    - ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Allow BanyanDB internal communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-banyandb-ingress
+  namespace: skywalking
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: banyandb
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from OAP
+    - from:
+        - podSelector:
+            matchLabels:
+              app: skywalking
+              component: oap
+      ports:
+        - protocol: TCP
+          port: 17912  # gRPC
+        - protocol: TCP
+          port: 17913  # HTTP
+    # Allow internal BanyanDB cluster communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: banyandb
+      ports:
+        - protocol: TCP
+          port: 17912
+        - protocol: TCP
+          port: 17913
+        - protocol: TCP
+          port: 17914  # Internal cluster
+
+---
+# Allow etcd cluster communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-etcd-ingress
+  namespace: skywalking
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: etcd
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from BanyanDB
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: banyandb
+      ports:
+        - protocol: TCP
+          port: 2379  # Client
+        - protocol: TCP
+          port: 2380  # Peer
+
+---
+# Allow DNS resolution
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: skywalking
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

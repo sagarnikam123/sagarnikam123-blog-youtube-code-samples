@@ -1,0 +1,35 @@
+# =============================================================================
+# Sample Redis Service for Testing SkyWalking Monitoring
+# =============================================================================
+# This creates a sample Redis instance that can be monitored by SkyWalking.
+#
+# Usage:
+#   1. Start Redis: docker compose -f examples/redis/docker-compose.yml up -d
+#   2. Enable Redis monitoring: docker compose --profile redis up -d
+#   3. Check SkyWalking UI for Redis dashboard
+# =============================================================================
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: sample-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - skywalking
+
+networks:
+  skywalking:
+    external: true
+    name: docker-standalone_skywalking
+
+volumes:
+  redis-data:

@@ -1,0 +1,116 @@
+# =============================================================================
+# Apache SkyWalking - Development Values for AWS EKS + BanyanDB
+# =============================================================================
+# Minimal resources for development/testing
+# =============================================================================
+
+fullnameOverride: "skywalking"
+namespaceOverride: "skywalking-dev"
+
+# =============================================================================
+# OAP SERVER - Dev Configuration (Minimal)
+# =============================================================================
+oap:
+  name: oap
+
+  image:
+    repository: apache/skywalking-oap-server
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  storageType: banyandb
+  replicas: 1
+
+  ports:
+    grpc: 11800
+    rest: 12800
+
+  service:
+    type: ClusterIP
+
+  javaOpts: "-Xms512m -Xmx512m"
+
+  env:
+    SW_CORE_RECORD_DATA_TTL: "1"
+    SW_CORE_METRICS_DATA_TTL: "1"
+    SW_HEALTH_CHECKER: "default"
+    SW_OTEL_RECEIVER: "default"
+
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+  antiAffinity: "soft"
+
+# =============================================================================
+# UI - Dev Configuration
+# =============================================================================
+ui:
+  name: ui
+
+  image:
+    repository: apache/skywalking-ui
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    externalPort: 80
+    internalPort: 8080
+
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+  ingress:
+    enabled: false
+
+# =============================================================================
+# ELASTICSEARCH - DISABLED
+# =============================================================================
+elasticsearch:
+  enabled: false
+
+# =============================================================================
+# BANYANDB - Dev (Minimal standalone)
+# =============================================================================
+banyandb:
+  enabled: true
+
+  image:
+    repository: apache/skywalking-banyandb
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+
+  standalone:
+    enabled: true
+
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+  cluster:
+    enabled: false
+
+  storage:
+    enabled: true
+    persistentVolumeClaim:
+      storageClassName: "gp2"
+      size: 10Gi
+
+satellite:
+  enabled: false

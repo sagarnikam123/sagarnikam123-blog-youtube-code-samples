@@ -1,0 +1,80 @@
+# =============================================================================
+# Test RabbitMQ Deployment for Message Queue Monitoring
+# =============================================================================
+# Deploys: RabbitMQ with management plugin (built-in Prometheus)
+# Tests: MQ → RabbitMQ menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-rabbitmq.yaml -n skywalking
+#   kubectl port-forward svc/test-rabbitmq 15672:15672 -n skywalking
+#   # Open http://localhost:15672 (guest/guest)
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-rabbitmq
+  labels:
+    app: test-rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: test-rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 15672
+            - name: metrics
+              containerPort: 15692
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "guest"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "guest"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # Enable Prometheus plugin on startup
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    sleep 10
+                    rabbitmq-plugins enable rabbitmq_prometheus
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-rabbitmq
+  labels:
+    app: test-rabbitmq
+spec:
+  type: ClusterIP
+  ports:
+    - name: amqp
+      port: 5672
+    - name: management
+      port: 15672
+    - name: metrics
+      port: 15692
+  selector:
+    app: test-rabbitmq

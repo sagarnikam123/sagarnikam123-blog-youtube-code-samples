@@ -1,0 +1,100 @@
+# =============================================================================
+# Apache Flink Prometheus Configuration for SkyWalking
+# =============================================================================
+# Flink has built-in Prometheus metrics reporter
+#
+# Prerequisites:
+#   - Apache Flink cluster running
+#   - Prometheus reporter enabled in flink-conf.yaml
+#
+# Required OAP Rule: flink
+# SkyWalking Menu: Flink → JobManager, TaskManager
+#
+# References:
+#   - https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/metric_reporters/
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-flink-monitoring/
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-prometheus-config
+  labels:
+    app.kubernetes.io/name: flink
+    app.kubernetes.io/component: flink-monitoring
+data:
+  # Add these settings to your flink-conf.yaml
+  flink-conf.yaml.snippet: |
+    # =================================================================
+    # Prometheus Metrics Reporter Configuration
+    # =================================================================
+
+    # Enable Prometheus reporter
+    metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+
+    # Port for Prometheus metrics endpoint
+    metrics.reporter.prom.port: 9249
+
+    # Optional: Filter metrics (reduce cardinality)
+    # metrics.reporter.prom.filterLabelValueCharacters: true
+
+    # =================================================================
+    # Recommended Metrics Settings
+    # =================================================================
+
+    # Enable system metrics
+    metrics.system-resource: true
+    metrics.system-resource-probing-interval: 5000
+
+    # Job/Task metrics
+    metrics.job.status.enable: CURRENT_EXECUTION_ATTEMPTS
+
+    # Latency tracking (optional, can be expensive)
+    # metrics.latency.interval: 2000
+    # metrics.latency.granularity: operator
+
+---
+# =============================================================================
+# Flink Services for Metrics Scraping
+# =============================================================================
+
+# JobManager metrics service
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-jobmanager-metrics
+  labels:
+    app.kubernetes.io/name: flink
+    app.kubernetes.io/component: flink-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9249
+      targetPort: 9249
+  selector:
+    # Adjust selector to match your Flink JobManager
+    app: flink
+    component: jobmanager
+
+---
+# TaskManager metrics service (headless for scraping all pods)
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-taskmanager-metrics
+  labels:
+    app.kubernetes.io/name: flink
+    app.kubernetes.io/component: flink-monitoring
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service
+  ports:
+    - name: metrics
+      port: 9249
+      targetPort: 9249
+  selector:
+    # Adjust selector to match your Flink TaskManagers
+    app: flink
+    component: taskmanager

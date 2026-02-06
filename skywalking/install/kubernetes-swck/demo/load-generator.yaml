@@ -1,0 +1,40 @@
+# =============================================================================
+# Load Generator - Generates traffic to demo app for traces
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+        - name: load
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting load generator..."
+              while true; do
+                curl -s http://simple-demo:8080/ > /dev/null
+                curl -s http://simple-demo:8080/owners > /dev/null
+                curl -s http://simple-demo:8080/vets > /dev/null
+                curl -s http://simple-demo:8080/owners/find > /dev/null
+                sleep 2
+              done
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

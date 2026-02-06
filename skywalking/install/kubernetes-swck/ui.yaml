@@ -1,0 +1,67 @@
+# =============================================================================
+# SkyWalking UI Custom Resource
+# =============================================================================
+# Official: https://github.com/apache/skywalking-swck/blob/master/operator/config/samples/default.yaml
+# =============================================================================
+
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: UI
+metadata:
+  name: skywalking
+spec:
+  # UI version
+  version: 10.3.0
+
+  # Number of UI replicas
+  instances: 1
+
+  # Container image
+  image: apache/skywalking-ui:10.3.0
+
+  # OAP Server address (format: http://<oapserver-name>-oap:12800)
+  OAPServerAddress: http://skywalking-oap:12800
+
+  # Service configuration
+  service:
+    template:
+      type: ClusterIP
+
+---
+# =============================================================================
+# SkyWalking UI with Ingress
+# =============================================================================
+
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: UI
+metadata:
+  name: skywalking-ingress
+spec:
+  version: 10.3.0
+  instances: 1
+  image: apache/skywalking-ui:10.3.0
+  OAPServerAddress: http://skywalking-oap:12800
+
+  service:
+    template:
+      type: ClusterIP
+    ingress:
+      host: skywalking.local
+
+---
+# =============================================================================
+# SkyWalking UI with NodePort (for Minikube access)
+# =============================================================================
+
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: UI
+metadata:
+  name: skywalking-nodeport
+spec:
+  version: 10.3.0
+  instances: 1
+  image: apache/skywalking-ui:10.3.0
+  OAPServerAddress: http://skywalking-oap:12800
+
+  service:
+    template:
+      type: NodePort

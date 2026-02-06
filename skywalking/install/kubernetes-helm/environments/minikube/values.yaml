@@ -1,0 +1,199 @@
+# =============================================================================
+# Apache SkyWalking - Minikube Local Development Values
+# =============================================================================
+# Optimized for local Minikube testing with minimal resources
+#
+# Prerequisites:
+#   - Minikube with at least 4 CPU and 8GB RAM
+#   - Start: minikube start --cpus=4 --memory=8192
+#
+# Install:
+#   helm install skywalking oci://registry-1.docker.io/apache/skywalking-helm \
+#     --version 4.8.0 -n skywalking -f environments/minikube/values.yaml
+# =============================================================================
+
+fullnameOverride: "skywalking"
+
+# =============================================================================
+# OAP SERVER - Minimal for Minikube
+# =============================================================================
+oap:
+  name: oap
+
+  image:
+    repository: apache/skywalking-oap-server
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  # Use BanyanDB storage
+  storageType: banyandb
+
+  # Single replica for local testing
+  replicas: 1
+
+  ports:
+    grpc: 11800
+    rest: 12800
+
+  service:
+    type: ClusterIP
+
+  # Reduced JVM heap for Minikube
+  javaOpts: "-Xms512m -Xmx1g -XX:+UseG1GC"
+
+  env:
+    SW_CORE_RECORD_DATA_TTL: "2"
+    SW_CORE_METRICS_DATA_TTL: "2"
+    SW_HEALTH_CHECKER: "default"
+    SW_CLUSTER: "standalone"
+    # OpenTelemetry Receiver
+    SW_OTEL_RECEIVER: "default"
+    SW_OTEL_RECEIVER_ENABLED_HANDLERS: "otlp-metrics,otlp-logs,otlp-traces"
+    # Enable monitoring rules (Self-Observability + K8s)
+    SW_OTEL_RECEIVER_ENABLED_OC_RULES: "oap,k8s-cluster,k8s-node,k8s-service,vm,mysql,postgresql,redis,elasticsearch,mongodb,bookkeeper,clickhouse,nginx,apisix,kong"
+    # Enable Prometheus telemetry for Self-Observability
+    SW_TELEMETRY: "prometheus"
+    SW_TELEMETRY_PROMETHEUS_HOST: "0.0.0.0"
+    SW_TELEMETRY_PROMETHEUS_PORT: "1234"
+    SW_LOGGING_LEVEL: "INFO"
+
+  # Minimal resources for Minikube
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+
+  # Disable anti-affinity for single node
+  antiAffinity: "soft"
+
+  # Faster startup probes for local testing
+  startupProbe:
+    tcpSocket:
+      port: 12800
+    failureThreshold: 30
+    periodSeconds: 10
+
+  livenessProbe:
+    tcpSocket:
+      port: 12800
+    initialDelaySeconds: 60
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  readinessProbe:
+    tcpSocket:
+      port: 12800
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# =============================================================================
+# UI - Minimal for Minikube
+# =============================================================================
+ui:
+  name: ui
+
+  image:
+    repository: apache/skywalking-ui
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  service:
+    type: NodePort
+    externalPort: 80
+    internalPort: 8080
+    nodePort: 30080
+
+  # Disable ingress for Minikube (use NodePort instead)
+  ingress:
+    enabled: false
+
+# =============================================================================
+# ELASTICSEARCH - DISABLED (using BanyanDB)
+# =============================================================================
+elasticsearch:
+  enabled: false
+
+# =============================================================================
+# BANYANDB - Enabled with Standalone mode
+# =============================================================================
+banyandb:
+  enabled: true
+
+  # BanyanDB image
+  image:
+    repository: apache/skywalking-banyandb
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+
+  # Connection config for OAP
+  config:
+    grpcAddress: "skywalking-banyandb-grpc:17912"
+    httpAddress: "skywalking-banyandb-http:17913"
+
+  # Standalone mode for local testing
+  standalone:
+    enabled: true
+
+  # Cluster mode disabled
+  cluster:
+    enabled: false
+
+  # etcd not needed for standalone
+  etcd:
+    enabled: false
+
+# =============================================================================
+# SATELLITE - Enabled for testing agent load balancing
+# =============================================================================
+# Satellite acts as a proxy between agents and OAP for:
+#   - Load balancing across OAP instances
+#   - Buffering during OAP restarts
+#   - Protocol translation (gRPC/Kafka)
+#
+# Note: Satellite does NOT scrape Prometheus metrics - use OTel Collector for that
+# =============================================================================
+satellite:
+  enabled: true
+
+  name: satellite
+
+  image:
+    repository: apache/skywalking-satellite
+    tag: "v1.3.0"
+    pullPolicy: IfNotPresent
+
+  # Single replica for Minikube
+  replicas: 1
+
+  # Service ports
+  ports:
+    grpc: 11800      # Agents connect here
+    prometheus: 1234 # Self-observability metrics
+
+  service:
+    type: ClusterIP
+
+  # Environment variables
+  env:
+    # Backend OAP servers
+    SATELLITE_GRPC_CLIENT_FINDER: "static"
+    SATELLITE_GRPC_CLIENT_STATIC_SERVERS: "skywalking-oap:11800"
+    # Logging
+    SATELLITE_LOGGING_LEVEL: "INFO"
+
+  # Minimal resources for Minikube
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

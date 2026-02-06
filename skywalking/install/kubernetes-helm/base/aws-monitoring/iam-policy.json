@@ -1,0 +1,47 @@
+{
+  "Statement": [
+    {
+      "Action": [
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics"
+      ],
+      "Effect": "Allow",
+      "Resource": "*",
+      "Sid": "CloudWatchReadAccess"
+    },
+    {
+      "Action": [
+        "tag:GetResources"
+      ],
+      "Effect": "Allow",
+      "Resource": "*",
+      "Sid": "TagReadAccess"
+    },
+    {
+      "Action": [
+        "apigateway:GET"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:apigateway:*::/restapis",
+        "arn:aws:apigateway:*::/restapis/*",
+        "arn:aws:apigateway:*::/apis",
+        "arn:aws:apigateway:*::/apis/*"
+      ],
+      "Sid": "APIGatewayReadAccess"
+    },
+    {
+      "Action": [
+        "dynamodb:ListTables",
+        "dynamodb:DescribeTable",
+        "dynamodb:ListGlobalTables",
+        "dynamodb:DescribeGlobalTable"
+      ],
+      "Effect": "Allow",
+      "Resource": "*",
+      "Sid": "DynamoDBReadAccess"
+    }
+  ],
+  "Version": "2012-10-17"
+}

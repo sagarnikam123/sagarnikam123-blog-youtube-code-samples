@@ -1,0 +1,86 @@
+# =============================================================================
+# Test Elasticsearch Deployment for Database Monitoring
+# =============================================================================
+# Deploys: Elasticsearch (single-node) + elasticsearch-exporter
+# Tests: Database → Elasticsearch menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-elasticsearch.yaml -n skywalking
+#   kubectl port-forward svc/test-elasticsearch 9200:9200 -n skywalking
+#   curl http://localhost:9200
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-elasticsearch
+  labels:
+    app: test-elasticsearch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-elasticsearch
+  template:
+    metadata:
+      labels:
+        app: test-elasticsearch
+    spec:
+      containers:
+        # Elasticsearch (single-node for testing)
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+          ports:
+            - containerPort: 9200
+            - containerPort: 9300
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: xpack.security.enabled
+              value: "false"
+            - name: ES_JAVA_OPTS
+              value: "-Xms256m -Xmx256m"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+        # Elasticsearch Exporter (sidecar)
+        - name: es-exporter
+          image: quay.io/prometheuscommunity/elasticsearch-exporter:v1.8.0
+          ports:
+            - name: metrics
+              containerPort: 9114
+          args:
+            - --es.uri=http://localhost:9200
+            - --es.all
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-elasticsearch
+  labels:
+    app: test-elasticsearch
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9200
+    - name: transport
+      port: 9300
+    - name: metrics
+      port: 9114
+  selector:
+    app: test-elasticsearch

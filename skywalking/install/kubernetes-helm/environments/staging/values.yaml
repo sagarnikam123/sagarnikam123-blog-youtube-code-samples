@@ -1,0 +1,135 @@
+# =============================================================================
+# Apache SkyWalking - Staging Values for AWS EKS + BanyanDB
+# =============================================================================
+# Production-like environment with reduced resources
+# Use for testing before production deployment
+# =============================================================================
+
+fullnameOverride: "skywalking"
+namespaceOverride: "skywalking-staging"
+
+# =============================================================================
+# OAP SERVER - Staging Configuration
+# =============================================================================
+oap:
+  name: oap
+
+  image:
+    repository: apache/skywalking-oap-server
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  storageType: banyandb
+
+  # 2 replicas for staging
+  replicas: 2
+
+  ports:
+    grpc: 11800
+    rest: 12800
+    prometheus: 1234
+
+  service:
+    type: ClusterIP
+
+  javaOpts: "-Xms1g -Xmx1g -XX:+UseG1GC"
+
+  env:
+    SW_CORE_RECORD_DATA_TTL: "2"
+    SW_CORE_METRICS_DATA_TTL: "3"
+    SW_HEALTH_CHECKER: "default"
+    SW_TELEMETRY: "prometheus"
+    SW_CLUSTER: "kubernetes"
+    SW_CLUSTER_K8S_NAMESPACE: "skywalking-staging"
+    SW_OTEL_RECEIVER: "default"
+    SW_OTEL_RECEIVER_ENABLED_HANDLERS: "otlp-metrics,otlp-logs,otlp-traces"
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+
+  antiAffinity: "soft"
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# =============================================================================
+# UI - Staging Configuration
+# =============================================================================
+ui:
+  name: ui
+
+  image:
+    repository: apache/skywalking-ui
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    externalPort: 80
+    internalPort: 8080
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: alb
+      alb.ingress.kubernetes.io/scheme: internal
+      alb.ingress.kubernetes.io/target-type: ip
+    hosts:
+      - skywalking-staging.internal.example.com
+
+# =============================================================================
+# ELASTICSEARCH - DISABLED
+# =============================================================================
+elasticsearch:
+  enabled: false
+
+# =============================================================================
+# BANYANDB - Staging (Standalone mode for cost savings)
+# =============================================================================
+banyandb:
+  enabled: true
+
+  image:
+    repository: apache/skywalking-banyandb
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+
+  # Standalone for staging (simpler, cheaper)
+  standalone:
+    enabled: true
+
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+
+  cluster:
+    enabled: false
+
+  storage:
+    enabled: true
+    persistentVolumeClaim:
+      storageClassName: "gp3-skywalking"
+      size: 50Gi
+
+satellite:
+  enabled: false

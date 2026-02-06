@@ -1,0 +1,73 @@
+# =============================================================================
+# Apache Pulsar Prometheus Configuration for SkyWalking
+# =============================================================================
+# Pulsar has built-in Prometheus metrics support
+#
+# Prerequisites:
+#   - Apache Pulsar cluster running
+#   - Prometheus metrics enabled (default)
+#
+# Required OAP Rule: pulsar
+# SkyWalking Menu: MQ → Pulsar
+#
+# References:
+#   - https://pulsar.apache.org/docs/reference-metrics/
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-pulsar-monitoring/
+# =============================================================================
+
+---
+# =============================================================================
+# Pulsar Metrics Configuration
+# =============================================================================
+# Pulsar exposes metrics on HTTP port 8080 by default:
+#   - Broker: http://pulsar-broker:8080/metrics
+#   - Proxy: http://pulsar-proxy:8080/metrics
+#   - BookKeeper: http://bookkeeper:8000/metrics
+#
+# Enable in broker.conf:
+#   exposeTopicLevelMetricsInPrometheus=true
+#   exposeConsumerLevelMetricsInPrometheus=true
+#   exposeProducerLevelMetricsInPrometheus=true
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-prometheus-config
+  labels:
+    app.kubernetes.io/name: pulsar
+    app.kubernetes.io/component: mq-monitoring
+data:
+  # Pulsar broker configuration for detailed metrics
+  broker.conf.snippet: |
+    # Enable Prometheus metrics
+    exposeTopicLevelMetricsInPrometheus=true
+    exposeConsumerLevelMetricsInPrometheus=true
+    exposeProducerLevelMetricsInPrometheus=true
+    exposeManagedLedgerMetricsInPrometheus=true
+    exposeManagedCursorMetricsInPrometheus=true
+
+    # Metrics port (default 8080)
+    webServicePort=8080
+
+---
+# =============================================================================
+# Pulsar Service for Metrics Scraping
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulsar-metrics
+  labels:
+    app.kubernetes.io/name: pulsar
+    app.kubernetes.io/component: mq-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: 8080
+  selector:
+    # Adjust selector to match your Pulsar broker deployment
+    app.kubernetes.io/name: pulsar
+    app.kubernetes.io/component: broker

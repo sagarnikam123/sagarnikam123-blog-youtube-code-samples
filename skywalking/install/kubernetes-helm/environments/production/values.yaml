@@ -1,0 +1,367 @@
+# =============================================================================
+# Apache SkyWalking - Production Values for AWS EKS + BanyanDB Cluster
+# =============================================================================
+# Target: AWS EKS with high availability BanyanDB storage
+#
+# Prerequisites:
+#   - EKS cluster with 3+ nodes (m5.xlarge or larger)
+#   - EBS CSI driver installed
+#   - ALB Ingress Controller (optional)
+#   - External Secrets Operator (optional, for secrets management)
+#
+# Install:
+#   helm install skywalking oci://registry-1.docker.io/apache/skywalking-helm \
+#     --version 4.8.0 \
+#     -n skywalking \
+#     -f environments/production/values.yaml
+# =============================================================================
+
+# =============================================================================
+# GLOBAL SETTINGS
+# =============================================================================
+fullnameOverride: "skywalking"
+namespaceOverride: "skywalking"
+
+# =============================================================================
+# OAP SERVER - Production Configuration
+# =============================================================================
+oap:
+  name: oap
+
+  image:
+    repository: apache/skywalking-oap-server
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  # Storage backend
+  storageType: banyandb
+
+  # High Availability - 3 replicas minimum
+  replicas: 3
+
+  # Service ports
+  ports:
+    grpc: 11800      # Agent reporting
+    rest: 12800      # GraphQL API
+    prometheus: 1234 # Self-observability metrics
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    annotations: {}
+
+  # JVM Configuration - Production tuned
+  javaOpts: >-
+    -Xms2g -Xmx2g
+    -XX:+UseG1GC
+    -XX:MaxGCPauseMillis=200
+    -XX:+ParallelRefProcEnabled
+    -XX:+DisableExplicitGC
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/var/log/skywalking/heapdump.hprof
+
+  # Environment variables
+  env:
+    # Core settings
+    SW_CORE_RECORD_DATA_TTL: "3"        # Days to keep trace/log records
+    SW_CORE_METRICS_DATA_TTL: "7"       # Days to keep metrics
+    SW_HEALTH_CHECKER: "default"
+
+    # Telemetry - Enable Prometheus metrics
+    SW_TELEMETRY: "prometheus"
+    SW_TELEMETRY_PROMETHEUS_HOST: "0.0.0.0"
+    SW_TELEMETRY_PROMETHEUS_PORT: "1234"
+
+    # OpenTelemetry Receiver
+    SW_OTEL_RECEIVER: "default"
+    SW_OTEL_RECEIVER_ENABLED_HANDLERS: "otlp-metrics,otlp-logs,otlp-traces"
+    SW_OTEL_RECEIVER_ENABLED_OC_RULES: "oap,vm,mysql,mariadb,postgresql,redis,mongodb,elasticsearch,bookkeeper,clickhouse,kafka,rabbitmq,pulsar,activemq,rocketmq,nginx,apisix,kong,aws-gateway,aws-dynamodb,flink,istio-controlplane,cilium-service,k8s-cluster,k8s-node,k8s-service"
+
+    # Envoy ALS for Service Mesh
+    SW_ENVOY_METRIC_ALS_HTTP_ANALYSIS: "k8s-mesh"
+    SW_ENVOY_METRIC_ALS_TCP_ANALYSIS: "k8s-mesh"
+
+    # Cluster coordination (using Kubernetes)
+    SW_CLUSTER: "kubernetes"
+    SW_CLUSTER_K8S_NAMESPACE: "skywalking"
+    SW_CLUSTER_K8S_LABEL: "app=skywalking,component=oap"
+
+    # Query performance
+    SW_QUERY_MAX_QUERY_COMPLEXITY: "3000"
+
+    # Logging
+    SW_LOGGING_LEVEL: "INFO"
+
+  # Resource allocation - Production sizing
+  resources:
+    requests:
+      cpu: "2000m"
+      memory: "4Gi"
+    limits:
+      cpu: "4000m"
+      memory: "6Gi"
+
+  # Pod scheduling
+  antiAffinity: "hard"
+
+  # Node selector (optional - use dedicated nodes)
+  nodeSelector: {}
+    # node-role: observability
+
+  # Tolerations (optional)
+  tolerations: []
+
+  # Pod topology spread for AZ distribution
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: skywalking
+          component: oap
+
+  # Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+  # Liveness and Readiness probes
+  livenessProbe:
+    initialDelaySeconds: 120
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # Service Account
+  serviceAccount:
+    create: true
+    name: "skywalking-oap"
+    annotations: {}
+      # For IRSA (if needed for AWS services)
+      # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/skywalking-oap-role
+
+# =============================================================================
+# UI - Production Configuration
+# =============================================================================
+ui:
+  name: ui
+
+  image:
+    repository: apache/skywalking-ui
+    tag: "10.3.0"
+    pullPolicy: IfNotPresent
+
+  # Multiple replicas for HA
+  replicas: 2
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    externalPort: 80
+    internalPort: 8080
+
+  # Resource allocation
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+  # Ingress - AWS ALB
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: alb
+      alb.ingress.kubernetes.io/scheme: internal
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/healthcheck-path: /
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+      # Add your ACM certificate ARN
+      # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:region:account:certificate/xxx
+    hosts:
+      - skywalking.internal.example.com
+    tls: []
+
+  # Pod anti-affinity
+  antiAffinity: "soft"
+
+# =============================================================================
+# ELASTICSEARCH - DISABLED (using BanyanDB)
+# =============================================================================
+elasticsearch:
+  enabled: false
+
+# =============================================================================
+# BANYANDB - Production Cluster Configuration
+# =============================================================================
+banyandb:
+  enabled: true
+
+  image:
+    repository: apache/skywalking-banyandb
+    tag: "0.9.0"
+    pullPolicy: IfNotPresent
+
+  # Standalone mode - DISABLED for production
+  standalone:
+    enabled: false
+
+  # Cluster mode - ENABLED for production HA
+  cluster:
+    enabled: true
+
+    # Liaison nodes - Query routing layer
+    liaison:
+      replicas: 2
+
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2000m"
+          memory: "2Gi"
+
+      # Service for OAP to connect
+      grpcSvc:
+        type: ClusterIP
+        port: 17912
+
+      httpSvc:
+        type: ClusterIP
+        port: 17913
+
+    # Data nodes - Storage layer
+    data:
+      replicas: 3
+
+      resources:
+        requests:
+          cpu: "1000m"
+          memory: "2Gi"
+        limits:
+          cpu: "4000m"
+          memory: "4Gi"
+
+      # Storage configuration
+      storage:
+        - name: stream
+          persistentVolumeClaim:
+            claimName: ""
+            storageClassName: "gp3-skywalking"
+            accessModes:
+              - ReadWriteOnce
+            size: 100Gi
+        - name: measure
+          persistentVolumeClaim:
+            claimName: ""
+            storageClassName: "gp3-skywalking"
+            accessModes:
+              - ReadWriteOnce
+            size: 100Gi
+
+  # etcd for cluster coordination
+  etcd:
+    enabled: true
+    replicaCount: 3
+
+    persistence:
+      enabled: true
+      storageClass: "gp3-skywalking"
+      size: 10Gi
+
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+# =============================================================================
+# SATELLITE - Production Configuration
+# =============================================================================
+# Satellite acts as a proxy between agents and OAP for:
+#   - Load balancing across OAP instances
+#   - Buffering during OAP restarts/upgrades
+#   - Protocol translation (gRPC/Kafka)
+#   - Reducing direct connections to OAP in large clusters
+#
+# Note: Satellite does NOT scrape Prometheus metrics - use OTel Collector for that
+# =============================================================================
+satellite:
+  enabled: true
+
+  name: satellite
+
+  image:
+    repository: apache/skywalking-satellite
+    tag: "v1.3.0"
+    pullPolicy: IfNotPresent
+
+  # Multiple replicas for HA
+  replicas: 2
+
+  # Service ports
+  ports:
+    grpc: 11800      # Agents connect here
+    prometheus: 1234 # Self-observability metrics
+
+  service:
+    type: ClusterIP
+
+  # Environment variables
+  env:
+    # Backend OAP servers - use Kubernetes service discovery
+    SATELLITE_GRPC_CLIENT_FINDER: "kubernetes"
+    SATELLITE_GRPC_CLIENT_KUBERNETES_NAMESPACE: "skywalking"
+    SATELLITE_GRPC_CLIENT_KUBERNETES_LABEL: "app=skywalking,component=oap"
+    # Or use static for simpler setup:
+    # SATELLITE_GRPC_CLIENT_FINDER: "static"
+    # SATELLITE_GRPC_CLIENT_STATIC_SERVERS: "skywalking-oap:11800"
+
+    # Logging
+    SATELLITE_LOGGING_LEVEL: "INFO"
+
+    # Buffer settings for resilience
+    SATELLITE_QUEUE_PARTITION: "4"
+    SATELLITE_QUEUE_SEGMENT_SIZE: "524288"
+    SATELLITE_QUEUE_MAX_SEGMENTS: "10"
+
+  # Production resource allocation
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+
+  # Pod anti-affinity for HA
+  antiAffinity: "soft"
+
+  # Pod topology spread for AZ distribution
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: skywalking
+          component: satellite
+
+# =============================================================================
+# OPENTELEMETRY COLLECTOR - Optional (for metrics collection)
+# =============================================================================
+# Deploy separately if needed for infrastructure metrics
+# See: base/otel-collector/ for configuration

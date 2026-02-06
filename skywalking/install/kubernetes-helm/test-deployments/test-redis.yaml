@@ -1,0 +1,81 @@
+# =============================================================================
+# Test Redis Deployment for Database Monitoring
+# =============================================================================
+# Deploys: Redis + redis-exporter
+# Tests: Database → Redis menu in SkyWalking
+#
+# Usage:
+#   kubectl apply -f test-redis.yaml -n skywalking
+#   kubectl exec -it deploy/test-redis -c redis -- redis-cli
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-redis
+  labels:
+    app: test-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-redis
+  template:
+    metadata:
+      labels:
+        app: test-redis
+    spec:
+      containers:
+        # Redis Server
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          args:
+            - redis-server
+            - --maxmemory
+            - 128mb
+            - --maxmemory-policy
+            - allkeys-lru
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        # Redis Exporter (sidecar)
+        - name: redis-exporter
+          image: oliver006/redis_exporter:v1.66.0
+          ports:
+            - name: metrics
+              containerPort: 9121
+          env:
+            - name: REDIS_ADDR
+              value: "redis://localhost:6379"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-redis
+  labels:
+    app: test-redis
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+    - name: metrics
+      port: 9121
+  selector:
+    app: test-redis

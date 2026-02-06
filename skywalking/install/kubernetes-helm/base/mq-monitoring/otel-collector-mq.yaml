@@ -1,0 +1,85 @@
+# =============================================================================
+# OTel Collector Scrape Configs for Message Queue Monitoring
+# =============================================================================
+# Add these scrape configs to your OTel Collector configuration
+# to enable MQ monitoring in SkyWalking.
+#
+# Required OAP Rules:
+#   SW_OTEL_RECEIVER_ENABLED_OC_RULES: "kafka,rabbitmq,pulsar,activemq,rocketmq"
+# =============================================================================
+
+# Add these jobs to your OTel Collector's prometheus receiver config:
+# receivers:
+#   prometheus:
+#     config:
+#       scrape_configs:
+
+# =============================================================================
+# Kafka Metrics
+# Menu: MQ → Kafka
+# =============================================================================
+- job_name: 'kafka'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['kafka-exporter:9308']
+  relabel_configs:
+    - target_label: service
+      replacement: kafka::kafka-cluster
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# RabbitMQ Metrics
+# Menu: MQ → RabbitMQ
+# =============================================================================
+- job_name: 'rabbitmq'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['rabbitmq-metrics:15692']
+  relabel_configs:
+    - target_label: service
+      replacement: rabbitmq::rabbitmq-cluster
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# Pulsar Metrics
+# Menu: MQ → Pulsar
+# =============================================================================
+- job_name: 'pulsar'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['pulsar-metrics:8080']
+  relabel_configs:
+    - target_label: service
+      replacement: pulsar::pulsar-cluster
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# ActiveMQ Metrics
+# Menu: MQ → ActiveMQ
+# =============================================================================
+- job_name: 'activemq'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['activemq-exporter:8161']
+  relabel_configs:
+    - target_label: service
+      replacement: activemq::activemq-broker
+    - target_label: cluster
+      replacement: minikube
+
+# =============================================================================
+# RocketMQ Metrics
+# Menu: MQ → RocketMQ
+# =============================================================================
+- job_name: 'rocketmq'
+  scrape_interval: 15s
+  static_configs:
+    - targets: ['rocketmq-exporter:5557']
+  relabel_configs:
+    - target_label: service
+      replacement: rocketmq::rocketmq-cluster
+    - target_label: cluster
+      replacement: minikube

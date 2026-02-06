@@ -1,0 +1,109 @@
+# =============================================================================
+# PostgreSQL Prometheus Exporter for SkyWalking
+# =============================================================================
+# Exports PostgreSQL metrics for SkyWalking monitoring
+#
+# Prerequisites:
+#   - PostgreSQL database running
+#   - Database user with monitoring privileges
+#
+# Required OAP Rule: postgresql
+# SkyWalking Menu: Database → PostgreSQL
+#
+# References:
+#   - https://github.com/prometheus-community/postgres_exporter
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-postgresql-monitoring/
+# =============================================================================
+
+---
+# Create monitoring user in PostgreSQL first:
+# CREATE USER exporter WITH PASSWORD 'your-password';
+# GRANT pg_monitor TO exporter;
+# -- Or for older PostgreSQL versions:
+# GRANT SELECT ON pg_stat_database TO exporter;
+# GRANT SELECT ON pg_stat_user_tables TO exporter;
+# GRANT SELECT ON pg_stat_bgwriter TO exporter;
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-exporter-secret
+  labels:
+    app.kubernetes.io/name: postgresql-exporter
+type: Opaque
+stringData:
+  # PostgreSQL connection string
+  DATA_SOURCE_NAME: "postgresql://exporter:your-password@postgresql-service:5432/postgres?sslmode=disable"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql-exporter
+  labels:
+    app.kubernetes.io/name: postgresql-exporter
+    app.kubernetes.io/component: database-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresql-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+    spec:
+      containers:
+        - name: postgres-exporter
+          image: prometheuscommunity/postgres-exporter:v0.16.0
+          ports:
+            - name: metrics
+              containerPort: 9187
+          env:
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-exporter-secret
+                  key: DATA_SOURCE_NAME
+          args:
+            - --auto-discover-databases
+            - --collector.stat_statements
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9187
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9187
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-exporter
+  labels:
+    app.kubernetes.io/name: postgresql-exporter
+    app.kubernetes.io/component: database-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9187
+      targetPort: 9187
+  selector:
+    app.kubernetes.io/name: postgresql-exporter

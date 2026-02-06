@@ -1,0 +1,67 @@
+# =============================================================================
+# RabbitMQ Prometheus Configuration for SkyWalking
+# =============================================================================
+# RabbitMQ has built-in Prometheus metrics support via rabbitmq_prometheus plugin
+#
+# Prerequisites:
+#   - RabbitMQ 3.8+ with management plugin
+#   - Enable rabbitmq_prometheus plugin
+#
+# Required OAP Rule: rabbitmq
+# SkyWalking Menu: MQ → RabbitMQ
+#
+# References:
+#   - https://www.rabbitmq.com/prometheus.html
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-rabbitmq-monitoring/
+# =============================================================================
+
+---
+# =============================================================================
+# RabbitMQ Configuration
+# =============================================================================
+# Enable Prometheus plugin in RabbitMQ:
+#   rabbitmq-plugins enable rabbitmq_prometheus
+#
+# Or via environment variable in Kubernetes:
+#   RABBITMQ_PLUGINS: "rabbitmq_management rabbitmq_prometheus"
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-prometheus-config
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: mq-monitoring
+data:
+  # RabbitMQ configuration for Prometheus
+  enabled_plugins: |
+    [rabbitmq_management,rabbitmq_prometheus].
+
+  # Advanced config (optional)
+  rabbitmq.conf: |
+    # Prometheus metrics endpoint
+    prometheus.return_per_object_metrics = true
+    prometheus.path = /metrics
+    prometheus.tcp.port = 15692
+
+---
+# =============================================================================
+# RabbitMQ Service for Metrics Scraping
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-metrics
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: mq-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 15692
+      targetPort: 15692
+  selector:
+    # Adjust selector to match your RabbitMQ deployment
+    app.kubernetes.io/name: rabbitmq

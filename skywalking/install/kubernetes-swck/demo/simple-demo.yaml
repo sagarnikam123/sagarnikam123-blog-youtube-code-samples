@@ -1,0 +1,72 @@
+# =============================================================================
+# Simple Demo - Manual Java Agent Configuration (No SwAgent CR needed)
+# =============================================================================
+# Uses init container to download agent, works without SWCK injection
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-demo
+  labels:
+    app: simple-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simple-demo
+  template:
+    metadata:
+      labels:
+        app: simple-demo
+    spec:
+      # Init container downloads the SkyWalking Java agent
+      initContainers:
+        - name: agent-init
+          image: apache/skywalking-java-agent:9.3.0-java17
+          command: ['sh', '-c', 'cp -r /skywalking/agent /agent/']
+          volumeMounts:
+            - name: agent
+              mountPath: /agent
+
+      containers:
+        - name: app
+          image: ghcr.io/pavolloffay/spring-petclinic:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/agent/agent/skywalking-agent.jar"
+            - name: SW_AGENT_NAME
+              value: "simple-demo"
+            - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+              value: "skywalking-oap-oap:11800"
+            - name: SW_LOGGING_OUTPUT
+              value: "CONSOLE"
+          volumeMounts:
+            - name: agent
+              mountPath: /agent
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+
+      volumes:
+        - name: agent
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simple-demo
+spec:
+  selector:
+    app: simple-demo
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

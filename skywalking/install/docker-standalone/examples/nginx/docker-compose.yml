@@ -1,0 +1,26 @@
+# =============================================================================
+# Sample Nginx Service for Testing SkyWalking Monitoring
+# =============================================================================
+# This creates a sample nginx instance that can be monitored by SkyWalking.
+#
+# Usage:
+#   1. Start this nginx: docker compose -f examples/nginx/docker-compose.yml up -d
+#   2. Enable nginx monitoring: docker compose --profile nginx up -d
+#   3. Check SkyWalking UI for Nginx dashboard
+# =============================================================================
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sample-nginx
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - skywalking
+
+networks:
+  skywalking:
+    external: true
+    name: docker-standalone_skywalking

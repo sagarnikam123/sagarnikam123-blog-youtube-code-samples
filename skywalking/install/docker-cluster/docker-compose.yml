@@ -1,0 +1,158 @@
+# =============================================================================
+# Apache SkyWalking - Docker Cluster Mode with BanyanDB
+# =============================================================================
+# Multi-node OAP cluster with load balancing and BanyanDB storage
+# Usage: docker-compose up -d
+# =============================================================================
+
+services:
+  # ==========================================================================
+  # BanyanDB Storage Backend
+  # ==========================================================================
+  banyandb:
+    image: apache/skywalking-banyandb:0.9.0
+    container_name: skywalking-banyandb
+    restart: unless-stopped
+    ports:
+      - "17912:17912"
+      - "17913:17913"
+    volumes:
+      - banyandb-data:/data
+    command:
+      - standalone
+      - --data-path=/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:17913/api/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # OAP Server Node 1
+  # ==========================================================================
+  oap-1:
+    image: apache/skywalking-oap-server:10.3.0
+    container_name: skywalking-oap-1
+    restart: unless-stopped
+    depends_on:
+      banyandb:
+        condition: service_healthy
+    environment:
+      SW_STORAGE: banyandb
+      SW_STORAGE_BANYANDB_TARGETS: banyandb:17912
+      SW_CLUSTER: standalone
+      SW_HEALTH_CHECKER: default
+      SW_TELEMETRY: prometheus
+      SW_OTEL_RECEIVER: default
+      JAVA_OPTS: "-Xms512m -Xmx1024m"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:12800/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # OAP Server Node 2
+  # ==========================================================================
+  oap-2:
+    image: apache/skywalking-oap-server:10.3.0
+    container_name: skywalking-oap-2
+    restart: unless-stopped
+    depends_on:
+      banyandb:
+        condition: service_healthy
+    environment:
+      SW_STORAGE: banyandb
+      SW_STORAGE_BANYANDB_TARGETS: banyandb:17912
+      SW_CLUSTER: standalone
+      SW_HEALTH_CHECKER: default
+      SW_TELEMETRY: prometheus
+      SW_OTEL_RECEIVER: default
+      JAVA_OPTS: "-Xms512m -Xmx1024m"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:12800/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # OAP Server Node 3
+  # ==========================================================================
+  oap-3:
+    image: apache/skywalking-oap-server:10.3.0
+    container_name: skywalking-oap-3
+    restart: unless-stopped
+    depends_on:
+      banyandb:
+        condition: service_healthy
+    environment:
+      SW_STORAGE: banyandb
+      SW_STORAGE_BANYANDB_TARGETS: banyandb:17912
+      SW_CLUSTER: standalone
+      SW_HEALTH_CHECKER: default
+      SW_TELEMETRY: prometheus
+      SW_OTEL_RECEIVER: default
+      JAVA_OPTS: "-Xms512m -Xmx1024m"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:12800/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # Nginx Load Balancer for OAP Nodes
+  # ==========================================================================
+  oap-lb:
+    image: nginx:alpine
+    container_name: skywalking-oap-lb
+    restart: unless-stopped
+    depends_on:
+      oap-1:
+        condition: service_healthy
+      oap-2:
+        condition: service_healthy
+      oap-3:
+        condition: service_healthy
+    ports:
+      - "11800:11800"  # gRPC (agent communication)
+      - "12800:12800"  # HTTP (REST API)
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - skywalking
+
+  # ==========================================================================
+  # SkyWalking UI
+  # ==========================================================================
+  ui:
+    image: apache/skywalking-ui:10.3.0
+    container_name: skywalking-ui
+    restart: unless-stopped
+    depends_on:
+      - oap-lb
+    ports:
+      - "8080:8080"
+    environment:
+      SW_OAP_ADDRESS: http://oap-lb:12800
+    networks:
+      - skywalking
+
+networks:
+  skywalking:
+    driver: bridge
+
+volumes:
+  banyandb-data:
+    driver: local

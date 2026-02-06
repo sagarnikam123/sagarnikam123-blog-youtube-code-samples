@@ -1,0 +1,73 @@
+# =============================================================================
+# AWS EBS Storage Classes for SkyWalking
+# =============================================================================
+# Prerequisites:
+#   - AWS EBS CSI Driver installed on EKS
+#   - IAM permissions for EBS volume management
+#
+# Apply before Helm installation:
+#   kubectl apply -f base/storage-class.yaml
+# =============================================================================
+
+---
+# GP3 Storage Class - Recommended for Production
+# Better price-performance than gp2
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-skywalking
+  labels:
+    app.kubernetes.io/name: skywalking
+    app.kubernetes.io/component: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  # IOPS and throughput for production workloads
+  iops: "3000"
+  throughput: "125"
+  encrypted: "true"
+  # Optional: Use customer-managed KMS key
+  # kmsKeyId: arn:aws:kms:region:account:key/key-id
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+
+---
+# GP3 High Performance - For high-throughput BanyanDB data nodes
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-skywalking-high-perf
+  labels:
+    app.kubernetes.io/name: skywalking
+    app.kubernetes.io/component: storage
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  # Higher IOPS for intensive workloads
+  iops: "10000"
+  throughput: "500"
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+
+---
+# IO1 Storage Class - For etcd (low latency required)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: io1-skywalking-etcd
+  labels:
+    app.kubernetes.io/name: skywalking
+    app.kubernetes.io/component: storage
+provisioner: ebs.csi.aws.com
+parameters:
+  type: io1
+  iopsPerGB: "50"
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+allowVolumeExpansion: true

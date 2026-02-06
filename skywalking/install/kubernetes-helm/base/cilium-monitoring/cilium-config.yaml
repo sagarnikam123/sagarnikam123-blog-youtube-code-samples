@@ -1,0 +1,131 @@
+# =============================================================================
+# Cilium Prometheus Configuration for SkyWalking
+# =============================================================================
+# Cilium has built-in Prometheus metrics support
+#
+# Prerequisites:
+#   - Cilium installed as CNI
+#   - Prometheus metrics enabled (default)
+#
+# Required OAP Rule: cilium-service
+# SkyWalking Menu: Cilium → Cilium Service
+#
+# References:
+#   - https://docs.cilium.io/en/stable/observability/metrics/
+#   - https://skywalking.apache.org/docs/main/latest/en/setup/backend/backend-cilium-monitoring/
+# =============================================================================
+
+---
+# =============================================================================
+# Cilium Helm Values for Metrics (Reference)
+# =============================================================================
+# Add these to your Cilium Helm installation:
+#
+# helm install cilium cilium/cilium \
+#   --namespace kube-system \
+#   --set prometheus.enabled=true \
+#   --set operator.prometheus.enabled=true \
+#   --set hubble.enabled=true \
+#   --set hubble.metrics.enabled="{dns,drop,tcp,flow,icmp,http}" \
+#   --set hubble.relay.enabled=true \
+#   --set hubble.ui.enabled=true
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cilium-prometheus-config
+  labels:
+    app.kubernetes.io/name: cilium
+    app.kubernetes.io/component: cilium-monitoring
+data:
+  # Cilium Helm values snippet for metrics
+  values-metrics.yaml: |
+    # Enable Prometheus metrics for Cilium Agent
+    prometheus:
+      enabled: true
+      port: 9962
+      serviceMonitor:
+        enabled: false  # Set true if using Prometheus Operator
+
+    # Enable Prometheus metrics for Cilium Operator
+    operator:
+      prometheus:
+        enabled: true
+        port: 9963
+
+    # Enable Hubble for flow visibility
+    hubble:
+      enabled: true
+      relay:
+        enabled: true
+      metrics:
+        enabled:
+          - dns
+          - drop
+          - tcp
+          - flow
+          - icmp
+          - http
+        serviceMonitor:
+          enabled: false
+      ui:
+        enabled: true
+
+---
+# =============================================================================
+# ServiceMonitor for Prometheus Operator (Optional)
+# =============================================================================
+# Use if you have Prometheus Operator installed
+
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: cilium-agent
+#   namespace: kube-system
+# spec:
+#   selector:
+#     matchLabels:
+#       k8s-app: cilium
+#   endpoints:
+#     - port: metrics
+#       interval: 15s
+
+---
+# =============================================================================
+# Cilium Metrics Service (if not created by Helm)
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: cilium-agent-metrics
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cilium
+    app.kubernetes.io/component: cilium-monitoring
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless for scraping all agents
+  ports:
+    - name: metrics
+      port: 9962
+      targetPort: 9962
+  selector:
+    k8s-app: cilium
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cilium-operator-metrics
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cilium-operator
+    app.kubernetes.io/component: cilium-monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9963
+      targetPort: 9963
+  selector:
+    name: cilium-operator
