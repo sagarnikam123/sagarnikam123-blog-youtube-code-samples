@@ -1242,8 +1242,10 @@ kubectl delete -f test-deployments/test-activemq.yaml -n skywalking
 # Deploy
 kubectl apply -f test-deployments/test-rocketmq.yaml -n skywalking
 
-# Wait for ready
-kubectl wait --for=condition=Ready pod -l app=test-rocketmq -n skywalking --timeout=180s
+# Wait for ready (multiple deployments)
+kubectl wait --for=condition=Ready pod -l app=test-rocketmq,component=nameserver -n skywalking --timeout=180s
+kubectl wait --for=condition=Ready pod -l app=test-rocketmq,component=broker -n skywalking --timeout=180s
+kubectl wait --for=condition=Ready pod -l app=test-rocketmq,component=exporter -n skywalking --timeout=180s
 
 # Verify metrics
 kubectl exec -it deploy/test-rocketmq-exporter -n skywalking -- wget -qO- http://localhost:5557/metrics | head
