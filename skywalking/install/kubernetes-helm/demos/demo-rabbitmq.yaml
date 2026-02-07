@@ -5,8 +5,8 @@
 # Tests: MQ → RabbitMQ menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-rabbitmq.yaml -n skywalking
-#   kubectl port-forward svc/test-rabbitmq 15672:15672 -n skywalking
+#   kubectl apply -f demo-rabbitmq.yaml -n skywalking
+#   kubectl port-forward svc/demo-rabbitmq 15672:15672 -n skywalking
 #   # Open http://localhost:15672 (guest/guest)
 # =============================================================================
 
@@ -14,18 +14,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-rabbitmq
+  name: demo-rabbitmq
   labels:
-    app: test-rabbitmq
+    app: demo-rabbitmq
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-rabbitmq
+      app: demo-rabbitmq
   template:
     metadata:
       labels:
-        app: test-rabbitmq
+        app: demo-rabbitmq
     spec:
       containers:
         - name: rabbitmq
@@ -64,9 +64,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-rabbitmq
+  name: demo-rabbitmq
   labels:
-    app: test-rabbitmq
+    app: demo-rabbitmq
 spec:
   type: ClusterIP
   ports:
@@ -77,4 +77,4 @@ spec:
     - name: metrics
       port: 15692
   selector:
-    app: test-rabbitmq
+    app: demo-rabbitmq

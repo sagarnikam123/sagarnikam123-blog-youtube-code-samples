@@ -5,26 +5,26 @@
 # Tests: Database → Redis menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-redis.yaml -n skywalking
-#   kubectl exec -it deploy/test-redis -c redis -- redis-cli
+#   kubectl apply -f demo-redis.yaml -n skywalking
+#   kubectl exec -it deploy/demo-redis -c redis -- redis-cli
 # =============================================================================
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-redis
+  name: demo-redis
   labels:
-    app: test-redis
+    app: demo-redis
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-redis
+      app: demo-redis
   template:
     metadata:
       labels:
-        app: test-redis
+        app: demo-redis
     spec:
       containers:
         # Redis Server
@@ -67,9 +67,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-redis
+  name: demo-redis
   labels:
-    app: test-redis
+    app: demo-redis
 spec:
   type: ClusterIP
   ports:
@@ -78,4 +78,4 @@ spec:
     - name: metrics
       port: 9121
   selector:
-    app: test-redis
+    app: demo-redis

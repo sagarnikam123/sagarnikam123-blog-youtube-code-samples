@@ -1,58 +1,56 @@
 # =============================================================================
-# Test MySQL Deployment for Database Monitoring
+# Test PostgreSQL Deployment for Database Monitoring
 # =============================================================================
-# Deploys: MySQL + mysqld-exporter
-# Tests: Database → MySQL menu in SkyWalking
+# Deploys: PostgreSQL + postgres-exporter
+# Tests: Database → PostgreSQL menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-mysql.yaml -n skywalking
-#   kubectl exec -it deploy/test-mysql -c mysql -- mysql -uroot -ptest123
+#   kubectl apply -f demo-postgresql.yaml -n skywalking
+#   kubectl exec -it deploy/demo-postgresql -c postgres -- psql -U postgres
 # =============================================================================
 
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: test-mysql-secret
+  name: demo-postgresql-secret
   labels:
-    app: test-mysql
+    app: demo-postgresql
 type: Opaque
 stringData:
-  MYSQL_ROOT_PASSWORD: "test123"
-  MYSQL_USER: "exporter"
-  MYSQL_PASSWORD: "exporter123"
+  POSTGRES_PASSWORD: "test123"
   # Exporter connection string
-  DATA_SOURCE_NAME: "exporter:exporter123@tcp(localhost:3306)/"
+  DATA_SOURCE_NAME: "postgresql://postgres:test123@localhost:5432/postgres?sslmode=disable"
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-mysql
+  name: demo-postgresql
   labels:
-    app: test-mysql
+    app: demo-postgresql
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-mysql
+      app: demo-postgresql
   template:
     metadata:
       labels:
-        app: test-mysql
+        app: demo-postgresql
     spec:
       containers:
-        # MySQL Server
-        - name: mysql
-          image: mysql:8.0
+        # PostgreSQL Server
+        - name: postgres
+          image: postgres:16-alpine
           ports:
-            - containerPort: 3306
+            - containerPort: 5432
           env:
-            - name: MYSQL_ROOT_PASSWORD
+            - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: test-mysql-secret
-                  key: MYSQL_ROOT_PASSWORD
+                  name: demo-postgresql-secret
+                  key: POSTGRES_PASSWORD
           resources:
             requests:
               cpu: 100m
@@ -61,17 +59,17 @@ spec:
               cpu: 500m
               memory: 512Mi
 
-        # MySQL Exporter (sidecar)
-        - name: mysql-exporter
-          image: prom/mysqld-exporter:v0.16.0
+        # PostgreSQL Exporter (sidecar)
+        - name: postgres-exporter
+          image: prometheuscommunity/postgres-exporter:v0.16.0
           ports:
             - name: metrics
-              containerPort: 9104
+              containerPort: 9187
           env:
             - name: DATA_SOURCE_NAME
               valueFrom:
                 secretKeyRef:
-                  name: test-mysql-secret
+                  name: demo-postgresql-secret
                   key: DATA_SOURCE_NAME
           resources:
             requests:
@@ -85,15 +83,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-mysql
+  name: demo-postgresql
   labels:
-    app: test-mysql
+    app: demo-postgresql
 spec:
   type: ClusterIP
   ports:
-    - name: mysql
-      port: 3306
+    - name: postgres
+      port: 5432
     - name: metrics
-      port: 9104
+      port: 9187
   selector:
-    app: test-mysql
+    app: demo-postgresql

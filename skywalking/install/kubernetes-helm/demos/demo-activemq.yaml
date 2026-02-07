@@ -5,8 +5,8 @@
 # Tests: MQ → ActiveMQ menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-activemq.yaml -n skywalking
-#   kubectl port-forward svc/test-activemq 8161:8161 -n skywalking
+#   kubectl apply -f demo-activemq.yaml -n skywalking
+#   kubectl port-forward svc/demo-activemq 8161:8161 -n skywalking
 #   # Open http://localhost:8161/admin (admin/admin)
 # =============================================================================
 
@@ -14,9 +14,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-activemq-jmx-config
+  name: demo-activemq-jmx-config
   labels:
-    app: test-activemq
+    app: demo-activemq
 data:
   jmx-config.yaml: |
     ---
@@ -30,18 +30,18 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-activemq
+  name: demo-activemq
   labels:
-    app: test-activemq
+    app: demo-activemq
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-activemq
+      app: demo-activemq
   template:
     metadata:
       labels:
-        app: test-activemq
+        app: demo-activemq
     spec:
       containers:
         # ActiveMQ Classic
@@ -89,15 +89,15 @@ spec:
       volumes:
         - name: jmx-config
           configMap:
-            name: test-activemq-jmx-config
+            name: demo-activemq-jmx-config
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-activemq
+  name: demo-activemq
   labels:
-    app: test-activemq
+    app: demo-activemq
 spec:
   type: ClusterIP
   ports:
@@ -110,4 +110,4 @@ spec:
     - name: metrics
       port: 9404
   selector:
-    app: test-activemq
+    app: demo-activemq

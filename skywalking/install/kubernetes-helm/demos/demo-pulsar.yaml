@@ -5,26 +5,26 @@
 # Tests: MQ → Pulsar menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-pulsar.yaml -n skywalking
-#   kubectl exec -it deploy/test-pulsar -- bin/pulsar-client produce test -m "hello"
+#   kubectl apply -f demo-pulsar.yaml -n skywalking
+#   kubectl exec -it deploy/demo-pulsar -- bin/pulsar-client produce test -m "hello"
 # =============================================================================
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-pulsar
+  name: demo-pulsar
   labels:
-    app: test-pulsar
+    app: demo-pulsar
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-pulsar
+      app: demo-pulsar
   template:
     metadata:
       labels:
-        app: test-pulsar
+        app: demo-pulsar
     spec:
       containers:
         - name: pulsar
@@ -58,9 +58,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-pulsar
+  name: demo-pulsar
   labels:
-    app: test-pulsar
+    app: demo-pulsar
 spec:
   type: ClusterIP
   ports:
@@ -71,4 +71,4 @@ spec:
     - name: metrics
       port: 8080
   selector:
-    app: test-pulsar
+    app: demo-pulsar

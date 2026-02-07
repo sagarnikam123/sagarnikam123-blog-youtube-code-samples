@@ -5,8 +5,8 @@
 # Tests: Database → Elasticsearch menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-elasticsearch.yaml -n skywalking
-#   kubectl port-forward svc/test-elasticsearch 9200:9200 -n skywalking
+#   kubectl apply -f demo-elasticsearch.yaml -n skywalking
+#   kubectl port-forward svc/demo-elasticsearch 9200:9200 -n skywalking
 #   curl http://localhost:9200
 # =============================================================================
 
@@ -14,18 +14,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-elasticsearch
+  name: demo-elasticsearch
   labels:
-    app: test-elasticsearch
+    app: demo-elasticsearch
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-elasticsearch
+      app: demo-elasticsearch
   template:
     metadata:
       labels:
-        app: test-elasticsearch
+        app: demo-elasticsearch
     spec:
       containers:
         # Elasticsearch (single-node for testing)
@@ -70,9 +70,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-elasticsearch
+  name: demo-elasticsearch
   labels:
-    app: test-elasticsearch
+    app: demo-elasticsearch
 spec:
   type: ClusterIP
   ports:
@@ -83,4 +83,4 @@ spec:
     - name: metrics
       port: 9114
   selector:
-    app: test-elasticsearch
+    app: demo-elasticsearch

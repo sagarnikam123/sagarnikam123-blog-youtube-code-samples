@@ -5,8 +5,8 @@
 # Tests: Flink menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-flink.yaml -n skywalking
-#   kubectl port-forward svc/test-flink-jobmanager 8081:8081 -n skywalking
+#   kubectl apply -f demo-flink.yaml -n skywalking
+#   kubectl port-forward svc/demo-flink-jobmanager 8081:8081 -n skywalking
 #   # Open http://localhost:8081 (Flink Dashboard)
 # =============================================================================
 
@@ -14,12 +14,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-flink-config
+  name: demo-flink-config
   labels:
-    app: test-flink
+    app: demo-flink
 data:
   flink-conf.yaml: |
-    jobmanager.rpc.address: test-flink-jobmanager
+    jobmanager.rpc.address: demo-flink-jobmanager
     jobmanager.rpc.port: 6123
     jobmanager.memory.process.size: 512m
     taskmanager.memory.process.size: 512m
@@ -34,20 +34,20 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-flink-jobmanager
+  name: demo-flink-jobmanager
   labels:
-    app: test-flink
+    app: demo-flink
     component: jobmanager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-flink
+      app: demo-flink
       component: jobmanager
   template:
     metadata:
       labels:
-        app: test-flink
+        app: demo-flink
         component: jobmanager
     spec:
       containers:
@@ -66,7 +66,7 @@ spec:
           env:
             - name: FLINK_PROPERTIES
               value: |
-                jobmanager.rpc.address: test-flink-jobmanager
+                jobmanager.rpc.address: demo-flink-jobmanager
                 metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
                 metrics.reporter.prom.port: 9249
           resources:
@@ -83,15 +83,15 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: test-flink-config
+            name: demo-flink-config
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-flink-jobmanager
+  name: demo-flink-jobmanager
   labels:
-    app: test-flink
+    app: demo-flink
 spec:
   type: ClusterIP
   ports:
@@ -104,27 +104,27 @@ spec:
     - name: metrics
       port: 9249
   selector:
-    app: test-flink
+    app: demo-flink
     component: jobmanager
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-flink-taskmanager
+  name: demo-flink-taskmanager
   labels:
-    app: test-flink
+    app: demo-flink
     component: taskmanager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-flink
+      app: demo-flink
       component: taskmanager
   template:
     metadata:
       labels:
-        app: test-flink
+        app: demo-flink
         component: taskmanager
     spec:
       containers:
@@ -141,7 +141,7 @@ spec:
           env:
             - name: FLINK_PROPERTIES
               value: |
-                jobmanager.rpc.address: test-flink-jobmanager
+                jobmanager.rpc.address: demo-flink-jobmanager
                 metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
                 metrics.reporter.prom.port: 9249
           resources:
@@ -156,9 +156,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-flink-taskmanager
+  name: demo-flink-taskmanager
   labels:
-    app: test-flink
+    app: demo-flink
 spec:
   type: ClusterIP
   clusterIP: None
@@ -166,5 +166,5 @@ spec:
     - name: metrics
       port: 9249
   selector:
-    app: test-flink
+    app: demo-flink
     component: taskmanager

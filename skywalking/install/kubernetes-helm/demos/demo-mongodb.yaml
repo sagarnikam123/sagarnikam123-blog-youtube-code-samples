@@ -5,17 +5,17 @@
 # Tests: Database → MongoDB menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-mongodb.yaml -n skywalking
-#   kubectl exec -it deploy/test-mongodb -c mongodb -- mongosh
+#   kubectl apply -f demo-mongodb.yaml -n skywalking
+#   kubectl exec -it deploy/demo-mongodb -c mongodb -- mongosh
 # =============================================================================
 
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: test-mongodb-secret
+  name: demo-mongodb-secret
   labels:
-    app: test-mongodb
+    app: demo-mongodb
 type: Opaque
 stringData:
   MONGO_INITDB_ROOT_USERNAME: "admin"
@@ -27,18 +27,18 @@ stringData:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-mongodb
+  name: demo-mongodb
   labels:
-    app: test-mongodb
+    app: demo-mongodb
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-mongodb
+      app: demo-mongodb
   template:
     metadata:
       labels:
-        app: test-mongodb
+        app: demo-mongodb
     spec:
       containers:
         # MongoDB Server
@@ -50,12 +50,12 @@ spec:
             - name: MONGO_INITDB_ROOT_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: test-mongodb-secret
+                  name: demo-mongodb-secret
                   key: MONGO_INITDB_ROOT_USERNAME
             - name: MONGO_INITDB_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: test-mongodb-secret
+                  name: demo-mongodb-secret
                   key: MONGO_INITDB_ROOT_PASSWORD
           resources:
             requests:
@@ -75,7 +75,7 @@ spec:
             - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:
-                  name: test-mongodb-secret
+                  name: demo-mongodb-secret
                   key: MONGODB_URI
           args:
             - --compatible-mode
@@ -91,9 +91,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-mongodb
+  name: demo-mongodb
   labels:
-    app: test-mongodb
+    app: demo-mongodb
 spec:
   type: ClusterIP
   ports:
@@ -102,4 +102,4 @@ spec:
     - name: metrics
       port: 9216
   selector:
-    app: test-mongodb
+    app: demo-mongodb

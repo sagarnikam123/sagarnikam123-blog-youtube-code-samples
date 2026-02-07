@@ -5,27 +5,27 @@
 # Tests: MQ → RocketMQ menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-rocketmq.yaml -n skywalking
+#   kubectl apply -f demo-rocketmq.yaml -n skywalking
 # =============================================================================
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-rocketmq-nameserver
+  name: demo-rocketmq-nameserver
   labels:
-    app: test-rocketmq
+    app: demo-rocketmq
     component: nameserver
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-rocketmq
+      app: demo-rocketmq
       component: nameserver
   template:
     metadata:
       labels:
-        app: test-rocketmq
+        app: demo-rocketmq
         component: nameserver
     spec:
       containers:
@@ -50,42 +50,42 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-rocketmq-nameserver
+  name: demo-rocketmq-nameserver
   labels:
-    app: test-rocketmq
+    app: demo-rocketmq
 spec:
   type: ClusterIP
   ports:
     - name: namesrv
       port: 9876
   selector:
-    app: test-rocketmq
+    app: demo-rocketmq
     component: nameserver
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-rocketmq-broker
+  name: demo-rocketmq-broker
   labels:
-    app: test-rocketmq
+    app: demo-rocketmq
     component: broker
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-rocketmq
+      app: demo-rocketmq
       component: broker
   template:
     metadata:
       labels:
-        app: test-rocketmq
+        app: demo-rocketmq
         component: broker
     spec:
       containers:
         - name: broker
           image: apache/rocketmq:5.2.0
-          command: ["sh", "-c", "mqbroker -n test-rocketmq-nameserver:9876 autoCreateTopicEnable=true"]
+          command: ["sh", "-c", "mqbroker -n demo-rocketmq-nameserver:9876 autoCreateTopicEnable=true"]
           ports:
             - name: broker
               containerPort: 10911
@@ -104,16 +104,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-rocketmq-broker
+  name: demo-rocketmq-broker
   labels:
-    app: test-rocketmq
+    app: demo-rocketmq
 spec:
   type: ClusterIP
   ports:
     - name: broker
       port: 10911
   selector:
-    app: test-rocketmq
+    app: demo-rocketmq
     component: broker
 
 ---
@@ -121,20 +121,20 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-rocketmq-exporter
+  name: demo-rocketmq-exporter
   labels:
-    app: test-rocketmq
+    app: demo-rocketmq
     component: exporter
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-rocketmq
+      app: demo-rocketmq
       component: exporter
   template:
     metadata:
       labels:
-        app: test-rocketmq
+        app: demo-rocketmq
         component: exporter
     spec:
       containers:
@@ -145,7 +145,7 @@ spec:
               containerPort: 5557
           env:
             - name: rocketmq.config.namesrvAddr
-              value: "test-rocketmq-nameserver:9876"
+              value: "demo-rocketmq-nameserver:9876"
           resources:
             requests:
               cpu: 50m
@@ -158,14 +158,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-rocketmq
+  name: demo-rocketmq
   labels:
-    app: test-rocketmq
+    app: demo-rocketmq
 spec:
   type: ClusterIP
   ports:
     - name: metrics
       port: 5557
   selector:
-    app: test-rocketmq
+    app: demo-rocketmq
     component: exporter

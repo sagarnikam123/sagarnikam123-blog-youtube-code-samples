@@ -4,16 +4,16 @@
 # Scrapes metrics from all test deployments and forwards to SkyWalking OAP
 #
 # Usage:
-#   kubectl apply -f otel-collector-test.yaml -n skywalking
+#   kubectl apply -f otel-collector-demo.yaml -n skywalking
 # =============================================================================
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: otel-collector-test-config
+  name: otel-collector-demo-config
   labels:
-    app: otel-collector-test
+    app: otel-collector-demo
 data:
   config.yaml: |
     receivers:
@@ -21,112 +21,112 @@ data:
         config:
           scrape_configs:
             # Gateway Tests
-            - job_name: 'test-nginx'
+            - job_name: 'demo-nginx'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-nginx:9113']
+                - targets: ['demo-nginx:9113']
               relabel_configs:
                 - target_label: service
-                  replacement: nginx::test-nginx
+                  replacement: nginx::demo-nginx
 
             # Database Tests
-            - job_name: 'test-mysql'
+            - job_name: 'demo-mysql'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-mysql:9104']
+                - targets: ['demo-mysql:9104']
               relabel_configs:
                 - target_label: service
-                  replacement: mysql::test-mysql
+                  replacement: mysql::demo-mysql
 
-            - job_name: 'test-postgresql'
+            - job_name: 'demo-postgresql'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-postgresql:9187']
+                - targets: ['demo-postgresql:9187']
               relabel_configs:
                 - target_label: service
-                  replacement: postgresql::test-postgresql
+                  replacement: postgresql::demo-postgresql
 
-            - job_name: 'test-redis'
+            - job_name: 'demo-redis'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-redis:9121']
+                - targets: ['demo-redis:9121']
               relabel_configs:
                 - target_label: service
-                  replacement: redis::test-redis
+                  replacement: redis::demo-redis
 
-            - job_name: 'test-mongodb'
+            - job_name: 'demo-mongodb'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-mongodb:9216']
+                - targets: ['demo-mongodb:9216']
               relabel_configs:
                 - target_label: service
-                  replacement: mongodb::test-mongodb
+                  replacement: mongodb::demo-mongodb
 
-            - job_name: 'test-elasticsearch'
+            - job_name: 'demo-elasticsearch'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-elasticsearch:9114']
+                - targets: ['demo-elasticsearch:9114']
               relabel_configs:
                 - target_label: service
-                  replacement: elasticsearch::test-elasticsearch
+                  replacement: elasticsearch::demo-elasticsearch
 
             # Message Queue Tests
-            - job_name: 'test-kafka'
+            - job_name: 'demo-kafka'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-kafka:9308']
+                - targets: ['demo-kafka:9308']
               relabel_configs:
                 - target_label: service
-                  replacement: kafka::test-kafka
+                  replacement: kafka::demo-kafka
 
-            - job_name: 'test-rabbitmq'
+            - job_name: 'demo-rabbitmq'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-rabbitmq:15692']
+                - targets: ['demo-rabbitmq:15692']
               relabel_configs:
                 - target_label: service
-                  replacement: rabbitmq::test-rabbitmq
+                  replacement: rabbitmq::demo-rabbitmq
 
-            - job_name: 'test-pulsar'
+            - job_name: 'demo-pulsar'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-pulsar:8080']
+                - targets: ['demo-pulsar:8080']
               relabel_configs:
                 - target_label: service
-                  replacement: pulsar::test-pulsar
+                  replacement: pulsar::demo-pulsar
 
-            - job_name: 'test-activemq'
+            - job_name: 'demo-activemq'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-activemq:9404']
+                - targets: ['demo-activemq:9404']
               relabel_configs:
                 - target_label: service
-                  replacement: activemq::test-activemq
+                  replacement: activemq::demo-activemq
 
-            - job_name: 'test-rocketmq'
+            - job_name: 'demo-rocketmq'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-rocketmq:5557']
+                - targets: ['demo-rocketmq:5557']
               relabel_configs:
                 - target_label: service
-                  replacement: rocketmq::test-rocketmq
+                  replacement: rocketmq::demo-rocketmq
 
             # Data Processing Tests
-            - job_name: 'test-flink-jobmanager'
+            - job_name: 'demo-flink-jobmanager'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-flink-jobmanager:9249']
+                - targets: ['demo-flink-jobmanager:9249']
               relabel_configs:
                 - target_label: service
-                  replacement: flink::test-flink-jobmanager
+                  replacement: flink::demo-flink-jobmanager
 
-            - job_name: 'test-flink-taskmanager'
+            - job_name: 'demo-flink-taskmanager'
               scrape_interval: 15s
               static_configs:
-                - targets: ['test-flink-taskmanager:9249']
+                - targets: ['demo-flink-taskmanager:9249']
               relabel_configs:
                 - target_label: service
-                  replacement: flink::test-flink-taskmanager
+                  replacement: flink::demo-flink-taskmanager
 
     processors:
       batch:
@@ -149,18 +149,18 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: otel-collector-test
+  name: otel-collector-demo
   labels:
-    app: otel-collector-test
+    app: otel-collector-demo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: otel-collector-test
+      app: otel-collector-demo
   template:
     metadata:
       labels:
-        app: otel-collector-test
+        app: otel-collector-demo
     spec:
       containers:
         - name: otel-collector
@@ -179,4 +179,4 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: otel-collector-test-config
+            name: otel-collector-demo-config

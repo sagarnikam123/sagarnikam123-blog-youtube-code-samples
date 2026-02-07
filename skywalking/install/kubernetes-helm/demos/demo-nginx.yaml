@@ -5,17 +5,17 @@
 # Tests: Gateway → NGINX menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-nginx.yaml -n skywalking
-#   kubectl port-forward svc/test-nginx 8080:80 -n skywalking
+#   kubectl apply -f demo-nginx.yaml -n skywalking
+#   kubectl port-forward svc/demo-nginx 8080:80 -n skywalking
 # =============================================================================
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-nginx-config
+  name: demo-nginx-config
   labels:
-    app: test-nginx
+    app: demo-nginx
 data:
   nginx.conf: |
     events {
@@ -26,7 +26,7 @@ data:
         listen 80;
 
         location / {
-          return 200 'Hello from test-nginx\n';
+          return 200 'Hello from demo-nginx\n';
           add_header Content-Type text/plain;
         }
 
@@ -42,18 +42,18 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-nginx
+  name: demo-nginx
   labels:
-    app: test-nginx
+    app: demo-nginx
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-nginx
+      app: demo-nginx
   template:
     metadata:
       labels:
-        app: test-nginx
+        app: demo-nginx
     spec:
       containers:
         # Nginx Server
@@ -91,15 +91,15 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: test-nginx-config
+            name: demo-nginx-config
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-nginx
+  name: demo-nginx
   labels:
-    app: test-nginx
+    app: demo-nginx
 spec:
   type: ClusterIP
   ports:
@@ -108,4 +108,4 @@ spec:
     - name: metrics
       port: 9113
   selector:
-    app: test-nginx
+    app: demo-nginx

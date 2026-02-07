@@ -5,9 +5,9 @@
 # Tests: MQ → Kafka menu in SkyWalking
 #
 # Usage:
-#   kubectl apply -f test-kafka.yaml -n skywalking
+#   kubectl apply -f demo-kafka.yaml -n skywalking
 #   # Create test topic
-#   kubectl exec -it deploy/test-kafka -c kafka -- \
+#   kubectl exec -it deploy/demo-kafka -c kafka -- \
 #     kafka-topics.sh --create --topic test --bootstrap-server localhost:9092
 # =============================================================================
 
@@ -15,18 +15,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-kafka
+  name: demo-kafka
   labels:
-    app: test-kafka
+    app: demo-kafka
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-kafka
+      app: demo-kafka
   template:
     metadata:
       labels:
-        app: test-kafka
+        app: demo-kafka
     spec:
       containers:
         # Kafka (KRaft mode - no Zookeeper needed)
@@ -81,9 +81,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-kafka
+  name: demo-kafka
   labels:
-    app: test-kafka
+    app: demo-kafka
 spec:
   type: ClusterIP
   ports:
@@ -92,4 +92,4 @@ spec:
     - name: metrics
       port: 9308
   selector:
-    app: test-kafka
+    app: demo-kafka
