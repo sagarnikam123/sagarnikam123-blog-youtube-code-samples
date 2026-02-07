@@ -105,12 +105,6 @@ install_skywalking() {
         exit 1
     fi
 
-    # Create namespace
-    if ! kubectl get namespace "${NAMESPACE}" &> /dev/null; then
-        log_info "Creating namespace: ${NAMESPACE}"
-        kubectl create namespace "${NAMESPACE}"
-    fi
-
     # Check if already installed
     if helm status "${RELEASE_NAME}" -n "${NAMESPACE}" &> /dev/null; then
         log_warn "SkyWalking is already installed"
@@ -122,18 +116,30 @@ install_skywalking() {
                 --version "${HELM_VERSION}" \
                 -n "${NAMESPACE}" \
                 -f "${values_file}" \
-                --wait --timeout=10m
+                --timeout=15m
         else
             return 0
         fi
     else
         log_info "Installing SkyWalking..."
+        # Note: --create-namespace creates namespace if it doesn't exist
+        # Note: Not using --wait because the oap-init hook runs post-install
         helm install "${RELEASE_NAME}" "${HELM_CHART}" \
             --version "${HELM_VERSION}" \
-            -n "${NAMESPACE}" \
+            -n "${NAMESPACE}" --create-namespace \
             -f "${values_file}" \
-            --wait --timeout=10m
+            --timeout=15m
     fi
+
+    # Wait for oap-init job to complete (creates BanyanDB schema)
+    log_info "Waiting for OAP init job to complete (creates BanyanDB schema)..."
+    if ! kubectl wait --for=condition=complete job -l app=skywalking,component=skywalking-job -n "${NAMESPACE}" --timeout=10m 2>/dev/null; then
+        log_warn "Init job wait timed out, checking status..."
+    fi
+
+    # Wait for OAP to be ready
+    log_info "Waiting for OAP server to be ready..."
+    kubectl wait --for=condition=Ready pods -l app=skywalking,component=oap -n "${NAMESPACE}" --timeout=10m
 
     log_success "SkyWalking installed successfully"
 }
