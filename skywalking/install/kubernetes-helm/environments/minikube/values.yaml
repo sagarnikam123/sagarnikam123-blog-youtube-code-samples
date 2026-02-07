@@ -186,6 +186,8 @@ satellite:
     # Backend OAP servers
     SATELLITE_GRPC_CLIENT_FINDER: "static"
     SATELLITE_GRPC_CLIENT_STATIC_SERVERS: "skywalking-oap:11800"
+    # Increase gRPC timeout to avoid DeadlineExceeded errors
+    SATELLITE_GRPC_CLIENT_TIMEOUT: "30s"
     # Logging
     SATELLITE_LOGGING_LEVEL: "INFO"
 
