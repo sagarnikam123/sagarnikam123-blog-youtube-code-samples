@@ -69,11 +69,11 @@ oap:
   # Disable anti-affinity for single node
   antiAffinity: "soft"
 
-  # Faster startup probes for local testing
+  # Startup probes - allow more time for first-time BanyanDB table creation
   startupProbe:
     tcpSocket:
       port: 12800
-    failureThreshold: 30
+    failureThreshold: 60
     periodSeconds: 10
 
   livenessProbe:
