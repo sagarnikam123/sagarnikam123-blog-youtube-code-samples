@@ -1,0 +1,211 @@
+# =============================================================================
+# Sample Java Application with SkyWalking Agent
+# =============================================================================
+# A simple Spring Boot application instrumented with SkyWalking Java Agent
+# Generates: Traces, Metrics, Logs
+#
+# Deploy:
+#   kubectl apply -f demos/demo-app-java.yaml -n skywalking
+#
+# Test:
+#   kubectl port-forward svc/demo-app-java 8081:8080 -n skywalking
+#   curl http://localhost:8081/hello
+#   curl http://localhost:8081/slow
+#   curl http://localhost:8081/error
+#
+# View in UI:
+#   General Service → demo-app-java
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-app-java-config
+  namespace: skywalking
+data:
+  # Simple Spring Boot app with multiple endpoints
+  Application.java: |
+    package com.example.demo;
+
+    import org.springframework.boot.SpringApplication;
+    import org.springframework.boot.autoconfigure.SpringBootApplication;
+    import org.springframework.web.bind.annotation.*;
+    import org.slf4j.Logger;
+    import org.slf4j.LoggerFactory;
+    import java.util.Random;
+    import java.util.concurrent.TimeUnit;
+
+    @SpringBootApplication
+    @RestController
+    public class Application {
+        private static final Logger logger = LoggerFactory.getLogger(Application.class);
+        private final Random random = new Random();
+
+        public static void main(String[] args) {
+            SpringApplication.run(Application.class, args);
+        }
+
+        @GetMapping("/")
+        public String root() {
+            logger.info("Root endpoint called");
+            return "SkyWalking Java Demo App";
+        }
+
+        @GetMapping("/hello")
+        public String hello(@RequestParam(defaultValue = "World") String name) {
+            logger.info("Hello endpoint called with name: {}", name);
+            return "Hello, " + name + "!";
+        }
+
+        @GetMapping("/slow")
+        public String slow() throws InterruptedException {
+            int delay = 500 + random.nextInt(1500);
+            logger.warn("Slow endpoint called, sleeping for {}ms", delay);
+            TimeUnit.MILLISECONDS.sleep(delay);
+            return "Slow response after " + delay + "ms";
+        }
+
+        @GetMapping("/error")
+        public String error() {
+            logger.error("Error endpoint called - simulating error");
+            if (random.nextBoolean()) {
+                throw new RuntimeException("Simulated error!");
+            }
+            return "No error this time";
+        }
+
+        @GetMapping("/health")
+        public String health() {
+            return "OK";
+        }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app-java
+  namespace: skywalking
+  labels:
+    app: demo-app-java
+    app.kubernetes.io/name: demo-app-java
+    app.kubernetes.io/component: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app-java
+  template:
+    metadata:
+      labels:
+        app: demo-app-java
+    spec:
+      initContainers:
+        # Download SkyWalking Java Agent
+        - name: agent-init
+          image: apache/skywalking-java-agent:9.3.0-java17
+          command: ['sh', '-c', 'cp -r /skywalking/agent/* /agent/']
+          volumeMounts:
+            - name: agent
+              mountPath: /agent
+      containers:
+        - name: app
+          # Using Spring Boot Petclinic as demo app
+          image: springcommunity/spring-framework-petclinic:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # SkyWalking Agent Configuration
+            - name: SW_AGENT_NAME
+              value: "demo-app-java"
+            - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+              # Use skywalking-oap:11800 for direct connection (recommended)
+              # Use skywalking-satellite:11800 for load-balanced connection via Satellite
+              value: "skywalking-oap:11800"
+            - name: SW_LOGGING_LEVEL
+              value: "INFO"
+            - name: SW_AGENT_INSTANCE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # Ignore health check traces
+            - name: SW_AGENT_TRACE_IGNORE_PATH
+              value: "/actuator/**"
+            # Java options to load agent
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/skywalking/agent/skywalking-agent.jar"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 5
+          volumeMounts:
+            - name: agent
+              mountPath: /skywalking/agent
+      volumes:
+        - name: agent
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app-java
+  namespace: skywalking
+  labels:
+    app: demo-app-java
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: demo-app-java
+
+---
+# CronJob to generate continuous traffic
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: demo-app-java-traffic
+  namespace: skywalking
+spec:
+  schedule: "* * * * *"  # Every minute
+  concurrencyPolicy: Allow
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: traffic-generator
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  for i in $(seq 1 10); do
+                    curl -s http://demo-app-java:8080/
+                    curl -s http://demo-app-java:8080/owners/find
+                    curl -s http://demo-app-java:8080/vets.html
+                    curl -s http://demo-app-java:8080/oups || true
+                    sleep 2
+                  done
+          restartPolicy: OnFailure

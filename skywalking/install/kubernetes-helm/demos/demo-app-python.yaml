@@ -1,0 +1,227 @@
+# =============================================================================
+# Sample Python Application with SkyWalking Agent
+# =============================================================================
+# A simple Flask application instrumented with SkyWalking Python Agent
+# Generates: Traces, Metrics, Logs
+#
+# Deploy:
+#   kubectl apply -f demos/demo-app-python.yaml -n skywalking
+#
+# Test:
+#   kubectl port-forward svc/demo-app-python 8082:8080 -n skywalking
+#   curl http://localhost:8082/hello
+#   curl http://localhost:8082/slow
+#   curl http://localhost:8082/error
+#
+# View in UI:
+#   General Service → demo-app-python
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-app-python-code
+  namespace: skywalking
+data:
+  app.py: |
+    import logging
+    import random
+    import time
+    from flask import Flask, request, jsonify
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
+
+    app = Flask(__name__)
+
+    @app.route('/')
+    def root():
+        logger.info("Root endpoint called")
+        return "SkyWalking Python Demo App"
+
+    @app.route('/hello')
+    def hello():
+        name = request.args.get('name', 'World')
+        logger.info(f"Hello endpoint called with name: {name}")
+        return f"Hello, {name}!"
+
+    @app.route('/slow')
+    def slow():
+        delay = random.uniform(0.5, 2.0)
+        logger.warning(f"Slow endpoint called, sleeping for {delay:.2f}s")
+        time.sleep(delay)
+        return f"Slow response after {delay:.2f}s"
+
+    @app.route('/error')
+    def error():
+        logger.error("Error endpoint called - simulating error")
+        if random.random() > 0.5:
+            raise Exception("Simulated error!")
+        return "No error this time"
+
+    @app.route('/health')
+    def health():
+        return "OK"
+
+    @app.route('/chain')
+    def chain():
+        """Call another service to demonstrate distributed tracing"""
+        import urllib.request
+        logger.info("Chain endpoint - calling Java service")
+        try:
+            with urllib.request.urlopen('http://demo-app-java:8080/hello?name=FromPython', timeout=5) as response:
+                result = response.read().decode('utf-8')
+                return f"Chain result: {result}"
+        except Exception as e:
+            logger.error(f"Chain call failed: {e}")
+            return f"Chain failed: {str(e)}", 500
+
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        logger.exception(f"Unhandled exception: {e}")
+        return jsonify(error=str(e)), 500
+
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=8080)
+
+  requirements.txt: |
+    flask==3.0.0
+    apache-skywalking==1.1.0
+    werkzeug==3.0.1
+
+  entrypoint.sh: |
+    #!/bin/bash
+    set -e
+
+    # Install dependencies
+    pip install --no-cache-dir -r /app/requirements.txt
+
+    # Run with SkyWalking agent
+    sw-python run python /app/app.py
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app-python
+  namespace: skywalking
+  labels:
+    app: demo-app-python
+    app.kubernetes.io/name: demo-app-python
+    app.kubernetes.io/component: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app-python
+  template:
+    metadata:
+      labels:
+        app: demo-app-python
+    spec:
+      containers:
+        - name: app
+          image: python:3.11-slim
+          command: ["/bin/bash", "/app/entrypoint.sh"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # SkyWalking Agent Configuration
+            - name: SW_AGENT_NAME
+              value: "demo-app-python"
+            - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+              # Use skywalking-oap:11800 for direct connection (recommended)
+              # Use skywalking-satellite:11800 for load-balanced connection via Satellite
+              value: "skywalking-oap:11800"
+            - name: SW_AGENT_LOGGING_LEVEL
+              value: "INFO"
+            - name: SW_AGENT_INSTANCE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # Ignore health check traces
+            - name: SW_AGENT_TRACE_IGNORE_PATH
+              value: "/health"
+            # Enable logging reporter
+            - name: SW_AGENT_LOG_REPORTER_ACTIVE
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 45
+            periodSeconds: 5
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+      volumes:
+        - name: app-code
+          configMap:
+            name: demo-app-python-code
+            defaultMode: 0755
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app-python
+  namespace: skywalking
+  labels:
+    app: demo-app-python
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: demo-app-python
+
+---
+# CronJob to generate continuous traffic
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: demo-app-python-traffic
+  namespace: skywalking
+spec:
+  schedule: "* * * * *"  # Every minute
+  concurrencyPolicy: Allow
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: traffic-generator
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  for i in $(seq 1 10); do
+                    curl -s http://demo-app-python:8080/hello?name=User$i
+                    curl -s http://demo-app-python:8080/slow
+                    curl -s http://demo-app-python:8080/error || true
+                    curl -s http://demo-app-python:8080/chain || true
+                    sleep 1
+                  done
+          restartPolicy: OnFailure
