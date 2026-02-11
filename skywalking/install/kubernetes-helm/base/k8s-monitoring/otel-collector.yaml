@@ -34,6 +34,7 @@ data:
 
             # OAP Server Metrics
             # Menu: Self Observability → OAP
+            # OAP exposes Prometheus metrics on port 1234 (configured via SW_TELEMETRY_PROMETHEUS_PORT)
             - job_name: 'skywalking-oap'
               scrape_interval: 15s
               static_configs:
@@ -55,6 +56,7 @@ data:
 
             # Satellite Metrics
             # Menu: Self Observability → Satellite
+            # Satellite exposes Prometheus metrics on port 1234
             - job_name: 'skywalking-satellite'
               scrape_interval: 15s
               static_configs:
@@ -120,6 +122,27 @@ data:
               relabel_configs:
                 - target_label: node_identifier_host_name
                   replacement: minikube-node
+
+            # =================================================================
+            # DATABASE MONITORING
+            # Required for: Database menu in SkyWalking UI
+            # =================================================================
+
+            # Redis Metrics
+            # Menu: Database → Redis
+            # IMPORTANT: job_name must be 'redis-monitoring' to match SkyWalking's
+            # otel-rules/redis/redis-service.yaml filter
+            - job_name: 'redis-monitoring'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['demo-redis:9121']
+              relabel_configs:
+                # host_name is used by SkyWalking to create service name: redis::<host_name>
+                - target_label: host_name
+                  replacement: demo-redis
+                # service_instance_id is required for instance-level metrics
+                - target_label: service_instance_id
+                  replacement: demo-redis-instance
 
     processors:
       batch:
@@ -269,3 +292,49 @@ subjects:
   - kind: ServiceAccount
     name: otel-collector
     namespace: skywalking
+
+
+---
+# =============================================================================
+# Metrics Services for Self-Observability
+# =============================================================================
+# These services expose Prometheus metrics endpoints for OAP and Satellite
+# The Helm chart doesn't include port 1234 in the default services
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: skywalking-oap-metrics
+  namespace: skywalking
+  labels:
+    app: skywalking
+    component: oap-metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: prometheus
+      port: 1234
+      targetPort: 1234
+  selector:
+    app: skywalking
+    component: oap
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skywalking-satellite-metrics
+  namespace: skywalking
+  labels:
+    app: skywalking
+    component: satellite-metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: prometheus
+      port: 1234
+      targetPort: 1234
+  selector:
+    app: skywalking
+    component: satellite
