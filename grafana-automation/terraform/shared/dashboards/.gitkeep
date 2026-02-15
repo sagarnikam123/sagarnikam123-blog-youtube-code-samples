@@ -1,0 +1,3 @@
+# Shared dashboards used across multiple Grafana instances
+# Place common dashboard JSON files here
+# These will be deployed to all instances that enable dashboards
