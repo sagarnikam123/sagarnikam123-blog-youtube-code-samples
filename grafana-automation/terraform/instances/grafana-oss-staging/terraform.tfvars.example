@@ -1,0 +1,56 @@
+# grafana-oss-staging - Multiple datasources + 3 alerts
+grafana_url  = "http://grafana-staging.internal:3000"
+grafana_auth = "your-api-key"
+
+# Multiple datasources
+datasources = {
+  Prometheus = {
+    type       = "prometheus"
+    url        = "http://prometheus-staging:9090"
+    is_default = true
+    json_data  = { httpMethod = "POST", manageAlerts = true }
+  }
+  Loki = {
+    type      = "loki"
+    url       = "http://loki-staging:3100"
+    json_data = { maxLines = 1000 }
+  }
+  CloudWatch = {
+    type      = "cloudwatch"
+    json_data = { defaultRegion = "us-east-1" }
+  }
+}
+
+# Alerting - Get your webhook URL from https://webhook.site/
+webhook_url = "https://webhook.site/your-unique-id"
+
+# Only 3 alert rules for staging
+alert_rules = {
+  high_cpu = {
+    name           = "High CPU Usage"
+    folder_uid     = "grafana-oss-staging-monitoring"
+    datasource_uid = "prometheus"
+    expr           = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+    threshold      = 80
+    severity       = "warning"
+    summary        = "CPU usage above 80%"
+  }
+  high_memory = {
+    name           = "High Memory Usage"
+    folder_uid     = "grafana-oss-staging-monitoring"
+    datasource_uid = "prometheus"
+    expr           = "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100"
+    threshold      = 85
+    severity       = "warning"
+    summary        = "Memory usage above 85%"
+  }
+  disk_space = {
+    name           = "Low Disk Space"
+    folder_uid     = "grafana-oss-staging-monitoring"
+    datasource_uid = "prometheus"
+    expr           = "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100"
+    threshold      = 90
+    severity       = "critical"
+    summary        = "Disk usage above 90%"
+  }
+}

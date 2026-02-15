@@ -1,0 +1,98 @@
+# grafana-oss-prod - Full production setup
+grafana_url  = "https://grafana.company.com"
+grafana_auth = "your-api-key"
+
+# Multiple folders for organization
+folders = {
+  infrastructure = {
+    title = "Infrastructure"
+    uid   = "prod-infrastructure"
+  }
+  applications = {
+    title = "Applications"
+    uid   = "prod-applications"
+  }
+  business = {
+    title = "Business Metrics"
+    uid   = "prod-business"
+  }
+}
+
+# Multiple datasources
+datasources = {
+  Prometheus = {
+    type       = "prometheus"
+    url        = "http://prometheus-prod:9090"
+    is_default = true
+    json_data  = { httpMethod = "POST", manageAlerts = true }
+  }
+  Loki = {
+    type      = "loki"
+    url       = "http://loki-prod:3100"
+    json_data = { maxLines = 5000 }
+  }
+  CloudWatch = {
+    type      = "cloudwatch"
+    json_data = { defaultRegion = "us-east-1" }
+  }
+  Elasticsearch = {
+    type      = "elasticsearch"
+    url       = "http://elasticsearch-prod:9200"
+    json_data = { esVersion = "8.0.0", timeField = "@timestamp" }
+  }
+}
+
+# Production alerting
+webhook_url = "https://your-pagerduty-or-slack-webhook"
+
+alert_rules = {
+  high_cpu = {
+    name           = "High CPU Usage"
+    folder_uid     = "prod-infrastructure"
+    datasource_uid = "prometheus"
+    expr           = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+    threshold      = 80
+    severity       = "warning"
+  }
+  critical_cpu = {
+    name           = "Critical CPU Usage"
+    folder_uid     = "prod-infrastructure"
+    datasource_uid = "prometheus"
+    expr           = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+    threshold      = 95
+    severity       = "critical"
+  }
+  high_memory = {
+    name           = "High Memory Usage"
+    folder_uid     = "prod-infrastructure"
+    datasource_uid = "prometheus"
+    expr           = "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100"
+    threshold      = 85
+    severity       = "warning"
+  }
+  disk_space = {
+    name           = "Low Disk Space"
+    folder_uid     = "prod-infrastructure"
+    datasource_uid = "prometheus"
+    expr           = "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100"
+    threshold      = 85
+    severity       = "critical"
+  }
+  # Add more production alerts as needed...
+}
+
+# Teams for access control
+teams = {
+  devops = {
+    name  = "DevOps"
+    email = "devops@company.com"
+  }
+  platform = {
+    name  = "Platform"
+    email = "platform@company.com"
+  }
+  sre = {
+    name  = "SRE"
+    email = "sre@company.com"
+  }
+}

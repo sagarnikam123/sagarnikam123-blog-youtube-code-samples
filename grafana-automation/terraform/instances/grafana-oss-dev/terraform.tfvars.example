@@ -1,0 +1,13 @@
+# grafana-oss-dev - Only Loki datasource
+grafana_url  = "http://grafana-dev.internal:3000"
+grafana_auth = "your-api-key"
+
+# Only Loki - no Prometheus
+datasources = {
+  Loki = {
+    type       = "loki"
+    url        = "http://loki-dev:3100"
+    is_default = true
+    json_data  = { maxLines = 1000 }
+  }
+}

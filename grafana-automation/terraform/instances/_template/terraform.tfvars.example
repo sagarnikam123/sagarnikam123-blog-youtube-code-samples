@@ -1,0 +1,92 @@
+# =============================================================================
+# Instance Configuration Template
+# Copy to terraform.tfvars and customize
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Connection (REQUIRED)
+# -----------------------------------------------------------------------------
+grafana_url  = "http://localhost:3000"
+grafana_auth = "admin:admin"  # Or API key
+
+# -----------------------------------------------------------------------------
+# Identity (REQUIRED)
+# -----------------------------------------------------------------------------
+instance_name = "grafana-oss-template"
+environment   = "dev"
+
+# -----------------------------------------------------------------------------
+# Feature Flags - Enable what you need
+# -----------------------------------------------------------------------------
+enable_folders     = true
+enable_datasources = true
+enable_dashboards  = false  # Set true if you have dashboards/ folder
+enable_alerting    = false  # Set true and provide webhook_url
+enable_teams       = false
+
+# -----------------------------------------------------------------------------
+# Folders (optional - defaults to single "Monitoring" folder)
+# -----------------------------------------------------------------------------
+# folders = {
+#   monitoring = {
+#     title = "Monitoring"
+#   }
+#   alerts = {
+#     title = "Alert Dashboards"
+#   }
+# }
+
+# -----------------------------------------------------------------------------
+# Datasources - Configure what this instance needs
+# -----------------------------------------------------------------------------
+datasources = {
+  # Example: Only Loki
+  # Loki = {
+  #   type       = "loki"
+  #   url        = "http://loki:3100"
+  #   is_default = true
+  # }
+
+  # Example: Prometheus + Loki
+  # Prometheus = {
+  #   type       = "prometheus"
+  #   url        = "http://prometheus:9090"
+  #   is_default = true
+  #   json_data  = { httpMethod = "POST" }
+  # }
+  # Loki = {
+  #   type = "loki"
+  #   url  = "http://loki:3100"
+  # }
+}
+
+# -----------------------------------------------------------------------------
+# Dashboards
+# -----------------------------------------------------------------------------
+# dashboard_folder        = "${path.module}/dashboards"
+# shared_dashboard_folder = "../../shared/dashboards"
+
+# -----------------------------------------------------------------------------
+# Alerting
+# -----------------------------------------------------------------------------
+# webhook_url = "https://webhook.site/your-unique-id"
+# alert_rules = {
+#   high_cpu = {
+#     name           = "High CPU"
+#     folder_uid     = "monitoring"
+#     datasource_uid = "prometheus"
+#     expr           = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+#     threshold      = 80
+#     severity       = "warning"
+#   }
+# }
+
+# -----------------------------------------------------------------------------
+# Teams
+# -----------------------------------------------------------------------------
+# teams = {
+#   devops = {
+#     name  = "DevOps"
+#     email = "devops@example.com"
+#   }
+# }

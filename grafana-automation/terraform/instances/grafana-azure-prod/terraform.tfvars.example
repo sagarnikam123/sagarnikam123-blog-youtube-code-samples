@@ -1,0 +1,66 @@
+# =============================================================================
+# Azure Managed Grafana - Production
+# =============================================================================
+# Prerequisites:
+# 1. Azure Managed Grafana instance created
+# 2. Service account token created via: ./scripts/create-service-account.sh
+# =============================================================================
+
+# Azure Managed Grafana endpoint
+# Format: https://<grafana-name>-<random>.xxx.grafana.azure.com
+grafana_url = "https://my-grafana-xxxx.xxx.grafana.azure.com"
+
+# Service account token (create via Azure CLI - see scripts/create-service-account.sh)
+# Better: export TF_VAR_grafana_auth="your-token"
+grafana_auth = ""
+
+# -----------------------------------------------------------------------------
+# Datasources
+# Azure Managed Grafana supports: Azure Monitor, Log Analytics, Prometheus, etc.
+# Note: Azure Monitor is usually auto-configured
+# -----------------------------------------------------------------------------
+datasources = {
+  # Azure Monitor - usually auto-configured via managed identity
+  # AzureMonitor = {
+  #   type      = "grafana-azure-monitor-datasource"
+  #   json_data = {
+  #     cloudName = "azuremonitor"
+  #     # subscriptionId = "your-subscription-id"  # Optional
+  #   }
+  # }
+
+  # Azure Data Explorer (Kusto)
+  # AzureDataExplorer = {
+  #   type      = "grafana-azure-data-explorer-datasource"
+  #   json_data = {
+  #     clusterUrl = "https://your-cluster.region.kusto.windows.net"
+  #     database   = "your-database"
+  #   }
+  # }
+
+  # Prometheus (Azure Monitor managed Prometheus)
+  # Prometheus = {
+  #   type = "prometheus"
+  #   url  = "https://your-prometheus-endpoint.monitor.azure.com"
+  #   json_data = {
+  #     httpMethod = "POST"
+  #     azureCredentials = { authType = "msi" }
+  #   }
+  # }
+}
+
+# -----------------------------------------------------------------------------
+# Alerting (optional)
+# -----------------------------------------------------------------------------
+# webhook_url = "https://your-logic-app-or-webhook"
+
+# alert_rules = {
+#   high_cpu = {
+#     name           = "High VM CPU"
+#     folder_uid     = "grafana-azure-prod-monitoring"
+#     datasource_uid = "azuremonitor"
+#     expr           = "..."
+#     threshold      = 80
+#     severity       = "warning"
+#   }
+# }

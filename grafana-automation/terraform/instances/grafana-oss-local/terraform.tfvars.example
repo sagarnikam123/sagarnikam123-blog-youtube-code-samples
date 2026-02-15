@@ -1,0 +1,16 @@
+# grafana-oss-local - Local development
+grafana_url  = "http://localhost:3000"
+grafana_auth = "admin:admin"
+
+datasources = {
+  Prometheus = {
+    type       = "prometheus"
+    url        = "http://localhost:9090"
+    is_default = true
+    json_data  = { httpMethod = "POST" }
+  }
+  Loki = {
+    type = "loki"
+    url  = "http://localhost:3100"
+  }
+}

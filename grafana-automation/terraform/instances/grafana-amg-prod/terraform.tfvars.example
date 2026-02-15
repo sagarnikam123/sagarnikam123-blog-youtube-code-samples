@@ -1,0 +1,65 @@
+# =============================================================================
+# Amazon Managed Grafana - Production
+# =============================================================================
+# Prerequisites:
+# 1. AMG workspace created in AWS Console
+# 2. API key created via: ./scripts/create-api-key.sh
+# =============================================================================
+
+# AMG Workspace endpoint
+# Format: https://g-xxxxxxxxxx.grafana-workspace.<region>.amazonaws.com
+grafana_url = "https://g-xxxxxxxxxx.grafana-workspace.us-east-1.amazonaws.com"
+
+# API Key (create via AWS CLI - see scripts/create-api-key.sh)
+# Better: export TF_VAR_grafana_auth="your-api-key"
+grafana_auth = ""
+
+# -----------------------------------------------------------------------------
+# Datasources
+# AMG supports: CloudWatch, Prometheus, X-Ray, Timestream, etc.
+# Note: Some datasources are auto-configured via AMG workspace settings
+# -----------------------------------------------------------------------------
+datasources = {
+  # CloudWatch - usually auto-configured, but can customize
+  CloudWatch = {
+    type      = "cloudwatch"
+    json_data = {
+      defaultRegion = "us-east-1"
+      # authType = "default"  # Uses workspace IAM role
+    }
+  }
+
+  # Amazon Managed Prometheus (AMP)
+  # Prometheus = {
+  #   type = "prometheus"
+  #   url  = "https://aps-workspaces.us-east-1.amazonaws.com/workspaces/ws-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  #   json_data = {
+  #     httpMethod = "POST"
+  #     sigV4Auth  = true
+  #     sigV4AuthType = "default"
+  #     sigV4Region   = "us-east-1"
+  #   }
+  # }
+
+  # X-Ray
+  # XRay = {
+  #   type      = "grafana-x-ray-datasource"
+  #   json_data = { defaultRegion = "us-east-1" }
+  # }
+}
+
+# -----------------------------------------------------------------------------
+# Alerting (optional)
+# -----------------------------------------------------------------------------
+# webhook_url = "https://your-sns-or-webhook-endpoint"
+
+# alert_rules = {
+#   high_cpu = {
+#     name           = "High EC2 CPU"
+#     folder_uid     = "grafana-amg-prod-monitoring"
+#     datasource_uid = "cloudwatch"
+#     expr           = "..."
+#     threshold      = 80
+#     severity       = "warning"
+#   }
+# }
