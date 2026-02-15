@@ -2,20 +2,114 @@
 
 Complete guide for managing Grafana resources using Terraform Infrastructure as Code.
 
-## Overview
+Focus: Grafana OSS, Amazon Managed Grafana (AMG), and Azure Managed Grafana.
 
-The Terraform Grafana Provider allows you to manage Grafana resources (dashboards, datasources, folders, alerts) using Infrastructure as Code principles with Terraform.
+---
 
-### Key Benefits:
-- **Infrastructure as Code**: Version-controlled Grafana configuration
-- **State Management**: Track resource changes and dependencies
-- **Multi-Environment**: Consistent deployments across environments
+## Table of Contents
+
+1. [Introduction](#1-introduction)
+2. [Prerequisites](#2-prerequisites)
+3. [Provider Setup](#3-provider-setup)
+4. [Data Sources](#4-data-sources)
+5. [Folders & Permissions](#5-folders--permissions)
+6. [Dashboards](#6-dashboards)
+7. [Alerting](#7-alerting)
+8. [Access Control](#8-access-control)
+9. [OnCall Management](#9-oncall-management)
+10. [Multi-Environment Patterns](#10-multi-environment-patterns)
+11. [CI/CD Integration](#11-cicd-integration)
+12. [Best Practices](#12-best-practices)
+13. [Troubleshooting](#13-troubleshooting)
+14. [References](#14-references)
+
+---
+
+## 1. Introduction
+
+### What is Grafana Terraform Provider?
+
+The [Grafana Terraform Provider](https://registry.terraform.io/providers/grafana/grafana/latest/docs) enables Infrastructure as Code management for Grafana instances.
+
+### Supported Platforms
+
+| Platform | Description |
+|----------|-------------|
+| Grafana OSS | Self-hosted open source Grafana |
+| Amazon Managed Grafana (AMG) | AWS fully managed Grafana service |
+| Azure Managed Grafana | Azure fully managed Grafana service |
+| Grafana Cloud | Grafana Labs hosted service (limited coverage here) |
+
+### What Can You Manage?
+
+#### Core Resources (OSS, AMG, Azure)
+
+| Category | Resources | Description |
+|----------|-----------|-------------|
+| **Data Connectivity** | `grafana_data_source`, `grafana_data_source_permission` | Connect to Prometheus, Loki, CloudWatch, Azure Monitor, etc. |
+| **Organization** | `grafana_folder`, `grafana_folder_permission` | Organize and secure dashboards |
+| **Visualization** | `grafana_dashboard`, `grafana_library_panel`, `grafana_dashboard_permission`, `grafana_dashboard_public` | Create and manage visualizations |
+| **Alerting** | `grafana_rule_group`, `grafana_contact_point`, `grafana_notification_policy`, `grafana_mute_timing`, `grafana_message_template` | Complete alerting stack |
+| **Access Control** | `grafana_organization`, `grafana_team`, `grafana_user`, `grafana_service_account`, `grafana_service_account_token` | User and permission management |
+| **Other** | `grafana_annotation`, `grafana_playlist`, `grafana_sso_settings` | Annotations, playlists, SSO |
+
+#### Grafana Cloud Specific Resources
+
+| Category | Resources | Description |
+|----------|-----------|-------------|
+| **Stack Management** | `grafana_cloud_stack`, `grafana_cloud_stack_service_account` | Manage cloud stacks |
+| **Access** | `grafana_cloud_access_policy`, `grafana_cloud_access_policy_token` | Cloud access policies |
+| **Plugins** | `grafana_cloud_plugin_installation` | Install plugins |
+| **Synthetic Monitoring** | `grafana_synthetic_monitoring_check`, `grafana_synthetic_monitoring_probe` | Uptime monitoring |
+| **OnCall** | `grafana_oncall_integration`, `grafana_oncall_schedule`, `grafana_oncall_escalation_chain` | Incident management |
+| **Machine Learning** | `grafana_machine_learning_job`, `grafana_machine_learning_outlier_detector` | ML features |
+| **SLO** | `grafana_slo` | Service Level Objectives |
+| **Reporting** | `grafana_report` | Scheduled PDF reports (Enterprise) |
+
+> **Reference**: [Full Provider Documentation](https://registry.terraform.io/providers/grafana/grafana/latest/docs)
+
+### Benefits of Terraform for Grafana
+
+- **Version Control**: Track all configuration changes in Git
+- **Consistency**: Same configuration across dev/staging/prod
 - **Automation**: Integrate with CI/CD pipelines
 - **Rollback**: Easy reversion using Terraform state
+- **Audit Trail**: Complete history of who changed what
+- **Reduced Errors**: Eliminate manual configuration mistakes
 
-## Installation and Setup
+---
 
-### Provider Configuration
+## 2. Prerequisites
+
+### Software Requirements
+
+| Tool | Minimum Version | Purpose |
+|------|-----------------|---------|
+| Terraform | >= 1.0 | Infrastructure as Code tool |
+| Grafana | >= 9.1 | For alerting features |
+| Grafana Terraform Provider | >= 2.0 | Grafana resource management |
+
+### Authentication Requirements
+
+| Platform | Authentication Method |
+|----------|----------------------|
+| Grafana OSS | API Key or Basic Auth (username:password) |
+| Amazon Managed Grafana | Workspace API Key (short-lived) |
+| Azure Managed Grafana | Service Account Token via Azure CLI |
+
+### Required Permissions
+
+For full Terraform management, you need Admin-level access:
+- Create/modify/delete dashboards, folders, data sources
+- Manage alerting resources
+- Create service accounts and API keys
+
+---
+
+## 3. Provider Setup
+
+### 3.1 Grafana OSS (Self-Hosted)
+
 ```hcl
 # versions.tf
 terraform {
@@ -23,56 +117,205 @@ terraform {
   required_providers {
     grafana = {
       source  = "grafana/grafana"
-      version = "~> 2.0"
+      version = ">= 2.0"
     }
   }
 }
 
-# Configure the Grafana Provider
+# provider.tf
 provider "grafana" {
-  url  = var.grafana_url
-  auth = var.grafana_token
-  # org_id = 1  # Optional: specify organization ID
+  url  = var.grafana_url    # e.g., "http://localhost:3000"
+  auth = var.grafana_auth   # API key or "admin:admin"
 }
-```
 
-### Variables
-```hcl
 # variables.tf
 variable "grafana_url" {
   description = "Grafana server URL"
   type        = string
-  default     = "http://localhost:3000"
 }
 
-variable "grafana_token" {
-  description = "Grafana API token"
+variable "grafana_auth" {
+  description = "Grafana API key or username:password"
   type        = string
   sensitive   = true
 }
+```
 
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "dev"
+### 3.2 Amazon Managed Grafana (AMG)
+
+AMG uses a **two-plane architecture**:
+- **Control Plane** (AWS Provider): Workspace, IAM roles, SSO
+- **Data Plane** (Grafana Provider): Dashboards, data sources, alerts
+
+```hcl
+# versions.tf
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0"
+    }
+    grafana = {
+      source  = "grafana/grafana"
+      version = ">= 2.0"
+    }
+  }
+}
+
+# Control Plane: Create AMG Workspace
+resource "aws_grafana_workspace" "main" {
+  name                     = "my-grafana-workspace"
+  account_access_type      = "CURRENT_ACCOUNT"
+  authentication_providers = ["AWS_SSO"]
+  permission_type          = "SERVICE_MANAGED"
+  role_arn                 = aws_iam_role.grafana.arn
+  data_sources             = ["CLOUDWATCH", "PROMETHEUS", "XRAY"]
+}
+
+# IAM Role for AMG
+resource "aws_iam_role" "grafana" {
+  name = "grafana-workspace-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "grafana.amazonaws.com" }
+    }]
+  })
+}
+
+# API Key for Terraform (short-lived)
+resource "aws_grafana_workspace_api_key" "terraform" {
+  key_name        = "terraform-key"
+  key_role        = "ADMIN"
+  seconds_to_live = 3600
+  workspace_id    = aws_grafana_workspace.main.id
+}
+
+# Data Plane: Grafana Provider
+provider "grafana" {
+  url  = aws_grafana_workspace.main.endpoint
+  auth = aws_grafana_workspace_api_key.terraform.key
 }
 ```
 
-### Terraform Configuration
-```hcl
-# terraform.tfvars
-grafana_url   = "http://localhost:3000"
-grafana_token = "your-api-token-here"
-environment   = "production"
+#### AMG API Key Best Practice
+
+> **Important**: API keys expire. For production, manage keys outside Terraform.
+
+```bash
+# Create key before Terraform run
+API_KEY=$(aws grafana create-workspace-api-key \
+  --workspace-id $WORKSPACE_ID \
+  --key-name "terraform-$(date +%s)" \
+  --key-role ADMIN \
+  --seconds-to-live 300 \
+  --query 'key' --output text)
+
+# Run Terraform
+terraform apply -var="grafana_api_key=$API_KEY"
+
+# Delete key after completion
+aws grafana delete-workspace-api-key \
+  --workspace-id $WORKSPACE_ID \
+  --key-name "terraform-$(date +%s)"
 ```
 
-## Datasource Management
+### 3.3 Azure Managed Grafana
 
-### Basic Datasources
 ```hcl
-# datasources.tf
+# versions.tf
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = ">= 3.0"
+    }
+    grafana = {
+      source  = "grafana/grafana"
+      version = ">= 2.0"
+    }
+  }
+}
 
-# Prometheus datasource
+provider "azurerm" {
+  features {}
+}
+
+# Create Azure Managed Grafana Instance
+resource "azurerm_dashboard_grafana" "main" {
+  name                              = "amg-${var.app_name}-${var.environment}"
+  resource_group_name               = azurerm_resource_group.main.name
+  location                          = azurerm_resource_group.main.location
+  api_key_enabled                   = true
+  deterministic_outbound_ip_enabled = true
+  public_network_access_enabled     = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Grant Monitoring Reader to Grafana
+resource "azurerm_role_assignment" "grafana_monitoring" {
+  scope                = data.azurerm_subscription.current.id
+  role_definition_name = "Monitoring Reader"
+  principal_id         = azurerm_dashboard_grafana.main.identity[0].principal_id
+}
+
+# Grant Grafana Admin to administrators
+resource "azurerm_role_assignment" "grafana_admin" {
+  scope                = azurerm_dashboard_grafana.main.id
+  role_definition_name = "Grafana Admin"
+  principal_id         = var.admin_group_id
+}
+```
+
+#### Azure Service Account Setup
+
+Use Azure CLI to create service account for Terraform:
+
+```bash
+# Install AMG extension
+az extension add --name amg
+
+# Create service account
+az grafana service-account create \
+  --name $GRAFANA_NAME \
+  --service-account terraform \
+  --role Admin
+
+# Create token
+GRAFANA_TOKEN=$(az grafana service-account token create \
+  --name $GRAFANA_NAME \
+  --service-account terraform \
+  --token terraform-token \
+  --time-to-live 1d \
+  --query key -o tsv)
+
+# Use in Terraform
+export TF_VAR_grafana_auth=$GRAFANA_TOKEN
+```
+
+```hcl
+# Grafana Provider for Azure
+provider "grafana" {
+  url  = azurerm_dashboard_grafana.main.endpoint
+  auth = var.grafana_auth
+}
+```
+
+---
+
+## 4. Data Sources
+
+Data sources connect Grafana to your metrics, logs, and traces backends.
+
+### 4.1 Common Data Sources
+
+```hcl
+# Prometheus
 resource "grafana_data_source" "prometheus" {
   type       = "prometheus"
   name       = "Prometheus"
@@ -83,11 +326,10 @@ resource "grafana_data_source" "prometheus" {
     httpMethod     = "POST"
     manageAlerts   = true
     prometheusType = "Prometheus"
-    cacheLevel     = "High"
   })
 }
 
-# Loki datasource
+# Loki (Logs)
 resource "grafana_data_source" "loki" {
   type = "loki"
   name = "Loki"
@@ -98,37 +340,64 @@ resource "grafana_data_source" "loki" {
   })
 }
 
-# InfluxDB datasource
-resource "grafana_data_source" "influxdb" {
-  type     = "influxdb"
-  name     = "InfluxDB"
-  url      = "http://influxdb:8086"
-  database = "telegraf"
-  username = "admin"
-  password = "admin"
+# Elasticsearch
+resource "grafana_data_source" "elasticsearch" {
+  type     = "elasticsearch"
+  name     = "Elasticsearch"
+  url      = "http://elasticsearch:9200"
+  database = "[logs-]YYYY.MM.DD"
 
   json_data_encoded = jsonencode({
-    httpMode = "GET"
+    esVersion       = "8.0.0"
+    timeField       = "@timestamp"
+    logMessageField = "message"
   })
 }
 ```
 
-### Advanced Datasource Configuration
-```hcl
-# advanced-datasources.tf
+### 4.2 Cloud Provider Data Sources
 
-# Prometheus with authentication
-resource "grafana_data_source" "prometheus_secure" {
-  type       = "prometheus"
-  name       = "Prometheus-Secure"
-  url        = "https://prometheus.example.com"
-  is_default = false
+```hcl
+# AWS CloudWatch (for AMG)
+resource "grafana_data_source" "cloudwatch" {
+  type = "cloudwatch"
+  name = "CloudWatch"
 
   json_data_encoded = jsonencode({
-    httpMethod   = "POST"
-    manageAlerts = true
-    timeInterval = "15s"
-    queryTimeout = "60s"
+    defaultRegion = "us-east-1"
+    authType      = "default"  # Uses workspace IAM role
+  })
+}
+
+# Azure Monitor
+resource "grafana_data_source" "azure_monitor" {
+  type = "grafana-azure-monitor-datasource"
+  name = "Azure Monitor"
+
+  json_data_encoded = jsonencode({
+    cloudName      = "azuremonitor"
+    subscriptionId = var.azure_subscription_id
+    tenantId       = var.azure_tenant_id
+    clientId       = var.azure_client_id
+  })
+
+  secure_json_data_encoded = jsonencode({
+    clientSecret = var.azure_client_secret
+  })
+}
+```
+
+### 4.3 Data Source with Authentication
+
+```hcl
+# Prometheus with Bearer Token
+resource "grafana_data_source" "prometheus_secure" {
+  type = "prometheus"
+  name = "Prometheus-Secure"
+  url  = "https://prometheus.example.com"
+
+  json_data_encoded = jsonencode({
+    httpMethod      = "POST"
     httpHeaderName1 = "Authorization"
   })
 
@@ -136,90 +405,17 @@ resource "grafana_data_source" "prometheus_secure" {
     httpHeaderValue1 = "Bearer ${var.prometheus_token}"
   })
 }
-
-# Jaeger datasource
-resource "grafana_data_source" "jaeger" {
-  type = "jaeger"
-  name = "Jaeger"
-  url  = "http://jaeger:14268"
-  uid  = "jaeger-uid"
-
-  json_data_encoded = jsonencode({
-    tracesToLogs = {
-      datasourceUid = grafana_data_source.loki.uid
-      tags          = ["trace_id"]
-    }
-  })
-}
-
-# CloudWatch datasource
-resource "grafana_data_source" "cloudwatch" {
-  type = "cloudwatch"
-  name = "CloudWatch"
-
-  json_data_encoded = jsonencode({
-    defaultRegion = "us-east-1"
-    authType      = "keys"
-  })
-
-  secure_json_data_encoded = jsonencode({
-    accessKey = var.aws_access_key
-    secretKey = var.aws_secret_key
-  })
-}
 ```
 
-### Environment-Specific Datasources
+---
+
+## 5. Folders & Permissions
+
+Folders organize dashboards and provide permission boundaries.
+
+### 5.1 Creating Folders
+
 ```hcl
-# environment-datasources.tf
-
-locals {
-  datasource_configs = {
-    dev = {
-      prometheus_url = "http://prometheus-dev:9090"
-      loki_url      = "http://loki-dev:3100"
-    }
-    staging = {
-      prometheus_url = "http://prometheus-staging:9090"
-      loki_url      = "http://loki-staging:3100"
-    }
-    prod = {
-      prometheus_url = "http://prometheus-prod:9090"
-      loki_url      = "http://loki-prod:3100"
-    }
-  }
-}
-
-resource "grafana_data_source" "prometheus_env" {
-  type       = "prometheus"
-  name       = "Prometheus-${var.environment}"
-  url        = local.datasource_configs[var.environment].prometheus_url
-  is_default = true
-
-  json_data_encoded = jsonencode({
-    httpMethod     = "POST"
-    manageAlerts   = var.environment == "prod" ? true : false
-    prometheusType = "Prometheus"
-  })
-}
-
-resource "grafana_data_source" "loki_env" {
-  type = "loki"
-  name = "Loki-${var.environment}"
-  url  = local.datasource_configs[var.environment].loki_url
-
-  json_data_encoded = jsonencode({
-    maxLines = var.environment == "prod" ? 5000 : 1000
-  })
-}
-```
-
-## Folder Management
-
-### Basic Folders
-```hcl
-# folders.tf
-
 resource "grafana_folder" "monitoring" {
   title = "System Monitoring"
   uid   = "system-monitoring"
@@ -230,23 +426,17 @@ resource "grafana_folder" "applications" {
   uid   = "app-dashboards"
 }
 
-resource "grafana_folder" "business" {
-  title = "Business Metrics"
-  uid   = "business-metrics"
+resource "grafana_folder" "alerts" {
+  title = "Alert Rules"
+  uid   = "alert-rules"
 }
 ```
 
-### Folder Permissions
+### 5.2 Folder Permissions
+
 ```hcl
-# folder-permissions.tf
-
-resource "grafana_folder_permission" "monitoring_permissions" {
+resource "grafana_folder_permission" "monitoring_perms" {
   folder_uid = grafana_folder.monitoring.uid
-
-  permissions {
-    role       = "Editor"
-    permission = "Edit"
-  }
 
   permissions {
     role       = "Viewer"
@@ -254,101 +444,88 @@ resource "grafana_folder_permission" "monitoring_permissions" {
   }
 
   permissions {
+    role       = "Editor"
+    permission = "Edit"
+  }
+
+  permissions {
     team_id    = grafana_team.devops.id
     permission = "Admin"
   }
 }
+```
 
-resource "grafana_team" "devops" {
-  name  = "DevOps Team"
-  email = "devops@company.com"
+---
+
+## 6. Dashboards
+
+### 6.1 Dashboard from JSON File
+
+```hcl
+resource "grafana_dashboard" "system_metrics" {
+  config_json = file("${path.module}/dashboards/system-metrics.json")
+  folder      = grafana_folder.monitoring.uid
+  overwrite   = true
 }
 ```
 
-## Dashboard Management
+### 6.2 Multiple Dashboards from Directory
 
-### Simple Dashboard
 ```hcl
-# dashboards.tf
+resource "grafana_dashboard" "app_dashboards" {
+  for_each    = fileset("${path.module}/dashboards/apps", "*.json")
+  config_json = file("${path.module}/dashboards/apps/${each.value}")
+  folder      = grafana_folder.applications.uid
+}
+```
 
-resource "grafana_dashboard" "system_metrics" {
+### 6.3 Inline Dashboard Definition
+
+```hcl
+resource "grafana_dashboard" "cpu_overview" {
   config_json = jsonencode({
-    title = "System Metrics"
-    tags  = ["system", "monitoring"]
+    title   = "CPU Overview"
+    tags    = ["system", "cpu"]
+    refresh = "30s"
+    time    = { from = "now-1h", to = "now" }
 
     panels = [
       {
         id    = 1
         title = "CPU Usage"
         type  = "stat"
-        targets = [
-          {
-            expr  = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
-            refId = "A"
-          }
-        ]
-        gridPos = {
-          h = 8
-          w = 12
-          x = 0
-          y = 0
-        }
+        gridPos = { h = 8, w = 12, x = 0, y = 0 }
+        targets = [{
+          expr  = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+          refId = "A"
+        }]
         fieldConfig = {
-          defaults = {
-            unit = "percent"
-            min  = 0
-            max  = 100
-          }
+          defaults = { unit = "percent", min = 0, max = 100 }
         }
       }
     ]
-
-    time = {
-      from = "now-1h"
-      to   = "now"
-    }
-
-    refresh = "30s"
   })
-
-  folder = grafana_folder.monitoring.id
+  folder = grafana_folder.monitoring.uid
 }
 ```
 
-### Complex Dashboard with Template Variables
-```hcl
-# complex-dashboard.tf
+### 6.4 Dashboard with Template Variables
 
-locals {
-  dashboard_config = {
+```hcl
+resource "grafana_dashboard" "advanced" {
+  config_json = jsonencode({
     title = "Advanced System Dashboard"
-    tags  = ["system", "monitoring", "advanced"]
+    tags  = ["system", "advanced"]
 
     templating = {
       list = [
         {
-          name  = "instance"
-          type  = "query"
-          query = "label_values(up, instance)"
-          datasource = {
-            type = "prometheus"
-            uid  = grafana_data_source.prometheus.uid
-          }
-          multi       = true
-          includeAll  = true
-          allValue    = ".*"
-          refresh     = 1
-        },
-        {
-          name  = "job"
-          type  = "query"
-          query = "label_values(up, job)"
-          datasource = {
-            type = "prometheus"
-            uid  = grafana_data_source.prometheus.uid
-          }
-          multi      = false
-          includeAll = false
+          name       = "instance"
+          type       = "query"
+          query      = "label_values(up, instance)"
+          datasource = { type = "prometheus", uid = grafana_data_source.prometheus.uid }
+          multi      = true
+          includeAll = true
           refresh    = 1
         }
       ]
@@ -357,126 +534,91 @@ locals {
     panels = [
       {
         id    = 1
-        title = "CPU Usage by Instance"
+        title = "CPU by Instance"
         type  = "timeseries"
-        targets = [
-          {
-            expr  = "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$instance\", job=\"$job\"}[5m])) * 100)"
-            refId = "A"
-            legendFormat = "{{instance}}"
-          }
-        ]
-        gridPos = {
-          h = 8
-          w = 24
-          x = 0
-          y = 0
-        }
-        fieldConfig = {
-          defaults = {
-            unit = "percent"
-            min  = 0
-            max  = 100
-          }
-        }
-      },
-      {
-        id    = 2
-        title = "Memory Usage by Instance"
-        type  = "timeseries"
-        targets = [
-          {
-            expr  = "(1 - (node_memory_MemAvailable_bytes{instance=~\"$instance\", job=\"$job\"} / node_memory_MemTotal_bytes{instance=~\"$instance\", job=\"$job\"})) * 100"
-            refId = "B"
-            legendFormat = "{{instance}}"
-          }
-        ]
-        gridPos = {
-          h = 8
-          w = 24
-          x = 0
-          y = 8
-        }
-        fieldConfig = {
-          defaults = {
-            unit = "percent"
-            min  = 0
-            max  = 100
-          }
-        }
+        gridPos = { h = 8, w = 24, x = 0, y = 0 }
+        targets = [{
+          expr         = "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$instance\"}[5m])) * 100)"
+          legendFormat = "{{instance}}"
+          refId        = "A"
+        }]
       }
     ]
-
-    time = {
-      from = "now-6h"
-      to   = "now"
-    }
-
-    refresh = "30s"
-  }
-}
-
-resource "grafana_dashboard" "advanced_system" {
-  config_json = jsonencode(local.dashboard_config)
-  folder      = grafana_folder.monitoring.id
+  })
+  folder = grafana_folder.monitoring.uid
 }
 ```
 
-### Dashboard from File
-```hcl
-# dashboard-from-file.tf
+---
 
-resource "grafana_dashboard" "imported_dashboard" {
-  config_json = file("${path.module}/dashboards/system-overview.json")
-  folder      = grafana_folder.monitoring.id
-}
+## 7. Alerting
 
-# Multiple dashboards from directory
-resource "grafana_dashboard" "app_dashboards" {
-  for_each = fileset("${path.module}/dashboards/apps", "*.json")
+Grafana Alerting (v9+) provides a complete alerting stack manageable via Terraform.
 
-  config_json = file("${path.module}/dashboards/apps/${each.value}")
-  folder      = grafana_folder.applications.id
-}
+### Alerting Architecture
+
+```
+Alert Rules → Notification Policies → Contact Points → External Systems
+                    ↓
+              Mute Timings (optional)
 ```
 
-## Alert Management
+### 7.1 Alert Rules
 
-### Alert Rules
 ```hcl
-# alerts.tf
-
 resource "grafana_rule_group" "system_alerts" {
   name             = "system-alerts"
-  folder_uid       = grafana_folder.monitoring.uid
+  folder_uid       = grafana_folder.alerts.uid
   interval_seconds = 60
+  org_id           = 1
 
   rule {
-    name      = "HighCPUUsage"
-    condition = "A"
+    name      = "High CPU Usage"
+    condition = "C"
+    for       = "5m"
 
+    # Query the datasource
     data {
-      ref_id = "A"
-
-      relative_time_range {
-        from = 300
-        to   = 0
-      }
-
+      ref_id         = "A"
       datasource_uid = grafana_data_source.prometheus.uid
+      relative_time_range { from = 600, to = 0 }
       model = jsonencode({
         expr  = "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
         refId = "A"
       })
     }
 
+    # Reduce to single value
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      relative_time_range { from = 0, to = 0 }
+      model = jsonencode({
+        expression = "A"
+        type       = "reduce"
+        reducer    = "last"
+        refId      = "B"
+      })
+    }
+
+    # Threshold condition
+    data {
+      ref_id         = "C"
+      datasource_uid = "__expr__"
+      relative_time_range { from = 0, to = 0 }
+      model = jsonencode({
+        expression = "$B > 80"
+        type       = "math"
+        refId      = "C"
+      })
+    }
+
     no_data_state  = "NoData"
     exec_err_state = "Alerting"
-    for            = "5m"
 
     annotations = {
-      description = "CPU usage is above 80%"
       summary     = "High CPU usage detected"
+      description = "CPU usage is above 80% for more than 5 minutes"
     }
 
     labels = {
@@ -484,137 +626,139 @@ resource "grafana_rule_group" "system_alerts" {
       team     = "infrastructure"
     }
   }
-
-  rule {
-    name      = "HighMemoryUsage"
-    condition = "B"
-
-    data {
-      ref_id = "B"
-
-      relative_time_range {
-        from = 300
-        to   = 0
-      }
-
-      datasource_uid = grafana_data_source.prometheus.uid
-      model = jsonencode({
-        expr  = "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100"
-        refId = "B"
-      })
-    }
-
-    no_data_state  = "NoData"
-    exec_err_state = "Alerting"
-    for            = "5m"
-
-    annotations = {
-      description = "Memory usage is above 85%"
-      summary     = "High memory usage detected"
-    }
-
-    labels = {
-      severity = "critical"
-      team     = "infrastructure"
-    }
-  }
 }
 ```
 
-### Contact Points
-```hcl
-# contact-points.tf
+### 7.2 Contact Points
 
-resource "grafana_contact_point" "slack_alerts" {
-  name = "slack-alerts"
+```hcl
+# Slack
+resource "grafana_contact_point" "slack" {
+  name = "Slack Alerts"
 
   slack {
-    url      = var.slack_webhook_url
-    channel  = "#alerts"
-    username = "Grafana"
-    title    = "🚨 Grafana Alert"
-    text     = <<-EOT
-      {{ range .Alerts }}
-      **{{ .Annotations.summary }}**
-      {{ .Annotations.description }}
-      Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
-      {{ end }}
-    EOT
+    url = var.slack_webhook_url
+    text = <<EOT
+{{ len .Alerts.Firing }} alerts firing!
+{{ range .Alerts.Firing }}
+{{ template "Alert Instance Template" . }}
+{{ end }}
+EOT
   }
 }
 
-resource "grafana_contact_point" "email_alerts" {
-  name = "email-alerts"
+# Email
+resource "grafana_contact_point" "email" {
+  name = "Email Alerts"
 
   email {
-    addresses = ["alerts@company.com", "oncall@company.com"]
+    addresses = ["alerts@company.com"]
     subject   = "[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}"
-    message   = <<-EOT
-      {{ range .Alerts }}
-      Alert: {{ .Annotations.summary }}
-      Description: {{ .Annotations.description }}
-      Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
-      {{ end }}
-    EOT
   }
 }
 
-resource "grafana_contact_point" "pagerduty_critical" {
-  name = "pagerduty-critical"
+# PagerDuty
+resource "grafana_contact_point" "pagerduty" {
+  name = "PagerDuty Critical"
 
   pagerduty {
-    integration_key = var.pagerduty_integration_key
+    integration_key = var.pagerduty_key
     severity        = "critical"
-    component       = "Grafana"
-    group           = "Infrastructure"
   }
+}
+
+# Reusable Message Template
+resource "grafana_message_template" "alert_template" {
+  name = "Alert Instance Template"
+
+  template = <<EOT
+{{ define "Alert Instance Template" }}
+Firing: {{ .Labels.alertname }}
+Silence: {{ .SilenceURL }}
+{{ end }}
+EOT
 }
 ```
 
-### Notification Policies
+### 7.3 Notification Policies
+
 ```hcl
-# notification-policies.tf
+resource "grafana_notification_policy" "main" {
+  group_by        = ["alertname"]
+  contact_point   = grafana_contact_point.slack.name
+  group_wait      = "45s"
+  group_interval  = "6m"
+  repeat_interval = "3h"
 
-resource "grafana_notification_policy" "default_policy" {
-  group_by      = ["grafana_folder", "alertname"]
-  contact_point = grafana_contact_point.slack_alerts.name
-
-  group_wait      = "10s"
-  group_interval  = "5m"
-  repeat_interval = "12h"
-
+  # Route critical alerts to PagerDuty
   policy {
     matcher {
       label = "severity"
       match = "="
       value = "critical"
     }
-    contact_point   = grafana_contact_point.pagerduty_critical.name
-    group_wait      = "5s"
-    group_interval  = "2m"
+    contact_point   = grafana_contact_point.pagerduty.name
+    group_wait      = "10s"
     repeat_interval = "1h"
+    mute_timings    = [grafana_mute_timing.weekends.name]
   }
 
+  # Route database alerts to email
   policy {
     matcher {
       label = "team"
       match = "="
       value = "database"
     }
-    contact_point   = grafana_contact_point.email_alerts.name
-    group_wait      = "15s"
-    group_interval  = "5m"
-    repeat_interval = "6h"
+    contact_point = grafana_contact_point.email.name
   }
 }
 ```
 
-## User and Team Management
+### 7.4 Mute Timings
 
-### Teams
 ```hcl
-# teams.tf
+resource "grafana_mute_timing" "weekends" {
+  name = "Weekend Mute"
 
+  intervals {
+    weekdays = ["saturday", "sunday"]
+  }
+}
+
+resource "grafana_mute_timing" "maintenance" {
+  name = "Maintenance Window"
+
+  intervals {
+    times {
+      start = "02:00"
+      end   = "04:00"
+    }
+    weekdays = ["sunday"]
+  }
+}
+```
+
+---
+
+## 8. Access Control
+
+### 8.1 Organizations
+
+```hcl
+resource "grafana_organization" "team_alpha" {
+  name         = "Team Alpha"
+  admin_user   = "admin"
+  create_users = false
+  admins       = ["admin@company.com"]
+  editors      = ["editor@company.com"]
+  viewers      = ["viewer@company.com"]
+}
+```
+
+### 8.2 Teams
+
+```hcl
 resource "grafana_team" "devops" {
   name  = "DevOps Team"
   email = "devops@company.com"
@@ -624,119 +768,161 @@ resource "grafana_team" "platform" {
   name  = "Platform Team"
   email = "platform@company.com"
 }
+```
 
-resource "grafana_team" "security" {
-  name  = "Security Team"
-  email = "security@company.com"
+### 8.3 Service Accounts
+
+```hcl
+resource "grafana_service_account" "ci_cd" {
+  name        = "ci-cd-automation"
+  role        = "Editor"
+  is_disabled = false
+}
+
+resource "grafana_service_account_token" "ci_cd" {
+  name               = "ci-cd-token"
+  service_account_id = grafana_service_account.ci_cd.id
+  seconds_to_live    = 86400  # 24 hours
+}
+
+output "ci_cd_token" {
+  value     = grafana_service_account_token.ci_cd.key
+  sensitive = true
 }
 ```
 
-### Users
+---
+
+## 9. OnCall Management
+
+Grafana OnCall manages incident response, on-call schedules, and escalations.
+
+### 9.1 Provider Setup
+
 ```hcl
-# users.tf
-
-resource "grafana_user" "john_doe" {
-  email    = "john.doe@company.com"
-  name     = "John Doe"
-  login    = "john.doe"
-  password = "temporary-password"
-  is_admin = false
-}
-
-resource "grafana_team_preferences" "devops_preferences" {
-  team_id           = grafana_team.devops.id
-  theme             = "dark"
-  home_dashboard_id = grafana_dashboard.system_metrics.dashboard_id
-  timezone          = "UTC"
+provider "grafana" {
+  alias               = "oncall"
+  oncall_access_token = var.oncall_token
+  oncall_url          = "http://oncall:8080"  # Only for OSS, omit for Cloud
 }
 ```
 
-## Multi-Environment Setup
+### 9.2 Integration
 
-### Environment-Specific Configuration
 ```hcl
-# environments/dev/main.tf
-module "grafana_dev" {
-  source = "../../modules/grafana"
+resource "grafana_oncall_integration" "alertmanager" {
+  provider = grafana.oncall
+  name     = "Production Alertmanager"
+  type     = "alertmanager"
 
-  environment    = "dev"
-  grafana_url    = "http://grafana-dev.company.com"
-  grafana_token  = var.dev_grafana_token
-
-  prometheus_url = "http://prometheus-dev:9090"
-  loki_url      = "http://loki-dev:3100"
-
-  alert_enabled = false
-}
-
-# environments/prod/main.tf
-module "grafana_prod" {
-  source = "../../modules/grafana"
-
-  environment    = "prod"
-  grafana_url    = "https://grafana.company.com"
-  grafana_token  = var.prod_grafana_token
-
-  prometheus_url = "http://prometheus-prod:9090"
-  loki_url      = "http://loki-prod:3100"
-
-  alert_enabled = true
+  default_route {}
 }
 ```
 
-### Grafana Module
+### 9.3 Escalation Chain
+
 ```hcl
+resource "grafana_oncall_escalation_chain" "default" {
+  provider = grafana.oncall
+  name     = "Default Escalation"
+}
+
+resource "grafana_oncall_escalation" "notify_schedule" {
+  provider                     = grafana.oncall
+  escalation_chain_id          = grafana_oncall_escalation_chain.default.id
+  type                         = "notify_on_call_from_schedule"
+  notify_on_call_from_schedule = grafana_oncall_schedule.primary.id
+  position                     = 0
+}
+```
+
+### 9.4 On-Call Schedule
+
+```hcl
+resource "grafana_oncall_schedule" "primary" {
+  provider  = grafana.oncall
+  name      = "Primary On-Call"
+  type      = "calendar"
+  time_zone = "UTC"
+  shifts    = [grafana_oncall_on_call_shift.weekly.id]
+}
+
+resource "grafana_oncall_on_call_shift" "weekly" {
+  provider   = grafana.oncall
+  name       = "Weekly Rotation"
+  type       = "rolling_users"
+  start      = "2024-01-01T00:00:00"
+  duration   = 60 * 60 * 24  # 24 hours
+  frequency  = "weekly"
+  by_day     = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+  week_start = "MO"
+  time_zone  = "UTC"
+
+  rolling_users = [
+    [data.grafana_oncall_user.user1.id],
+    [data.grafana_oncall_user.user2.id]
+  ]
+}
+```
+
+### 9.5 Alert Routing
+
+```hcl
+resource "grafana_oncall_route" "critical" {
+  provider            = grafana.oncall
+  integration_id      = grafana_oncall_integration.alertmanager.id
+  escalation_chain_id = grafana_oncall_escalation_chain.critical.id
+  routing_regex       = "\"severity\": \"critical\""
+  position            = 0
+}
+```
+
+---
+
+## 10. Multi-Environment Patterns
+
+### 10.1 Module Structure
+
+```
+terraform/
+├── modules/
+│   └── grafana/
+│       ├── main.tf
+│       ├── variables.tf
+│       ├── outputs.tf
+│       └── dashboards/
+│           └── *.json
+├── environments/
+│   ├── dev/
+│   │   ├── main.tf
+│   │   └── terraform.tfvars
+│   ├── staging/
+│   └── prod/
+```
+
+### 10.2 Reusable Module
+
+```hcl
+# modules/grafana/variables.tf
+variable "environment" { type = string }
+variable "grafana_url" { type = string }
+variable "grafana_auth" { type = string; sensitive = true }
+variable "prometheus_url" { type = string }
+variable "alerting_enabled" { type = bool; default = true }
+
 # modules/grafana/main.tf
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-}
-
-variable "grafana_url" {
-  description = "Grafana URL"
-  type        = string
-}
-
-variable "grafana_token" {
-  description = "Grafana API token"
-  type        = string
-  sensitive   = true
-}
-
-variable "prometheus_url" {
-  description = "Prometheus URL"
-  type        = string
-}
-
-variable "loki_url" {
-  description = "Loki URL"
-  type        = string
-}
-
-variable "alert_enabled" {
-  description = "Enable alerting"
-  type        = bool
-  default     = true
-}
-
-# Provider configuration
 terraform {
   required_providers {
-    grafana = {
-      source  = "grafana/grafana"
-      version = "~> 2.0"
-    }
+    grafana = { source = "grafana/grafana", version = ">= 2.0" }
   }
 }
 
 provider "grafana" {
   url  = var.grafana_url
-  auth = var.grafana_token
+  auth = var.grafana_auth
 }
 
-# Resources
-resource "grafana_folder" "monitoring" {
+resource "grafana_folder" "main" {
   title = "${title(var.environment)} Monitoring"
   uid   = "${var.environment}-monitoring"
 }
@@ -748,175 +934,94 @@ resource "grafana_data_source" "prometheus" {
   is_default = true
 }
 
-resource "grafana_data_source" "loki" {
-  type = "loki"
-  name = "Loki-${var.environment}"
-  url  = var.loki_url
-}
-
-resource "grafana_dashboard" "system_overview" {
-  count = var.alert_enabled ? 1 : 0
-
-  config_json = templatefile("${path.module}/templates/system-dashboard.json.tpl", {
-    environment    = var.environment
-    prometheus_uid = grafana_data_source.prometheus.uid
-  })
-
-  folder = grafana_folder.monitoring.id
+resource "grafana_dashboard" "system" {
+  count       = var.alerting_enabled ? 1 : 0
+  config_json = file("${path.module}/dashboards/system.json")
+  folder      = grafana_folder.main.uid
 }
 ```
 
-## Advanced Patterns
+### 10.3 Environment Configuration
 
-### Dynamic Dashboard Generation
 ```hcl
-# dynamic-dashboards.tf
+# environments/prod/main.tf
+module "grafana" {
+  source = "../../modules/grafana"
 
-locals {
-  services = ["api", "database", "cache", "queue"]
-
-  service_dashboards = {
-    for service in local.services : service => {
-      title = "${title(service)} Service Dashboard"
-      panels = [
-        {
-          title = "${title(service)} Response Time"
-          expr  = "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"${service}\"}[5m]))"
-        },
-        {
-          title = "${title(service)} Error Rate"
-          expr  = "rate(http_requests_total{service=\"${service}\", status=~\"5..\"}[5m])"
-        }
-      ]
-    }
-  }
+  environment      = "prod"
+  grafana_url      = "https://grafana.company.com"
+  grafana_auth     = var.grafana_token
+  prometheus_url   = "http://prometheus-prod:9090"
+  alerting_enabled = true
 }
 
-resource "grafana_dashboard" "service_dashboards" {
-  for_each = local.service_dashboards
+# environments/dev/main.tf
+module "grafana" {
+  source = "../../modules/grafana"
 
-  config_json = jsonencode({
-    title = each.value.title
-    tags  = ["service", each.key]
-
-    panels = [
-      for i, panel in each.value.panels : {
-        id    = i + 1
-        title = panel.title
-        type  = "timeseries"
-        targets = [
-          {
-            expr  = panel.expr
-            refId = "A"
-          }
-        ]
-        gridPos = {
-          h = 8
-          w = 12
-          x = (i % 2) * 12
-          y = floor(i / 2) * 8
-        }
-      }
-    ]
-  })
-
-  folder = grafana_folder.applications.id
+  environment      = "dev"
+  grafana_url      = "http://grafana-dev:3000"
+  grafana_auth     = var.grafana_token
+  prometheus_url   = "http://prometheus-dev:9090"
+  alerting_enabled = false
 }
 ```
 
-### Conditional Resources
-```hcl
-# conditional-resources.tf
+---
 
-resource "grafana_rule_group" "production_alerts" {
-  count = var.environment == "prod" ? 1 : 0
+## 11. CI/CD Integration
 
-  name             = "production-critical-alerts"
-  folder_uid       = grafana_folder.monitoring.uid
-  interval_seconds = 30
+### 11.1 GitHub Actions
 
-  rule {
-    name      = "ServiceDown"
-    condition = "A"
-
-    data {
-      ref_id = "A"
-
-      relative_time_range {
-        from = 60
-        to   = 0
-      }
-
-      datasource_uid = grafana_data_source.prometheus.uid
-      model = jsonencode({
-        expr  = "up{job=\"api\"} == 0"
-        refId = "A"
-      })
-    }
-
-    no_data_state  = "Alerting"
-    exec_err_state = "Alerting"
-    for            = "1m"
-
-    annotations = {
-      description = "Service is down"
-      summary     = "Critical service failure"
-    }
-
-    labels = {
-      severity = "critical"
-    }
-  }
-}
-```
-
-## CI/CD Integration
-
-### GitHub Actions
 ```yaml
-# .github/workflows/terraform-grafana.yml
 name: Deploy Grafana Configuration
 
 on:
   push:
     branches: [main]
     paths: ['terraform/grafana/**']
+  pull_request:
+    branches: [main]
+    paths: ['terraform/grafana/**']
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.5.0
+          terraform_version: 1.6.0
 
       - name: Terraform Init
         run: terraform init
         working-directory: terraform/grafana
 
+      - name: Terraform Format Check
+        run: terraform fmt -check
+        working-directory: terraform/grafana
+
       - name: Terraform Plan
-        run: terraform plan
+        run: terraform plan -out=tfplan
         working-directory: terraform/grafana
         env:
-          TF_VAR_grafana_token: ${{ secrets.GRAFANA_TOKEN }}
+          TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan
         working-directory: terraform/grafana
         env:
-          TF_VAR_grafana_token: ${{ secrets.GRAFANA_TOKEN }}
+          TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
 ```
 
-### GitLab CI
+### 11.2 GitLab CI
+
 ```yaml
-# .gitlab-ci.yml
 stages:
   - validate
   - plan
@@ -925,130 +1030,162 @@ stages:
 variables:
   TF_ROOT: terraform/grafana
 
-before_script:
-  - cd $TF_ROOT
-  - terraform init
+.terraform:
+  image: hashicorp/terraform:1.6
+  before_script:
+    - cd $TF_ROOT
+    - terraform init
 
 validate:
+  extends: .terraform
   stage: validate
   script:
     - terraform validate
     - terraform fmt -check
 
 plan:
+  extends: .terraform
   stage: plan
   script:
     - terraform plan -out=tfplan
   artifacts:
-    paths:
-      - $TF_ROOT/tfplan
+    paths: [$TF_ROOT/tfplan]
     expire_in: 1 week
 
 apply:
+  extends: .terraform
   stage: apply
   script:
     - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan
-  only:
-    - main
+  dependencies: [plan]
+  only: [main]
+  when: manual
 ```
 
-## Best Practices
+---
 
-### 1. State Management
+## 12. Best Practices
+
+### 12.1 State Management
+
 ```hcl
-# backend.tf
 terraform {
   backend "s3" {
-    bucket = "company-terraform-state"
-    key    = "grafana/terraform.tfstate"
-    region = "us-east-1"
+    bucket         = "company-terraform-state"
+    key            = "grafana/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
   }
 }
 ```
 
-### 2. Resource Naming
-```hcl
-locals {
-  name_prefix = "${var.environment}-${var.project}"
+### 12.2 Sensitive Data
 
-  common_tags = {
-    Environment = var.environment
-    Project     = var.project
-    ManagedBy   = "terraform"
-  }
+```hcl
+# Never hardcode secrets
+variable "grafana_auth" {
+  type      = string
+  sensitive = true
 }
 
-resource "grafana_folder" "monitoring" {
+# Use external secret management
+data "aws_secretsmanager_secret_version" "grafana" {
+  secret_id = "grafana/api-token"
+}
+
+locals {
+  grafana_auth = jsondecode(data.aws_secretsmanager_secret_version.grafana.secret_string)["token"]
+}
+```
+
+### 12.3 Resource Naming Convention
+
+```hcl
+locals {
+  name_prefix = "${var.project}-${var.environment}"
+}
+
+resource "grafana_folder" "main" {
   title = "${local.name_prefix}-monitoring"
   uid   = "${local.name_prefix}-monitoring"
 }
 ```
 
-### 3. Sensitive Data
-```hcl
-# Use Terraform variables for sensitive data
-variable "grafana_token" {
-  description = "Grafana API token"
-  type        = string
-  sensitive   = true
-}
+### 12.4 Dashboard Version Control
 
-# Use external data sources for secrets
-data "aws_secretsmanager_secret_version" "grafana_token" {
-  secret_id = "grafana/api-token"
-}
+- Store dashboard JSON files in Git
+- Use `file()` function to load dashboards
+- Set `overwrite = true` to handle updates
 
-locals {
-  grafana_token = jsondecode(data.aws_secretsmanager_secret_version.grafana_token.secret_string)["token"]
-}
+### 12.5 Import Existing Resources
+
+```bash
+# Import existing dashboard
+terraform import grafana_dashboard.existing <dashboard-uid>
+
+# Import existing datasource
+terraform import grafana_data_source.existing <datasource-id>
+
+# Import existing folder
+terraform import grafana_folder.existing <folder-uid>
 ```
 
-### 4. Validation
-```hcl
-variable "environment" {
-  description = "Environment name"
-  type        = string
+---
 
-  validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Environment must be dev, staging, or prod."
-  }
-}
-```
-
-## Troubleshooting
+## 13. Troubleshooting
 
 ### Common Issues
 
-1. **Provider Authentication**
-   ```bash
-   # Test API connectivity
-   curl -H "Authorization: Bearer $GRAFANA_TOKEN" \
-        "$GRAFANA_URL/api/user"
-   ```
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Authentication failed | Invalid/expired API key | Regenerate API key, check permissions |
+| Resource not found | Wrong UID or ID | Use `terraform import` to sync state |
+| AMG API key expired | TTL exceeded | Create new key before Terraform run |
+| Azure access denied | Missing role assignment | Add Grafana Admin role to identity |
+| State drift | Manual UI changes | Run `terraform refresh` then `plan` |
 
-2. **Resource Import**
-   ```bash
-   # Import existing dashboard
-   terraform import grafana_dashboard.existing <dashboard-uid>
+### Debugging Commands
 
-   # Import existing datasource
-   terraform import grafana_data_source.existing <datasource-id>
-   ```
+```bash
+# Test API connectivity
+curl -H "Authorization: Bearer $GRAFANA_TOKEN" "$GRAFANA_URL/api/user"
 
-3. **State Issues**
-   ```bash
-   # Refresh state
-   terraform refresh
+# Refresh state
+terraform refresh
 
-   # Remove resource from state
-   terraform state rm grafana_dashboard.problematic
-   ```
+# Show current state
+terraform state list
+terraform state show grafana_dashboard.main
 
-## References
+# Remove problematic resource from state
+terraform state rm grafana_dashboard.problematic
 
-- [Terraform Grafana Provider Documentation](https://registry.terraform.io/providers/grafana/grafana/latest/docs)
-- [Grafana API Documentation](https://grafana.com/docs/grafana/latest/developers/http_api/)
-- [Terraform Best Practices](https://www.terraform.io/docs/cloud/guides/recommended-practices/index.html)
+# Enable debug logging
+export TF_LOG=DEBUG
+terraform plan
+```
+
+---
+
+## 14. References
+
+### Official Documentation
+
+- [Grafana Terraform Provider](https://registry.terraform.io/providers/grafana/grafana/latest/docs)
+- [GitHub: terraform-provider-grafana](https://github.com/grafana/terraform-provider-grafana)
+- [Provider Examples](https://github.com/grafana/terraform-provider-grafana/tree/main/examples)
+
+### Platform-Specific Guides
+
+- [AWS: AMG Terraform Alerting](https://docs.aws.amazon.com/grafana/latest/userguide/v10-alerting-setup-provision-terraform.html)
+- [Azure: Managed Grafana with Terraform](https://learn.microsoft.com/en-us/azure/managed-grafana/)
+
+### Blog Posts & Tutorials
+
+- [Grafana Alerts as Code](https://grafana.com/blog/grafana-alerts-as-code-get-started-with-terraform-and-grafana-alerting/)
+- [OnCall and Terraform](https://grafana.com/blog/2022/08/29/get-started-with-grafana-oncall-and-terraform/)
+
+---
+
+*Content was rephrased for compliance with licensing restrictions.*
