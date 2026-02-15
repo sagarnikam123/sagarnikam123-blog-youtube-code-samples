@@ -1,0 +1,63 @@
+# Copy to terraform.tfvars and update values
+
+# =============================================================================
+# GRAFANA OSS (Self-Hosted) - Current Configuration
+# =============================================================================
+grafana_url  = "http://localhost:3000"
+grafana_auth = "admin:admin"  # Or API key
+
+# =============================================================================
+# AMAZON MANAGED GRAFANA (AMG) - Example (commented)
+# =============================================================================
+# grafana_url  = "https://g-xxxxxxxxxx.grafana-workspace.us-east-1.amazonaws.com"
+# grafana_auth = "<workspace-api-key>"
+#
+# How to get AMG credentials:
+# 1. Create workspace: AWS Console → Amazon Grafana → Create workspace
+# 2. Get endpoint: Copy the "Grafana workspace URL" from workspace details
+# 3. Create API key (short-lived, expires):
+#    aws grafana create-workspace-api-key \
+#      --workspace-id g-xxxxxxxxxx \
+#      --key-name terraform-key \
+#      --key-role ADMIN \
+#      --seconds-to-live 3600
+# 4. Use the returned 'key' value as grafana_auth
+
+# =============================================================================
+# AZURE MANAGED GRAFANA - Example (commented)
+# =============================================================================
+# grafana_url  = "https://my-grafana-xxxx.xxx.grafana.azure.com"
+# grafana_auth = "<service-account-token>"
+#
+# How to get Azure Managed Grafana credentials:
+# 1. Create instance: Azure Portal → Azure Managed Grafana → Create
+# 2. Get endpoint: Copy the "Endpoint" URL from instance overview
+# 3. Install Azure CLI extension: az extension add --name amg
+# 4. Create service account:
+#    az grafana service-account create \
+#      --name <grafana-name> \
+#      --service-account terraform \
+#      --role Admin
+# 5. Create token:
+#    az grafana service-account token create \
+#      --name <grafana-name> \
+#      --service-account terraform \
+#      --token terraform-token \
+#      --time-to-live 1d
+# 6. Use the returned 'key' value as grafana_auth
+
+# =============================================================================
+# COMMON CONFIGURATION
+# =============================================================================
+
+# Environment
+environment = "dev"
+
+# Data sources
+prometheus_url = "http://localhost:9090"
+loki_url       = "http://localhost:3100"
+
+# Alerting (set to true after Step 3)
+alerting_enabled = false
+# Note: Get your unique webhook URL from https://webhook.site/ (different for each person)
+webhook_url      = "https://webhook.site/40265b47-d1ce-4b3d-8817-003d995b7a5d"
