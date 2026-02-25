@@ -12,6 +12,9 @@ Post-deployment scripts for monitoring, testing, and validating Prometheus (kube
 | `check-remote-write.sh` | Remote write health | `bash check-remote-write.sh` |
 | `resource-usage.sh` | CPU, memory, storage usage | `bash resource-usage.sh` |
 | `quick-report.sh` | Generate markdown report | `bash quick-report.sh` |
+| `backup-grafana-dashboards.sh` | Export/import Grafana dashboards | `bash backup-grafana-dashboards.sh export <URL> <API_KEY>` |
+| `backup-grafana-alerting.sh` | Export/import Grafana alerting config | `bash backup-grafana-alerting.sh export <URL> <API_KEY>` |
+| `backup-prometheus-rules.sh` | Export/import PrometheusRule CRDs | `bash backup-prometheus-rules.sh export` |
 
 ## 🚀 Quick Start
 
@@ -279,3 +282,111 @@ fi
 # Add to crontab
 0 9 * * * cd /path/to/scripts && bash quick-report.sh
 ```
+
+---
+
+## 📦 Backup & Restore Scripts
+
+### 7. backup-grafana-dashboards.sh
+
+**Purpose:** Export/import Grafana dashboards
+
+**Features:**
+- Export all dashboards organized by folder
+- Import dashboards to another Grafana instance
+- Filter by folder (include/exclude)
+- Preserves folder structure
+
+**Usage:**
+```bash
+# Export all dashboards
+bash backup-grafana-dashboards.sh export https://grafana.example.com <API_KEY>
+
+# Export to specific directory
+bash backup-grafana-dashboards.sh export https://grafana.example.com <API_KEY> ./backup
+
+# Export excluding specific folders
+bash backup-grafana-dashboards.sh export https://grafana.example.com <API_KEY> ./backup \
+  --exclude-folders "General,Test"
+
+# Export only specific folders
+bash backup-grafana-dashboards.sh export https://grafana.example.com <API_KEY> ./backup \
+  --include-folders "Production,Alerts"
+
+# Import dashboards
+bash backup-grafana-dashboards.sh import https://target-grafana.com <API_KEY> ./backup
+
+# Import excluding specific folders
+bash backup-grafana-dashboards.sh import https://target-grafana.com <API_KEY> ./backup \
+  --exclude-folders "General"
+```
+
+**API Key:** Create at Grafana > Administration > Service accounts > Add with Admin role > Generate token
+
+---
+
+### 8. backup-grafana-alerting.sh
+
+**Purpose:** Export/import Grafana native alerting configuration
+
+**Features:**
+- Alert rules (by folder)
+- Contact points
+- Notification policies
+- Mute timings
+- Notification templates
+
+**Usage:**
+```bash
+# Export all alerting config
+bash backup-grafana-alerting.sh export https://grafana.example.com <API_KEY>
+
+# Export to specific directory
+bash backup-grafana-alerting.sh export https://grafana.example.com <API_KEY> ./backup-alerts
+
+# Import alerting config
+bash backup-grafana-alerting.sh import https://target-grafana.com <API_KEY> ./backup-alerts
+```
+
+> **Note:** This is for Grafana's native alerting. For Prometheus alerting rules (PrometheusRule CRDs), use `backup-prometheus-rules.sh`.
+
+---
+
+### 9. backup-prometheus-rules.sh
+
+**Purpose:** Export/import PrometheusRule CRDs (Kubernetes)
+
+**Features:**
+- Export PrometheusRules from all namespaces
+- Filter by namespace (include/exclude)
+- Import to same or different cluster
+- Override target namespace on import
+
+**Usage:**
+```bash
+# Export all PrometheusRules
+bash backup-prometheus-rules.sh export
+
+# Export to specific file
+bash backup-prometheus-rules.sh export ./prometheus-rules.yaml
+
+# Export excluding namespaces (e.g., skip helm-managed rules)
+bash backup-prometheus-rules.sh export --exclude-namespaces "prometheus,kube-system"
+
+# Export with file and exclusions
+bash backup-prometheus-rules.sh export ./rules.yaml --exclude-namespaces "prometheus"
+
+# Export only specific namespaces
+bash backup-prometheus-rules.sh export --include-namespaces "hunt,response,datascience"
+
+# Import to original namespaces
+bash backup-prometheus-rules.sh import ./prometheus-rules.yaml
+
+# Import excluding certain namespaces
+bash backup-prometheus-rules.sh import ./prometheus-rules.yaml --exclude-namespaces "prometheus"
+
+# Import all rules to a specific namespace
+bash backup-prometheus-rules.sh import ./prometheus-rules.yaml --target-namespace "monitoring"
+```
+
+> **Note:** The `prometheus` namespace typically contains rules installed by kube-prometheus-stack Helm chart. These are managed by Helm and should not be imported manually to avoid conflicts.
