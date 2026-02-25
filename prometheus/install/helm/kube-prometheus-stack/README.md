@@ -305,6 +305,202 @@ alertmanager:
     replicas: 3
 ```
 
+## Enable ServiceMonitor for Your Applications
+
+ServiceMonitors tell Prometheus which services to scrape metrics from. Follow these steps to enable monitoring for your applications.
+
+### Prerequisites
+
+1. Your application must expose a metrics endpoint (e.g., `/actuator/prometheus` for Spring Boot, `/metrics` for most apps)
+2. Prometheus must be configured to scrape from all namespaces (default in our setup):
+   ```yaml
+   prometheus:
+     prometheusSpec:
+       serviceMonitorNamespaceSelector: {}
+       serviceMonitorSelector: {}
+   ```
+
+### Step 1: Verify Your App Exposes Metrics
+
+Check if your application exposes metrics:
+
+```bash
+# For Spring Boot apps (Actuator)
+kubectl exec -n <namespace> deploy/<deployment-name> -- \
+  curl -s localhost:<port>/actuator/prometheus | head -10
+
+# For generic apps
+kubectl exec -n <namespace> deploy/<deployment-name> -- \
+  curl -s localhost:<port>/metrics | head -10
+```
+
+Common metrics paths:
+| Framework | Path | Default Port |
+|-----------|------|--------------|
+| Spring Boot Actuator | `/actuator/prometheus` | app port |
+| Micrometer | `/actuator/prometheus` | app port |
+| OpenTelemetry Collector | `/metrics` | 8888 |
+| Node.js (prom-client) | `/metrics` | app port |
+| Go (promhttp) | `/metrics` | app port |
+
+### Step 2: Get Service Labels and Port Name
+
+```bash
+# Get service labels
+kubectl get svc -n <namespace> <service-name> -o yaml | grep -A5 "labels:"
+
+# Get port name
+kubectl get svc -n <namespace> <service-name> -o yaml | grep -A3 "ports:"
+```
+
+### Step 3: Create ServiceMonitor
+
+Create a ServiceMonitor in the same namespace as your service:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: <service-name>
+  namespace: <namespace>
+  labels:
+    release: prometheus  # Required for Prometheus to discover
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: <service-name>  # Must match service labels
+  endpoints:
+    - port: http                              # Must match service port name
+      path: /actuator/prometheus              # Metrics endpoint path
+      interval: 30s                           # Scrape interval
+```
+
+Apply it:
+```bash
+kubectl apply -f servicemonitor.yaml
+```
+
+### Step 4: Verify ServiceMonitor is Working
+
+```bash
+# Check ServiceMonitor created
+kubectl get servicemonitors -n <namespace>
+
+# Check Prometheus targets (wait 1-2 minutes)
+kubectl port-forward -n prometheus svc/prometheus-kube-prometheus-prometheus 9090:9090
+# Open http://localhost:9090/targets and search for your service
+```
+
+### Examples
+
+#### Spring Boot Application
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: my-spring-app
+  namespace: my-namespace
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: my-spring-app
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 30s
+```
+
+#### OpenTelemetry Collector
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector
+  namespace: observability
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otel-collector-collector-monitoring
+  endpoints:
+    - port: monitoring
+      path: /metrics
+      interval: 30s
+```
+
+#### Multiple Endpoints (Different Ports)
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: multi-port-app
+  namespace: my-namespace
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: multi-port-app
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 30s
+    - port: grpc-metrics
+      path: /metrics
+      interval: 30s
+```
+
+### Enable Metrics in Spring Boot
+
+If your Spring Boot app doesn't expose metrics, add these dependencies:
+
+```xml
+<!-- pom.xml -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-registry-prometheus</artifactId>
+</dependency>
+```
+
+```yaml
+# application.yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+```
+
+### Troubleshooting ServiceMonitors
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Target not appearing | Label mismatch | Verify `selector.matchLabels` matches service labels |
+| Target down | Wrong port/path | Check port name and metrics path |
+| No data | Metrics not exposed | Verify app exposes `/actuator/prometheus` or `/metrics` |
+| 401/403 errors | Auth required | Add `basicAuth` or `bearerTokenSecret` to endpoint |
+
+```bash
+# Debug: Check if Prometheus can reach the target
+kubectl exec -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -- \
+  wget -qO- http://<service>.<namespace>.svc.cluster.local:<port>/actuator/prometheus | head -5
+```
+
+---
+
 ## Disable ServiceMonitors
 
 See [FAQ.md - How to exclude services from scraping](../../docs/FAQ.md#how-to-exclude-services-from-scraping) for all 5 methods.
