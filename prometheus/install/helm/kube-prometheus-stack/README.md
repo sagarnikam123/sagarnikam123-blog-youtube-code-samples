@@ -608,6 +608,83 @@ kubectl logs -n prometheus prometheus-prometheus-kube-prometheus-prometheus-0 -c
 | Scrape timeout | Target slow/unreachable | Check target health, network |
 | Remote write lag | Queue backing up | Increase shards, check Mimir |
 
+## Scrape Interval Selection Guide
+
+The scrape interval determines how frequently Prometheus collects metrics from targets. Choosing the right interval balances data granularity, resource usage, and alerting responsiveness.
+
+### Recommended Intervals by Environment
+
+| Environment | Scrape Interval | Scrape Timeout | Evaluation Interval | Use Case |
+|-------------|-----------------|----------------|---------------------|----------|
+| Production | 30s | 10s | 30s | Standard workloads, responsive alerting |
+| Development | 1m | 30s | 1m | Cost-effective, sufficient for debugging |
+| High-frequency | 15s | 5s | 15s | Critical systems, real-time dashboards |
+| Cost-optimized | 2m-5m | 30s | 1m | Large scale, lower priority metrics |
+
+### Configuration Example
+
+```yaml
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 30s      # How often to scrape targets
+    scrapeTimeout: 10s       # Timeout for each scrape (must be < scrapeInterval)
+    evaluationInterval: 30s  # How often to evaluate alerting rules
+```
+
+### Trade-offs
+
+| Interval | Pros | Cons |
+|----------|------|------|
+| 15s | High resolution, fast alerting | Higher CPU/memory, more storage |
+| 30s | Good balance, standard choice | May miss very short spikes |
+| 1m | Lower resource usage | Slower alerting, less granular |
+| 5m | Minimal resources | Poor for alerting, misses issues |
+
+### Best Practices
+
+1. **scrapeTimeout < scrapeInterval**: Timeout should be 30-50% of interval
+2. **evaluationInterval = scrapeInterval**: Keep them aligned for consistent alerting
+3. **Per-target override**: Use ServiceMonitor `interval` field for specific services that need different rates
+4. **Remote write consideration**: With Mimir/Thanos, shorter intervals increase ingestion load
+
+### Per-Service Override
+
+Override scrape interval for specific services in ServiceMonitor:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: critical-service
+spec:
+  endpoints:
+    - port: http
+      interval: 15s  # Override global 30s for this service
+      scrapeTimeout: 5s
+```
+
+### Interval Precedence
+
+ServiceMonitor `interval` overrides global `scrapeInterval`:
+
+```
+ServiceMonitor endpoints[].interval  →  takes priority (if defined)
+         ↓ (fallback if not defined)
+Global prometheusSpec.scrapeInterval  →  default for all targets
+```
+
+**Example:**
+- Global config: `scrapeInterval: 5m`
+- ServiceMonitor: `interval: 30s`
+- **Result:** That target is scraped every 30s (not 5m)
+
+This allows:
+- Critical services: faster scraping (15s-30s)
+- High-cardinality services: slower scraping (2m-5m)
+- Per-service cost optimization
+
+---
+
 ## Resource Sizing
 
 See [FAQ.md - Resource Sizing Guidelines](../../docs/FAQ.md#resource-sizing-guidelines) for detailed sizing with formulas.
