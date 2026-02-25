@@ -520,3 +520,33 @@ https://skyapmtest.github.io/Agent-Benchmarks/
 ## FAQs
 https://skywalking.apache.org/docs/skywalking-java/next/en/faq/ext-dirs/
 https://skywalking.apache.org/docs/skywalking-java/next/en/faq/osgi/
+
+---
+
+# Python Agent
+
+## SkyWalking Python Overview
+https://skywalking.apache.org/docs/skywalking-python/next/readme/
+
+## Installation
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/installation/
+
+## Integration
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/cli/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/intrusive/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/container/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/configuration/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/advanced/logreporter/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/advanced/meterreporter/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/advanced/api/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/advanced/asyncenhancement/
+
+## Supported Plugins
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/plugins/
+
+## FAQs
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/faq/how-to-use-with-gunicorn/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/faq/how-to-use-with-uwsgi/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/faq/how-to-disable-plugin/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/faq/performance/
+https://skywalking.apache.org/docs/skywalking-python/next/en/setup/faq/how-to-build-from-sources/
