@@ -230,6 +230,79 @@ helm history skywalking -n skywalking
 helm get values skywalking -n skywalking
 ```
 
+#### Check Available BanyanDB Helm Chart Versions
+
+The BanyanDB Helm chart is also distributed via OCI registry (Docker Hub).
+
+```bash
+# Option 1: Using crane (recommended)
+# Install: brew install crane (macOS)
+crane ls registry-1.docker.io/apache/skywalking-banyandb-helm
+
+# Option 2: Using skopeo
+# Install: brew install skopeo (macOS)
+skopeo list-tags docker://registry-1.docker.io/apache/skywalking-banyandb-helm
+
+# Option 3: Using Docker Hub API (sorted by version)
+curl -s "https://hub.docker.com/v2/repositories/apache/skywalking-banyandb-helm/tags?page_size=100" | \
+  jq -r '.results[].name' | sort -V
+
+# Option 4: Quick check for latest versions
+curl -s "https://hub.docker.com/v2/repositories/apache/skywalking-banyandb-helm/tags?page_size=10" | \
+  jq -r '.results[].name' | head -5
+
+# Option 5: Visit Docker Hub directly
+# https://hub.docker.com/r/apache/skywalking-banyandb-helm/tags
+
+# Option 6: Check GitHub releases
+# https://github.com/apache/skywalking-banyandb-helm/releases
+```
+
+```bash
+# Check currently installed BanyanDB version
+helm list -n skywalking | grep banyandb
+
+# View BanyanDB release history
+helm history banyandb -n skywalking
+
+# Show values used in current BanyanDB release
+helm get values banyandb -n skywalking
+```
+
+#### View Default Values for a Chart Version
+
+To see all default values for a specific BanyanDB Helm chart version:
+
+```bash
+# Method 1: Show default values for a specific version (recommended)
+helm show values oci://registry-1.docker.io/apache/skywalking-banyandb-helm --version 0.5.3
+
+# Method 2: Show all chart information (includes values, README, chart metadata)
+helm show all oci://registry-1.docker.io/apache/skywalking-banyandb-helm --version 0.5.3
+
+# Method 3: Show only chart metadata
+helm show chart oci://registry-1.docker.io/apache/skywalking-banyandb-helm --version 0.5.3
+
+# Method 4: Show chart README
+helm show readme oci://registry-1.docker.io/apache/skywalking-banyandb-helm --version 0.5.3
+
+# Save default values to a file for customization
+helm show values oci://registry-1.docker.io/apache/skywalking-banyandb-helm --version 0.5.3 > banyandb-default-values.yaml
+```
+
+**Compare installed values with defaults:**
+
+```bash
+# Get current values
+helm get values banyandb -n sw > current-values.yaml
+
+# Get default values
+helm show values oci://registry-1.docker.io/apache/skywalking-banyandb-helm --version 0.5.3 > default-values.yaml
+
+# Compare using diff
+diff default-values.yaml current-values.yaml
+```
+
 #### Version Compatibility Matrix
 
 | Helm Chart | OAP Server | BanyanDB | Satellite | UI |
@@ -242,7 +315,7 @@ helm get values skywalking -n skywalking
 
 > **Note**: `helm search repo` doesn't work for OCI registries. Use the methods above to check available versions.
 >
-> **Tip**: Always check the [SkyWalking Helm Chart releases](https://github.com/apache/skywalking-helm/releases) for the latest version and changelog before upgrading.
+> **Tip**: Always check the [SkyWalking Helm Chart releases](https://github.com/apache/skywalking-helm/releases) and [BanyanDB Helm Chart releases](https://github.com/apache/skywalking-banyandb-helm/releases) for the latest versions and changelogs before upgrading.
 
 ---
 
@@ -284,6 +357,231 @@ kubectl apply -f base/namespace.yaml
 
 # 3. Access UI via Ingress or port-forward
 kubectl port-forward svc/skywalking-ui 8080:80 -n skywalking
+```
+
+### BanyanDB Standalone Deployment (Minikube)
+
+Deploy BanyanDB separately for testing or development. Based on [official documentation](https://skywalking.apache.org/docs/skywalking-banyandb/next/installation/kubernetes/).
+
+**Available Helm Chart Versions:**
+- `0.5.3` - Latest stable release (recommended)
+- `0.6.0-rc3` - Release candidate (newest features)
+- `0.3.0` - Version used in official docs
+
+**Prerequisites:**
+
+```bash
+# Login to Docker Hub (required for OCI registry)
+helm registry login registry-1.docker.io
+
+# Create namespace
+kubectl create namespace sw
+```
+
+#### Standalone Mode
+
+For single-node development/testing:
+
+```bash
+helm install banyandb \
+  oci://registry-1.docker.io/apache/skywalking-banyandb-helm \
+  --version 0.3.0 \
+  --set image.tag=0.7.0 \
+  --set standalone.enabled=true \
+  --set cluster.enabled=false \
+  --set etcd.enabled=false \
+  --set storage.enabled=true \
+  -n sw
+
+# Wait for pod to be ready
+kubectl get pod -n sw -w
+
+# Expected output:
+# NAME         READY   STATUS    RESTARTS   AGE
+# banyandb-0   1/1     Running   0          71s
+
+# Check storage
+kubectl get pvc -n sw
+# NAME              STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+# data-banyandb-0   Bound    pvc-a15e18bf-0423-4ff7-8a09-c68686c3c880   50Gi       RWO            standard       2m12s
+# meta-banyandb-0   Bound    pvc-548cfe75-8438-4fe2-bce5-66cd7fda4ffc   5Gi        RWO            standard       2m12s
+
+# Check services
+kubectl get svc -n sw
+# NAME            TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)           AGE
+# banyandb-grpc   ClusterIP      10.96.217.34   <none>        17912/TCP         12m
+# banyandb-http   LoadBalancer   10.96.90.175   <pending>     17913:30325/TCP   12m
+```
+
+#### Cluster Mode
+
+For high-availability production setup:
+
+**Method 1: Using values file (recommended)**
+
+Create `banyandb-cluster-values.yaml`:
+
+```yaml
+image:
+  tag: 0.8.0
+
+standalone:
+  enabled: false
+
+cluster:
+  enabled: true
+  liaison:
+    replicas: 2  # Query layer
+  data:
+    replicas: 3  # Storage layer
+
+etcd:
+  enabled: true
+  replicaCount: 1  # Use 3 for production
+
+storage:
+  enabled: true
+  persistentVolumeClaims:
+    - mountTargets:
+        - stream
+      claimName: stream-data
+      size: 10Gi
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+    - mountTargets:
+        - measure
+      claimName: measure-data
+      size: 10Gi
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+```
+
+Install:
+
+```bash
+helm install banyandb \
+  oci://registry-1.docker.io/apache/skywalking-banyandb-helm \
+  --version 0.5.3 \
+  -f banyandb-cluster-values.yaml \
+  -n sw
+```
+
+**Method 2: Using --set flags (from official docs)**
+
+```bash
+# Official versions from docs:
+# - Helm chart version: 0.3.0
+# - BanyanDB image: 0.7.0
+# Latest stable version (recommended):
+# - Helm chart: 0.5.3
+# - BanyanDB image: 0.8.0 (check compatibility matrix above)
+
+helm install banyandb \
+  oci://registry-1.docker.io/apache/skywalking-banyandb-helm \
+  --version 0.5.3 \
+  --set image.tag=0.8.0 \
+  --set standalone.enabled=false \
+  --set cluster.enabled=true \
+  --set etcd.enabled=true \
+  --set storage.enabled=true \
+  --set storage.persistentVolumeClaims[0].mountTargets[0]=stream \
+  --set storage.persistentVolumeClaims[0].claimName=stream-data \
+  --set storage.persistentVolumeClaims[0].size=10Gi \
+  --set storage.persistentVolumeClaims[0].accessModes[0]=ReadWriteOnce \
+  --set storage.persistentVolumeClaims[0].volumeMode=Filesystem \
+  --set storage.persistentVolumeClaims[1].mountTargets[0]=measure \
+  --set storage.persistentVolumeClaims[1].claimName=measure-data \
+  --set storage.persistentVolumeClaims[1].size=10Gi \
+  --set storage.persistentVolumeClaims[1].accessModes[0]=ReadWriteOnce \
+  --set storage.persistentVolumeClaims[1].volumeMode=Filesystem \
+  -n sw
+```
+
+**Note:** If using zsh, quote the array parameters:
+```bash
+--set 'storage.persistentVolumeClaims[0].mountTargets[0]=stream'
+```
+
+**Expected Pods:**
+
+```bash
+kubectl get pod -n sw -w
+
+# Expected output (cluster mode):
+# NAME                       READY   STATUS    RESTARTS   AGE
+# banyandb-0                 1/1     Running   0          7m7s   # Data node 1
+# banyandb-1                 1/1     Running   0          5m6s   # Data node 2
+# banyandb-2                 1/1     Running   0          4m6s   # Data node 3
+# banyandb-885bc59d4-669lh   1/1     Running   0          7m7s   # Liaison 1
+# banyandb-885bc59d4-dd4j7   1/1     Running   0          7m7s   # Liaison 2
+# banyandb-etcd-0            1/1     Running   0          7m7s   # etcd
+```
+
+**Check Storage:**
+
+```bash
+kubectl get pvc -n sw
+
+# Expected output (cluster mode):
+# NAME                      STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+# data-banyandb-etcd-0      Bound    pvc-b0139dc4-01ed-423d-8f00-13376ecad015   8Gi        RWO            standard       13m
+# measure-data-banyandb-0   Bound    pvc-471758b8-1dc9-4508-85cb-34f2e53ee4a0   10Gi       RWO            standard       13m
+# measure-data-banyandb-1   Bound    pvc-a95f7196-b55c-4030-a99a-96476716c3f4   10Gi       RWO            standard       11m
+# measure-data-banyandb-2   Bound    pvc-29983adc-ee40-45b5-944c-49379a13384c   10Gi       RWO            standard       10m
+# stream-data-banyandb-0    Bound    pvc-60f2f332-cc07-4a3d-aad7-6c7866cfb739   10Gi       RWO            standard       13m
+# stream-data-banyandb-1    Bound    pvc-66dad00a-2c16-45b3-8d0a-dbf939d479ac   10Gi       RWO            standard       11m
+# stream-data-banyandb-2    Bound    pvc-bfdfde2d-7e78-4e9f-b781-949963e729f3   10Gi       RWO            standard       10m
+```
+
+**Check Services:**
+
+```bash
+kubectl get svc -n sw
+
+# Expected output (cluster mode):
+# NAME                     TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
+# banyandb-etcd            ClusterIP      10.96.33.132    <none>        2379/TCP,2380/TCP   5m
+# banyandb-etcd-headless   ClusterIP      None            <none>        2379/TCP,2380/TCP   5m
+# banyandb-grpc            ClusterIP      10.96.152.152   <none>        17912/TCP           5m
+# banyandb-http            LoadBalancer   10.96.137.29    <pending>     17913:30899/TCP     5m
+```
+
+**Connect OAP to BanyanDB:**
+
+When deploying SkyWalking OAP, configure it to use this BanyanDB cluster:
+
+```yaml
+oap:
+  storageType: banyandb
+  env:
+    SW_STORAGE_BANYANDB_TARGETS: "banyandb-grpc.sw:17912"
+```
+
+**Uninstall:**
+
+```bash
+# Uninstall BanyanDB
+helm uninstall banyandb -n sw
+
+# Delete PVCs (WARNING: This deletes all data!)
+kubectl delete pvc --all -n sw
+```
+
+**Troubleshooting:**
+
+```bash
+# Check logs
+kubectl logs -f banyandb-0 -n sw                    # Data node
+kubectl logs -f banyandb-885bc59d4-669lh -n sw      # Liaison node
+kubectl logs -f banyandb-etcd-0 -n sw               # etcd
+
+# Describe pod for issues
+kubectl describe pod banyandb-0 -n sw
+
+# Check events
+kubectl get events -n sw --sort-by='.lastTimestamp'
 ```
 
 ---
