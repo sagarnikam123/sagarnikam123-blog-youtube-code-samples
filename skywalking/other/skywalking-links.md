@@ -271,6 +271,7 @@ https://github.com/apache/skywalking/issues/new
 # Other
 https://github.com/apache/skywalking-cli/tree/0.14.0
 https://github.com/apache/skywalking-helm/tree/v4.8.0
+https://github.com/apache/skywalking-kubernetes-event-exporter/tree/main
 
 -----
 
