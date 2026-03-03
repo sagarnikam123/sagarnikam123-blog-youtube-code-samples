@@ -1,0 +1,21 @@
+# SkyWalking OAP Server Configuration for OTLP
+# This should be added to your application.yml or set via environment variables
+
+receiver-otel:
+  selector: ${SW_OTEL_RECEIVER:default}
+  default:
+    # Enable OTLP handlers for traces, metrics, and logs
+    enabledHandlers: ${SW_OTEL_RECEIVER_ENABLED_HANDLERS:"otlp-traces,otlp-metrics,otlp-logs"}
+
+# Optional: If you need to expose OAP on specific ports
+core:
+  selector: ${SW_CORE:default}
+  default:
+    # gRPC server configuration (default port 11800)
+    gRPCHost: ${SW_CORE_GRPC_HOST:0.0.0.0}
+    gRPCPort: ${SW_CORE_GRPC_PORT:11800}
+
+    # REST server configuration (default port 12800)
+    restHost: ${SW_CORE_REST_HOST:0.0.0.0}
+    restPort: ${SW_CORE_REST_PORT:12800}
+    restContextPath: ${SW_CORE_REST_CONTEXT_PATH:/}

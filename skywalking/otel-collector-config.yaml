@@ -1,0 +1,40 @@
+# OpenTelemetry Collector Configuration for SkyWalking OAP
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  debug:
+    verbosity: detailed
+
+  # For SkyWalking OAP - use standard gRPC endpoint
+  otlp/skywalking:
+    endpoint: skywalking-oap.skywalking.svc.cluster.local:11800
+    tls:
+      insecure: true
+
+processors:
+  batch: {}
+
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers:
+        - otlp
+      processors:
+        - batch
+      exporters:
+        - otlp/skywalking
+        - debug
