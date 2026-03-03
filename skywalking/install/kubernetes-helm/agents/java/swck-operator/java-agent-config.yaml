@@ -1,0 +1,86 @@
+# =============================================================================
+# Default Java Agent Configuration for SWCK Injection
+# =============================================================================
+# This ConfigMap provides default agent configuration for all injected pods
+# Apply to the target namespace (e.g., hunt)
+#
+# Ref: https://skywalking.apache.org/docs/skywalking-swck/latest/java-agent-injector
+# =============================================================================
+
+---
+# Default ConfigMap for agent configuration (applied per namespace)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skywalking-swck-java-agent-configmap
+  namespace: hunt  # Change to your target namespace
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+data:
+  agent.config: |
+    # Service name - will be set by annotation or pod name
+    agent.service_name=${SW_AGENT_NAME:Your_ApplicationName}
+
+    # Backend service - pointing to Satellite
+    collector.backend_service=${SW_AGENT_COLLECTOR_BACKEND_SERVICES:skywalking-satellite.skywalking.svc:11800}
+
+    # Sampling (-1 = all traces)
+    agent.sample_n_per_3_secs=${SW_AGENT_SAMPLE_N_PER_3_SECS:-1}
+
+    # Logging
+    logging.level=${SW_LOGGING_LEVEL:INFO}
+    logging.dir=/tmp/skywalking-logs
+
+    # Plugins
+    plugin.springmvc.use_qualified_name_as_endpoint_name=true
+    plugin.jdbc.trace_sql_parameters=true
+    plugin.redis.trace_redis_parameters=true
+
+    # Ignore health checks and static resources
+    agent.ignore_suffix=.jpg,.jpeg,.js,.css,.png,.bmp,.gif,.ico,.html,.svg,.woff,.woff2,.ttf,.eot
+
+---
+# SwAgent CR - defines injection behavior
+# IMPORTANT: Create this in the TARGET namespace (e.g., hunt), NOT in operator namespace
+apiVersion: operator.skywalking.apache.org/v1alpha1
+kind: SwAgent
+metadata:
+  name: swagent-java
+  namespace: hunt  # MUST be in target namespace
+spec:
+  # Label selector - empty means all pods in labeled namespaces
+  selector: {}
+
+  # Container matcher - regex to match container names (empty = all)
+  containerMatcher: ".*"
+
+  # Java sidecar (init container) configuration
+  javaSidecar:
+    name: inject-skywalking-agent
+    image: apache/skywalking-java-agent:9.3.0-java21
+    env:
+      - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+        value: "skywalking-satellite.skywalking.svc:11800"
+      # Derive service name from pod label (avoids "Your_ApplicationName" in UI)
+      - name: SW_AGENT_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.labels['app.kubernetes.io/name']
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  # Shared volume for agent files
+  sharedVolumeName: sky-agent
+
+  # Optional plugins to enable
+  optionalPlugins:
+    - trace-ignore
+    - spring-cloud-gateway-3.x
+
+  # Optional reporter plugins
+  optionalReporterPlugins: []

@@ -1,0 +1,132 @@
+# All Persistent Volume Claims for SkyWalking Cluster - Minikube Environment
+# This file contains all PVC definitions for quick deployment in Minikube
+#
+# Usage:
+#   kubectl apply -f all-pvcs-minikube.yaml
+#
+# Note: These are example PVCs for manual pre-provisioning.
+# When using StatefulSets, PVCs are automatically created from volumeClaimTemplates.
+
+---
+# BanyanDB Data Node 0 - Stream Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stream-data-banyandb-data-0
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: stream
+    replica: "0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# BanyanDB Data Node 0 - Measure Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: measure-data-banyandb-data-0
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: measure
+    replica: "0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# BanyanDB Data Node 1 - Stream Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stream-data-banyandb-data-1
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: stream
+    replica: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# BanyanDB Data Node 1 - Measure Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: measure-data-banyandb-data-1
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: measure
+    replica: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# etcd Node 0 - Coordination Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-etcd-0
+  namespace: skywalking
+  labels:
+    app: etcd
+    component: coordination
+    replica: "0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Summary for Minikube Environment:
+# - 2 BanyanDB data nodes × 2 volumes (stream + measure) = 4 PVCs × 10Gi = 40Gi
+# - 1 etcd node × 1 volume = 1 PVC × 10Gi = 10Gi
+# - Total: 5 PVCs, 50Gi storage
+#
+# Prerequisites:
+# 1. Minikube started with sufficient resources:
+#    minikube start --cpus=8 --memory=16384 --disk-size=50g
+#
+# 2. Namespace created:
+#    kubectl create namespace skywalking
+#
+# 3. Storage class exists:
+#    kubectl get storageclass standard
+#
+# Verification:
+#   kubectl get pvc -n skywalking
+#   kubectl describe pvc -n skywalking

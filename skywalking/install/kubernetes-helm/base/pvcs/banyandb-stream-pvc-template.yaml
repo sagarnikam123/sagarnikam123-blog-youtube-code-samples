@@ -1,0 +1,97 @@
+# BanyanDB Stream Data Persistent Volume Claim Template
+# This PVC stores trace and log data (stream data) for BanyanDB data nodes
+#
+# Usage:
+#   For StatefulSet volumeClaimTemplates, this template is automatically applied per replica
+#   For manual PVC creation, apply this file with appropriate naming:
+#     kubectl apply -f banyandb-stream-pvc-template.yaml
+#
+# Requirements: 1.7, 17.1, 17.4, 17.5
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stream-data-banyandb-data-0  # Name pattern: stream-data-banyandb-data-{replica-index}
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: stream
+spec:
+  # Access mode: ReadWriteOnce - volume can be mounted as read-write by a single node
+  accessModes:
+    - ReadWriteOnce
+
+  # Volume mode: Filesystem - volume is mounted into pods as a directory
+  volumeMode: Filesystem
+
+  # Storage class: Environment-specific (standard for Minikube, gp3 for EKS)
+  # Override this value based on deployment environment
+  storageClass: standard  # Change to "gp3" for AWS EKS
+
+  # Storage size: Environment-specific
+  # - Minikube: 10Gi (testing workloads)
+  # - EKS: 50Gi (production workloads)
+  resources:
+    requests:
+      storage: 10Gi  # Change to "50Gi" for production
+
+  # Selector (optional): Use to bind to specific PV with matching labels
+  # selector:
+  #   matchLabels:
+  #     type: banyandb-stream
+
+---
+# Notes:
+#
+# 1. StatefulSet Integration:
+#    When used with StatefulSet, this template is defined in volumeClaimTemplates section.
+#    Kubernetes automatically creates PVCs with names: stream-data-{statefulset-name}-{ordinal}
+#    Example: stream-data-banyandb-data-0, stream-data-banyandb-data-1, stream-data-banyandb-data-2
+#
+# 2. Storage Class Configuration:
+#    - Minikube: Use "standard" storage class (default provisioner)
+#    - AWS EKS: Use "gp3" storage class (EBS CSI driver with GP3 volumes)
+#    - Ensure storage class exists before deployment: kubectl get storageclass
+#
+# 3. Storage Size Guidelines:
+#    - Minikube (testing): 10Gi per data node
+#    - EKS (production): 50Gi per data node
+#    - Monitor usage and expand as needed
+#    - Consider data retention policies to manage growth
+#
+# 4. Access Mode:
+#    - ReadWriteOnce: Volume can be mounted by a single node
+#    - Required for StatefulSet with pod anti-affinity
+#    - Each data node gets its own PVC
+#
+# 5. Volume Mode:
+#    - Filesystem: Volume is formatted and mounted as a directory
+#    - BanyanDB writes stream data to /data/stream mount path
+#
+# 6. Data Retention:
+#    - Minikube: 2-3 days (configured in BanyanDB settings)
+#    - EKS: 7-30 days (configured in BanyanDB settings)
+#    - Retention is managed by BanyanDB, not at PVC level
+#
+# 7. Backup and Recovery:
+#    - Use volume snapshots for backup (VolumeSnapshot CRD)
+#    - Test restore procedures regularly
+#    - Consider cross-region replication for DR
+#
+# 8. Performance Considerations:
+#    - GP3 volumes provide baseline 3000 IOPS and 125 MB/s throughput
+#    - Increase IOPS/throughput in storage class if needed
+#    - Monitor I/O metrics to identify bottlenecks
+#
+# 9. Cost Optimization:
+#    - Right-size storage based on actual usage
+#    - Implement data retention policies
+#    - Use GP3 instead of GP2 for better price/performance
+#    - Monitor and optimize IOPS/throughput settings
+#
+# 10. Troubleshooting:
+#     - If PVC remains Pending: Check storage class exists and provisioner is running
+#     - If binding fails: Verify PV availability or dynamic provisioning is enabled
+#     - If out of space: Expand PVC (if storage class supports volume expansion)
+#     - Check events: kubectl describe pvc <pvc-name> -n skywalking

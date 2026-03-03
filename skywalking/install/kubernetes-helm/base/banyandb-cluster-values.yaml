@@ -1,0 +1,150 @@
+# =============================================================================
+# BanyanDB Cluster Mode Configuration
+# =============================================================================
+# Based on: https://skywalking.apache.org/docs/skywalking-banyandb/next/installation/kubernetes/
+#
+# This configuration deploys BanyanDB in cluster mode with:
+# - 2 Liaison nodes (query routing layer)
+# - 3 Data nodes (storage layer)
+# - 1 etcd node (metadata coordination)
+#
+# For production, increase etcd.replicaCount to 3 for high availability.
+#
+# Install:
+#   helm registry login registry-1.docker.io
+#   kubectl create namespace sw
+#   helm install banyandb \
+#     oci://registry-1.docker.io/apache/skywalking-banyandb-helm \
+#     --version 0.5.3 \
+#     -f base/banyandb-cluster-values.yaml \
+#     -n sw
+# =============================================================================
+
+# BanyanDB image configuration
+image:
+  repository: apache/skywalking-banyandb
+  tag: 0.8.0
+  pullPolicy: IfNotPresent
+
+# Disable standalone mode
+standalone:
+  enabled: false
+
+# Enable cluster mode
+cluster:
+  enabled: true
+
+  # Liaison nodes - Query routing layer
+  # These nodes handle client queries and route them to appropriate data nodes
+  liaison:
+    replicas: 2
+
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+
+    # Service configuration
+    grpcSvc:
+      type: ClusterIP
+      port: 17912
+
+    httpSvc:
+      type: LoadBalancer  # Change to ClusterIP for internal-only access
+      port: 17913
+
+  # Data nodes - Storage layer
+  # These nodes store and manage the actual observability data
+  data:
+    replicas: 3
+
+    resources:
+      requests:
+        cpu: "1000m"
+        memory: "2Gi"
+      limits:
+        cpu: "4000m"
+        memory: "4Gi"
+
+# etcd for cluster coordination
+# Manages cluster metadata, shard mapping, and node discovery
+etcd:
+  enabled: true
+  replicaCount: 1  # Use 3 for production HA
+
+  persistence:
+    enabled: true
+    storageClass: ""  # Use default storage class
+    size: 8Gi
+
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# Storage configuration
+# Simplified: 2 PVCs (stream + measure) - good for most use cases
+# Default: 4 PVCs (measure, stream, property, trace) - better performance isolation
+#
+# For production with high load, consider using the full 4-PVC configuration:
+# See: helm show values oci://registry-1.docker.io/apache/skywalking-banyandb-helm --version 0.5.3
+storage:
+  enabled: true
+
+  persistentVolumeClaims:
+    # Stream data storage (logs, traces)
+    - mountTargets:
+        - stream
+      claimName: stream-data
+      size: 50Gi  # Increased from 10Gi to match defaults
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+      storageClass: ""  # Use default storage class
+
+    # Measure data storage (metrics)
+    - mountTargets:
+        - measure
+      claimName: measure-data
+      size: 50Gi  # Increased from 10Gi to match defaults
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+      storageClass: ""  # Use default storage class
+
+# Service Account
+serviceAccount:
+  create: true
+  name: "banyandb"
+  annotations: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# Container security context
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity: {}

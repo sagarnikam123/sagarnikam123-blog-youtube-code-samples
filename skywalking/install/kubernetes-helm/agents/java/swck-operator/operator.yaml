@@ -1,0 +1,101 @@
+# =============================================================================
+# SkyWalking Operator Deployment
+# =============================================================================
+# Based on official SWCK v0.9.0
+# Ref: https://skywalking.apache.org/docs/skywalking-swck/latest/operator
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skywalking-swck-controller-manager
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+    app.kubernetes.io/component: controller-manager
+    control-plane: controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        app.kubernetes.io/name: skywalking-swck
+    spec:
+      serviceAccountName: skywalking-swck-controller-manager
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: manager
+          image: apache/skywalking-swck:v0.9.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /manager
+          ports:
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: ENABLE_WEBHOOKS
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # NOTE: Health probes removed - v0.9.0 doesn't expose health endpoints properly
+          # The operator runs fine without probes
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: cert
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+      volumes:
+        - name: cert
+          secret:
+            secretName: skywalking-swck-controller-manager-cert
+            defaultMode: 420
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skywalking-swck-controller-manager-service
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+spec:
+  ports:
+    - name: https
+      port: 443
+      targetPort: 9443
+  selector:
+    control-plane: controller-manager
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: skywalking-swck-controller-manager-metrics-service
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+spec:
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+  selector:
+    control-plane: controller-manager

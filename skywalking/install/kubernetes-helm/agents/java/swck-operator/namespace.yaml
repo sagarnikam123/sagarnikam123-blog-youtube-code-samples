@@ -1,0 +1,12 @@
+# =============================================================================
+# Namespace for SkyWalking SWCK Operator
+# =============================================================================
+# Official namespace name used by SWCK
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+    control-plane: controller-manager

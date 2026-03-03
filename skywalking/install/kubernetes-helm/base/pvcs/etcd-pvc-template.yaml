@@ -1,0 +1,138 @@
+# etcd Data Persistent Volume Claim Template
+# This PVC stores etcd cluster data for BanyanDB coordination and metadata
+#
+# Usage:
+#   For StatefulSet volumeClaimTemplates, this template is automatically applied per replica
+#   For manual PVC creation, apply this file with appropriate naming:
+#     kubectl apply -f etcd-pvc-template.yaml
+#
+# Requirements: 1.7, 17.1, 17.4, 17.5
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-etcd-0  # Name pattern: data-etcd-{replica-index}
+  namespace: skywalking
+  labels:
+    app: etcd
+    component: coordination
+spec:
+  # Access mode: ReadWriteOnce - volume can be mounted as read-write by a single node
+  accessModes:
+    - ReadWriteOnce
+
+  # Volume mode: Filesystem - volume is mounted into pods as a directory
+  volumeMode: Filesystem
+
+  # Storage class: Environment-specific (standard for Minikube, gp3 for EKS)
+  # Override this value based on deployment environment
+  storageClass: standard  # Change to "gp3" for AWS EKS
+
+  # Storage size: 10Gi for both Minikube and EKS
+  # etcd data is relatively small (cluster metadata and coordination state)
+  resources:
+    requests:
+      storage: 10Gi
+
+  # Selector (optional): Use to bind to specific PV with matching labels
+  # selector:
+  #   matchLabels:
+  #     type: etcd-data
+
+---
+# Notes:
+#
+# 1. StatefulSet Integration:
+#    When used with StatefulSet, this template is defined in volumeClaimTemplates section.
+#    Kubernetes automatically creates PVCs with names: data-{statefulset-name}-{ordinal}
+#    Example: data-etcd-0, data-etcd-1, data-etcd-2
+#
+# 2. Storage Class Configuration:
+#    - Minikube: Use "standard" storage class (default provisioner)
+#    - AWS EKS: Use "gp3" storage class (EBS CSI driver with GP3 volumes)
+#    - Ensure storage class exists before deployment: kubectl get storageclass
+#
+# 3. Storage Size Guidelines:
+#    - Both Minikube and EKS: 10Gi per etcd member
+#    - etcd stores cluster metadata, not observability data
+#    - Typical usage: < 1Gi for metadata
+#    - 10Gi provides ample headroom for growth
+#
+# 4. Replica Configuration:
+#    - Minikube: 1 replica (resource efficiency for testing)
+#    - EKS: 3 replicas (production HA and quorum)
+#    - Odd number of replicas required for quorum (1, 3, 5)
+#
+# 5. Access Mode:
+#    - ReadWriteOnce: Volume can be mounted by a single node
+#    - Required for StatefulSet with pod anti-affinity
+#    - Each etcd member gets its own PVC
+#
+# 6. Volume Mode:
+#    - Filesystem: Volume is formatted and mounted as a directory
+#    - etcd writes data to /var/lib/etcd mount path
+#
+# 7. Data Criticality:
+#    - etcd stores BanyanDB cluster metadata and coordination state
+#    - Loss of etcd data requires BanyanDB cluster rebuild
+#    - Regular backups are CRITICAL for disaster recovery
+#    - Test restore procedures regularly
+#
+# 8. Backup and Recovery:
+#    - Use etcd built-in snapshot mechanism: etcdctl snapshot save
+#    - Use volume snapshots for additional protection
+#    - Store backups in separate location (S3, different region)
+#    - Automate backup schedule (hourly or daily)
+#    - Document restore procedures
+#
+# 9. Performance Considerations:
+#    - etcd is latency-sensitive (consensus protocol)
+#    - Use SSD-backed storage (GP3 provides good performance)
+#    - Low-latency storage critical for cluster coordination
+#    - Monitor etcd metrics: leader elections, proposal latency
+#    - Avoid network-attached storage with high latency
+#
+# 10. High Availability:
+#     - 3 replicas provide fault tolerance (can lose 1 member)
+#     - 5 replicas provide higher fault tolerance (can lose 2 members)
+#     - Distribute replicas across availability zones
+#     - Use pod anti-affinity to prevent co-location
+#     - Monitor quorum status continuously
+#
+# 11. Cost Optimization:
+#     - 10Gi is sufficient for most deployments
+#     - Use GP3 for better price/performance than GP2
+#     - Single replica acceptable for dev/test (Minikube)
+#     - 3 replicas recommended minimum for production
+#
+# 12. Troubleshooting:
+#     - If PVC remains Pending: Check storage class exists and provisioner is running
+#     - If binding fails: Verify PV availability or dynamic provisioning is enabled
+#     - If etcd fails to start: Check PVC mount and permissions
+#     - Check events: kubectl describe pvc <pvc-name> -n skywalking
+#     - Verify mount path: kubectl exec <pod> -n skywalking -- df -h /var/lib/etcd
+#     - Check etcd logs: kubectl logs <etcd-pod> -n skywalking
+#
+# 13. Monitoring:
+#     - Track storage usage: kubectl get pvc -n skywalking
+#     - Monitor etcd health: etcdctl endpoint health
+#     - Monitor etcd metrics via Prometheus
+#     - Set alerts for:
+#       - Storage capacity thresholds (80%, 90%)
+#       - Quorum loss
+#       - High proposal latency
+#       - Leader elections
+#
+# 14. Security:
+#     - Enable encryption at rest (storage class configuration)
+#     - Use TLS for etcd client and peer communication
+#     - Implement RBAC for etcd access
+#     - Restrict network access to etcd ports (2379, 2380)
+#
+# 15. Disaster Recovery:
+#     - Regular automated backups (etcdctl snapshot)
+#     - Test restore procedures quarterly
+#     - Document recovery runbook
+#     - Store backups in multiple locations
+#     - Coordinate with BanyanDB data backups
+#     - Plan for complete cluster rebuild scenario

@@ -2,16 +2,34 @@
 # AWS EBS Storage Classes for SkyWalking
 # =============================================================================
 # Prerequisites:
-#   - AWS EBS CSI Driver installed on EKS
+#   - AWS EBS CSI Driver installed on EKS cluster
 #   - IAM permissions for EBS volume management
+#   - EKS cluster version 1.23+ (for CSI driver compatibility)
 #
-# Apply before Helm installation:
-#   kubectl apply -f base/storage-class.yaml
+# Installation:
+#   1. Verify EBS CSI driver is installed:
+#      kubectl get pods -n kube-system | grep ebs-csi
+#
+#   2. Apply storage classes before Helm installation:
+#      kubectl apply -f base/storage-class.yaml
+#
+#   3. Verify storage classes are created:
+#      kubectl get storageclass | grep skywalking
+#
+# Storage Class Selection Guide:
+#   - gp3-skywalking: Standard production workloads (BanyanDB stream/measure data)
+#   - gp3-skywalking-high-perf: High-throughput BanyanDB data nodes
+#   - io1-skywalking-etcd: Low-latency etcd storage
+#
+# Requirements Satisfied:
+#   - Requirement 3.12: EBS CSI driver integration
+#   - Requirement 17.6: GP3 storage with appropriate IOPS and throughput
 # =============================================================================
 
 ---
 # GP3 Storage Class - Recommended for Production
-# Better price-performance than gp2
+# Better price-performance than gp2 with baseline 3000 IOPS and 125 MB/s throughput
+# Suitable for: BanyanDB stream and measure data, general production workloads
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -19,23 +37,36 @@ metadata:
   labels:
     app.kubernetes.io/name: skywalking
     app.kubernetes.io/component: storage
+    app.kubernetes.io/managed-by: kubectl
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
+    description: "GP3 storage for SkyWalking production workloads"
 provisioner: ebs.csi.aws.com
 parameters:
   type: gp3
-  # IOPS and throughput for production workloads
+  # IOPS: 3000 (baseline for gp3, suitable for most workloads)
+  # Max: 16000 IOPS for volumes > 5.33 GiB
   iops: "3000"
+  # Throughput: 125 MB/s (baseline for gp3)
+  # Max: 1000 MB/s
   throughput: "125"
+  # Encryption: Always enabled for security compliance
   encrypted: "true"
-  # Optional: Use customer-managed KMS key
+  # Optional: Use customer-managed KMS key for encryption
   # kmsKeyId: arn:aws:kms:region:account:key/key-id
+  # File system type (default: ext4)
+  fsType: ext4
+# WaitForFirstConsumer: Ensures volume is created in same AZ as pod
 volumeBindingMode: WaitForFirstConsumer
+# Retain: Prevents accidental data loss on PVC deletion
 reclaimPolicy: Retain
+# Allow volume expansion without downtime
 allowVolumeExpansion: true
 
 ---
 # GP3 High Performance - For high-throughput BanyanDB data nodes
+# Optimized for: Heavy write workloads, high ingestion rates, large-scale deployments
+# Use case: BanyanDB data nodes handling > 10K spans/second
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -43,19 +74,33 @@ metadata:
   labels:
     app.kubernetes.io/name: skywalking
     app.kubernetes.io/component: storage
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    description: "High-performance GP3 storage for intensive BanyanDB workloads"
 provisioner: ebs.csi.aws.com
 parameters:
   type: gp3
   # Higher IOPS for intensive workloads
+  # 10000 IOPS provides ~5x performance improvement over baseline
   iops: "10000"
+  # Higher throughput for large sequential writes
+  # 500 MB/s provides ~4x throughput improvement over baseline
   throughput: "500"
+  # Encryption: Always enabled for security compliance
   encrypted: "true"
+  fsType: ext4
+# WaitForFirstConsumer: Ensures volume is created in same AZ as pod
 volumeBindingMode: WaitForFirstConsumer
+# Retain: Prevents accidental data loss on PVC deletion
 reclaimPolicy: Retain
+# Allow volume expansion without downtime
 allowVolumeExpansion: true
 
 ---
 # IO1 Storage Class - For etcd (low latency required)
+# Optimized for: Consistent low-latency operations, etcd cluster coordination
+# Use case: etcd persistent storage requiring predictable IOPS
+# Note: More expensive than GP3, use only for latency-sensitive workloads
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -63,11 +108,21 @@ metadata:
   labels:
     app.kubernetes.io/name: skywalking
     app.kubernetes.io/component: storage
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    description: "IO1 storage for etcd with consistent low latency"
 provisioner: ebs.csi.aws.com
 parameters:
   type: io1
+  # IOPS per GB: 50 IOPS/GB (for 10GB volume = 500 IOPS)
+  # Range: 50-64000 IOPS depending on volume size
   iopsPerGB: "50"
+  # Encryption: Always enabled for security compliance
   encrypted: "true"
+  fsType: ext4
+# WaitForFirstConsumer: Ensures volume is created in same AZ as pod
 volumeBindingMode: WaitForFirstConsumer
+# Retain: Prevents accidental data loss on PVC deletion
 reclaimPolicy: Retain
+# Allow volume expansion without downtime
 allowVolumeExpansion: true

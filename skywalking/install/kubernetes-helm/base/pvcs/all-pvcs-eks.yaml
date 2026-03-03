@@ -1,0 +1,229 @@
+# All Persistent Volume Claims for SkyWalking Cluster - AWS EKS Environment
+# This file contains all PVC definitions for quick deployment in AWS EKS
+#
+# Usage:
+#   kubectl apply -f all-pvcs-eks.yaml
+#
+# Note: These are example PVCs for manual pre-provisioning.
+# When using StatefulSets, PVCs are automatically created from volumeClaimTemplates.
+
+---
+# BanyanDB Data Node 0 - Stream Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stream-data-banyandb-data-0
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: stream
+    replica: "0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# BanyanDB Data Node 0 - Measure Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: measure-data-banyandb-data-0
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: measure
+    replica: "0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# BanyanDB Data Node 1 - Stream Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stream-data-banyandb-data-1
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: stream
+    replica: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# BanyanDB Data Node 1 - Measure Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: measure-data-banyandb-data-1
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: measure
+    replica: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# BanyanDB Data Node 2 - Stream Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stream-data-banyandb-data-2
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: stream
+    replica: "2"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# BanyanDB Data Node 2 - Measure Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: measure-data-banyandb-data-2
+  namespace: skywalking
+  labels:
+    app: banyandb
+    component: data
+    data-type: measure
+    replica: "2"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# etcd Node 0 - Coordination Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-etcd-0
+  namespace: skywalking
+  labels:
+    app: etcd
+    component: coordination
+    replica: "0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# etcd Node 1 - Coordination Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-etcd-1
+  namespace: skywalking
+  labels:
+    app: etcd
+    component: coordination
+    replica: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# etcd Node 2 - Coordination Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-etcd-2
+  namespace: skywalking
+  labels:
+    app: etcd
+    component: coordination
+    replica: "2"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Summary for AWS EKS Environment:
+# - 3 BanyanDB data nodes × 2 volumes (stream + measure) = 6 PVCs × 50Gi = 300Gi
+# - 3 etcd nodes × 1 volume = 3 PVCs × 10Gi = 30Gi
+# - Total: 9 PVCs, 330Gi storage
+#
+# Prerequisites:
+# 1. EKS cluster with nodes in at least 3 availability zones
+#
+# 2. EBS CSI driver installed:
+#    kubectl get pods -n kube-system | grep ebs-csi
+#
+# 3. GP3 storage class created:
+#    kubectl apply -f ../storage-class.yaml
+#    kubectl get storageclass gp3
+#
+# 4. Namespace created:
+#    kubectl create namespace skywalking
+#
+# 5. Sufficient EBS volume quota in AWS account
+#
+# Verification:
+#   kubectl get pvc -n skywalking
+#   kubectl describe pvc -n skywalking
+#
+# Cost Estimate (us-east-1):
+#   - BanyanDB storage: 300Gi × $0.08/GB/month = $24/month
+#   - etcd storage: 30Gi × $0.08/GB/month = $2.40/month
+#   - Total: ~$26.40/month for storage
+#
+# Performance:
+#   - GP3 baseline: 3000 IOPS, 125 MB/s per volume
+#   - Total baseline: 27,000 IOPS, 1,125 MB/s
+#   - Can be increased in storage class if needed

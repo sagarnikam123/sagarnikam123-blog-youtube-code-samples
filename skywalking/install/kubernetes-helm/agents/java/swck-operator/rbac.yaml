@@ -1,0 +1,118 @@
+# =============================================================================
+# RBAC for SkyWalking SWCK Operator
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: skywalking-swck-controller-manager
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: skywalking-swck-manager-role
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "configmaps", "secrets", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get", "update", "patch"]
+
+  # Apps resources
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # SkyWalking CRDs
+  - apiGroups: ["operator.skywalking.apache.org"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["operator.skywalking.apache.org"]
+    resources: ["*/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["operator.skywalking.apache.org"]
+    resources: ["*/finalizers"]
+    verbs: ["update"]
+
+  # Admission webhooks
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Coordination for leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Networking
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: skywalking-swck-manager-rolebinding
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: skywalking-swck-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: skywalking-swck-controller-manager
+    namespace: skywalking-swck-system
+
+---
+# Leader election role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: skywalking-swck-leader-election-role
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: skywalking-swck-leader-election-rolebinding
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: skywalking-swck-leader-election-role
+subjects:
+  - kind: ServiceAccount
+    name: skywalking-swck-controller-manager
+    namespace: skywalking-swck-system

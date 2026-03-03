@@ -1,0 +1,37 @@
+# =============================================================================
+# Certificate for Webhook TLS (requires cert-manager)
+# =============================================================================
+# If you don't have cert-manager, use the self-signed-cert.sh script instead
+# =============================================================================
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: skywalking-swck-selfsigned-issuer
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: skywalking-swck-serving-cert
+  namespace: skywalking-swck-system
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+spec:
+  secretName: skywalking-swck-controller-manager-cert
+  dnsNames:
+    - skywalking-swck-controller-manager-service
+    - skywalking-swck-controller-manager-service.skywalking-swck-system
+    - skywalking-swck-controller-manager-service.skywalking-swck-system.svc
+    - skywalking-swck-controller-manager-service.skywalking-swck-system.svc.cluster.local
+  issuerRef:
+    name: skywalking-swck-selfsigned-issuer
+    kind: Issuer
+  duration: 8760h    # 1 year
+  renewBefore: 720h  # 30 days

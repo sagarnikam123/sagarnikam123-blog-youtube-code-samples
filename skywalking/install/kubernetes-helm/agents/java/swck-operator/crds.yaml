@@ -1,0 +1,152 @@
+# =============================================================================
+# SkyWalking SWCK CRDs
+# =============================================================================
+# Note: For production, download the official CRDs from:
+# https://github.com/apache/skywalking-swck/releases
+#
+# This file contains minimal CRDs for java agent injection only.
+# Full CRDs include: OAPServer, UI, Storage, Satellite, Fetcher, etc.
+# =============================================================================
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: javaagents.operator.skywalking.apache.org
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+spec:
+  group: operator.skywalking.apache.org
+  names:
+    kind: JavaAgent
+    listKind: JavaAgentList
+    plural: javaagents
+    singular: javaagent
+    shortNames:
+      - ja
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                podSelector:
+                  type: string
+                serviceName:
+                  type: string
+                backendService:
+                  type: string
+                agentConfiguration:
+                  type: object
+                  additionalProperties:
+                    type: string
+            status:
+              type: object
+              properties:
+                creationTime:
+                  type: string
+                lastUpdateTime:
+                  type: string
+                expectedInjectiedNum:
+                  type: integer
+                realInjectedNum:
+                  type: integer
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: ServiceName
+          type: string
+          jsonPath: .spec.serviceName
+        - name: Backend
+          type: string
+          jsonPath: .spec.backendService
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: swagents.operator.skywalking.apache.org
+  labels:
+    app.kubernetes.io/name: skywalking-swck
+spec:
+  group: operator.skywalking.apache.org
+  names:
+    kind: SwAgent
+    listKind: SwAgentList
+    plural: swagents
+    singular: swagent
+    shortNames:
+      - swa
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                selector:
+                  type: object
+                  additionalProperties:
+                    type: string
+                containerMatcher:
+                  type: string
+                javaSidecar:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    image:
+                      type: string
+                    env:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          value:
+                            type: string
+                    resources:
+                      type: object
+                      properties:
+                        limits:
+                          type: object
+                          additionalProperties:
+                            type: string
+                        requests:
+                          type: object
+                          additionalProperties:
+                            type: string
+                sharedVolumeName:
+                  type: string
+                optionalPlugins:
+                  type: array
+                  items:
+                    type: string
+                optionalReporterPlugins:
+                  type: array
+                  items:
+                    type: string
+            status:
+              type: object
+              properties:
+                creationTime:
+                  type: string
+                lastUpdateTime:
+                  type: string
+      subresources:
+        status: {}
