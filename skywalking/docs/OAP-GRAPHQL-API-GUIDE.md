@@ -662,6 +662,29 @@ oap:
 | Aggregation | ✅ (`sum`, `min`, `max`, `avg`) |
 | Vector Matching | ❌ |
 
+### PromQL API Limitations
+
+SkyWalking's PromQL API is NOT a full Prometheus-compatible API. Key limitations:
+
+| Limitation | Description |
+|------------|-------------|
+| **Labels required** | Queries like `service_cpm` fail without `service` and `layer` labels |
+| **No regex in selectors** | Only `=` operator supported (no `=~`, `!=`, `!~`) |
+| **Label values need match[]** | `/api/v1/label/service/values` returns empty without `match[]` param |
+| **No vector matching** | Operations between different metrics not supported |
+| **Traffic metrics for metadata** | Use `service_traffic`, `instance_traffic`, `endpoint_traffic` for label discovery |
+
+**Example - This fails:**
+```promql
+service_cpm
+# Error: No labels found in the expression
+```
+
+**Example - This works:**
+```promql
+service_cpm{service='hunt::spotter-api-service', layer='GENERAL'}
+```
+
 ### PromQL Query Examples
 
 ```promql
@@ -710,20 +733,57 @@ endpoint_traffic{layer='GENERAL', service='task-manager'}
 
 ### Grafana Dashboard Variables
 
-Configure dashboard variables for dynamic service/instance selection:
+Configure dashboard variables for dynamic service/instance selection.
 
-```yaml
-# Service variable (Query type: Label values)
-Label: service
-Metric: service_traffic{layer='GENERAL'}
+**Important**: SkyWalking's PromQL API has limitations compared to standard Prometheus:
+- Label values endpoint (`/api/v1/label/<name>/values`) returns empty without `match[]` parameter
+- Must use `service_traffic`, `instance_traffic`, or `endpoint_traffic` metrics to get label values
+- Queries require labels - can't query `service_cpm` without specifying `service` and `layer`
 
-# Instance variable
-Label: service_instance
-Metric: instance_traffic{layer='GENERAL', service='$service'}
+#### Variable Configuration
 
-# Endpoint variable
-Label: endpoint
-Metric: endpoint_traffic{layer='GENERAL', service='$service'}
+| Variable | Type | Query |
+|----------|------|-------|
+| Layer | Query | `label_values(service_traffic, layer)` |
+| Service | Query | `label_values(service_traffic{layer="$layer"}, service)` |
+| Instance | Query | `label_values(instance_traffic{layer="$layer", service="$service"}, service_instance)` |
+| Endpoint | Query | `label_values(endpoint_traffic{layer="$layer", service="$service"}, endpoint)` |
+
+#### Testing Label Values via curl
+
+```bash
+# Get all layers
+curl -s 'http://skywalking-oap.skywalking:9090/api/v1/label/layer/values'
+
+# Get services (MUST include match[] parameter)
+curl -s -G 'http://skywalking-oap.skywalking:9090/api/v1/label/service/values' \
+  --data-urlencode "match[]=service_traffic{layer='GENERAL'}"
+
+# Get instances for a service
+curl -s -G 'http://skywalking-oap.skywalking:9090/api/v1/label/service_instance/values' \
+  --data-urlencode "match[]=instance_traffic{layer='GENERAL', service='hunt::spotter-api-service'}"
+
+# Get endpoints for a service
+curl -s -G 'http://skywalking-oap.skywalking:9090/api/v1/label/endpoint/values' \
+  --data-urlencode "match[]=endpoint_traffic{layer='GENERAL', service='hunt::spotter-api-service'}"
+```
+
+#### Common Issue: Empty Label Values
+
+If Grafana shows empty dropdown for variables, ensure:
+1. Variable query uses `label_values()` with the correct traffic metric
+2. The `match[]` parameter includes required labels (`layer` is always required)
+3. For cascading variables, parent variable is selected first
+
+**Wrong** (returns empty):
+```
+label_values(service)
+label_values(service_cpm, service)
+```
+
+**Correct**:
+```
+label_values(service_traffic{layer="GENERAL"}, service)
 ```
 
 ---
