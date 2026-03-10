@@ -245,12 +245,15 @@ kubectl patch deployment <deploy-name> -n <namespace> --type='json' \
 
 #### Agent Image Selection
 
-| Java Version | Agent Image |
-|-------------|-------------|
-| Java 8 | `apache/skywalking-java-agent:9.3.0-java8` |
-| Java 11 | `apache/skywalking-java-agent:9.3.0-java11` |
-| Java 17 | `apache/skywalking-java-agent:9.3.0-java17` |
-| Java 21 | `apache/skywalking-java-agent:9.3.0-java21` |
+| Java Version | Agent Image (Latest 9.6.0) | Notes |
+|-------------|---------------------------|-------|
+| Java 8 | `apache/skywalking-java-agent:9.6.0-java8` | Async Profiler supported |
+| Java 11 | `apache/skywalking-java-agent:9.6.0-java11` | Async Profiler supported |
+| Java 17 | `apache/skywalking-java-agent:9.6.0-java17` | Async Profiler supported |
+| Java 21 | `apache/skywalking-java-agent:9.6.0-java21` | Async Profiler supported |
+| Java 25 | `apache/skywalking-java-agent:9.6.0-java25` | Async Profiler supported |
+
+> **Note:** Use Agent 9.4.0+ for Async Profiler (CPU/ALLOC/LOCK flame graphs). Agent 9.3.0 and earlier only support Trace Profiling. Async Profiler also requires OAP Server 10.2.0+.
 
 > **Ref:** [Docker Hub - skywalking-java-agent](https://hub.docker.com/r/apache/skywalking-java-agent/tags), [Java Agent Setup](https://skywalking.apache.org/docs/skywalking-java/next/en/setup/service-agent/java-agent/readme/)
 
@@ -662,8 +665,21 @@ Add these to `values.yaml` under `oap.env`:
     SW_RECEIVER_PROFILE: "default"
 
     # Async Profiler Receiver — accepts JFR data (CPU/ALLOC/LOCK) from agents
+    # NOTE: Requires Java Agent 10.0.0+ (async-profiler bundled in agent 10.x)
     SW_RECEIVER_ASYNC_PROFILER: "default"
 ```
+
+> **⚠️ IMPORTANT:** Async Profiler requires Java Agent version 9.4.0 or higher AND OAP Server 10.2.0+. Agent 9.3.0 and earlier only support Trace Profiling (thread stack sampling). If using agent < 9.4.0, async profiler tasks will be created but the agent won't pick them up.
+>
+> **References:**
+> - [Java Agent 9.4.0 Release Notes](https://skywalking.apache.org/events/release-apache-skywalking-java-agent-9-4-0/) — Async Profiler support added
+> - [Java App Profiling Setup](https://skywalking.apache.org/docs/main/next/en/setup/backend/backend-java-app-profiling/) — OAP configuration
+> - [Agent Docker Images](https://hub.docker.com/r/apache/skywalking-java-agent/tags) — Available tags
+
+| Feature | Agent < 9.4.0 | Agent 9.4.0+ |
+|---------|---------------|--------------|
+| Trace Profiling | ✅ Yes | ✅ Yes |
+| Async Profiler (CPU/ALLOC/LOCK) | ❌ No | ✅ Yes (requires OAP 10.2+) |
 
 Then upgrade the Helm release:
 
@@ -689,6 +705,8 @@ Satellite already has the required receiver/forwarder plugins:
 | Async Profiler | `grpc-native-async-profiler-receiver` | `native-async-profiler-grpc-forwarder` |
 
 ### Step 3: Create Profiling Tasks from UI
+
+> **Important:** Profiling requires applications with actual traced operations (HTTP endpoints, database calls, etc.). Simple log generators or batch jobs without traced spans won't receive profiling tasks via CDS.
 
 #### Trace Profiling
 
@@ -725,7 +743,43 @@ These are agent-level settings, set via env vars or `agent.config`. Defaults are
 | `profile.active` | `true` | Enable/disable trace profiling |
 | `profile.max_parallel` | `5` | Max concurrent profiling tasks |
 | `profile.max_accept_sub_parallel` | `5` | Max sub-tasks per task |
-| `profile.duration` | `10` | Max profiling duration (minutes) |
+| `profile.duration` | `10` | Default profiling duration (seconds) |
+
+### Troubleshooting Profiling
+
+If profiling tasks are created but the agent doesn't pick them up:
+
+1. **Verify the agent is connected to Satellite/OAP:**
+   ```bash
+   kubectl logs -n <namespace> <pod> | grep -i "skywalking\|connect"
+   ```
+
+2. **Check if the service has traced endpoints:**
+   - Async profiler tasks are delivered via CDS (Configuration Discovery Service)
+   - The agent must have active traced operations to receive tasks
+   - Simple log generators without HTTP endpoints won't receive profiling tasks
+
+3. **Verify OAP receivers are enabled:**
+   ```bash
+   kubectl exec -n skywalking deploy/skywalking-oap -- printenv | grep -i PROFILE
+   # Should show: SW_RECEIVER_PROFILE=default and SW_RECEIVER_ASYNC_PROFILER=default
+   ```
+
+4. **Check Satellite has profiling pipes:**
+   ```bash
+   kubectl exec -n skywalking deploy/skywalking-satellite -- \
+     cat /skywalking/configs/satellite_config.yaml | grep -A5 "profilepipe\|asyncprofilerpipe"
+   ```
+
+5. **Query task progress via GraphQL:**
+   ```bash
+   kubectl exec -n skywalking deploy/skywalking-oap -- curl -s -X POST \
+     http://localhost:12800/graphql -H "Content-Type: application/json" -d '{
+       "query": "query { queryAsyncProfilerTaskProgress(taskId: \"<TASK_ID>\") { logs { instanceName operationType } successInstanceIds errorInstanceIds } }"
+     }'
+   ```
+
+> **Note:** For async profiler to work, the Java application must have actual traced operations (HTTP endpoints, database calls, etc.). Simple log generators or batch jobs without traced spans won't receive profiling tasks. Max profiling duration (minutes) |
 | `profile.dump_max_stack_depth` | `500` | Max thread stack depth to dump |
 | `profile.snapshot_transport_buffer_size` | `50` | Buffer size for snapshot transport |
 
@@ -1004,10 +1058,13 @@ kubectl exec -n <namespace> <pod> -c <container> -- nslookup skywalking-satellit
 | Component | Version | Notes |
 |-----------|---------|-------|
 | SkyWalking OAP | 10.3.0 | Current deployment |
-| SkyWalking Java Agent | 9.3.0 | Compatible with OAP 10.x |
+| SkyWalking Java Agent | 9.3.0 | Compatible with OAP 10.x (Trace Profiling only) |
+| SkyWalking Java Agent | 9.4.0+ | Required for Async Profiler (CPU/ALLOC/LOCK), needs OAP 10.2+ |
 | Satellite | v1.3.0 | Supports all native protocols |
 | BanyanDB | 0.9.0 | Storage backend |
 | Java | 8, 11, 17, 21 | Agent supports JDK 8-25 |
+
+> **Async Profiler Note:** The async-profiler was added in Java Agent 9.4.0 and requires OAP Server 10.2.0+. If you need CPU/memory/lock flame graphs via Async Profiler, upgrade the agent to 9.4.0+. See [Java Agent 9.4.0 Release Notes](https://skywalking.apache.org/events/release-apache-skywalking-java-agent-9-4-0/) for details.
 
 ## References
 
