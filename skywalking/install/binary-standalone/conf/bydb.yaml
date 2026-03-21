@@ -1,0 +1,120 @@
+# =============================================================================
+# BanyanDB Storage Configuration for SkyWalking OAP
+# =============================================================================
+# This file configures how SkyWalking OAP connects to and uses BanyanDB.
+# Place this file in: skywalking-oap/config/bydb.yaml
+
+global:
+  # BanyanDB server address (standalone mode)
+  targets: ${SW_STORAGE_BANYANDB_TARGETS:127.0.0.1:17912}
+
+  # Bulk write settings
+  maxBulkSize: ${SW_STORAGE_BANYANDB_MAX_BULK_SIZE:10000}
+  flushInterval: ${SW_STORAGE_BANYANDB_FLUSH_INTERVAL:15}
+  flushTimeout: ${SW_STORAGE_BANYANDB_FLUSH_TIMEOUT:10}
+  concurrentWriteThreads: ${SW_STORAGE_BANYANDB_CONCURRENT_WRITE_THREADS:15}
+
+  # Query settings
+  resultWindowMaxSize: ${SW_STORAGE_BANYANDB_QUERY_MAX_WINDOW_SIZE:10000}
+  metadataQueryMaxSize: ${SW_STORAGE_BANYANDB_QUERY_MAX_SIZE:10000}
+  segmentQueryMaxSize: ${SW_STORAGE_BANYANDB_QUERY_SEGMENT_SIZE:200}
+  profileTaskQueryMaxSize: ${SW_STORAGE_BANYANDB_QUERY_PROFILE_TASK_SIZE:200}
+  profileDataQueryBatchSize: ${SW_STORAGE_BANYANDB_QUERY_PROFILE_DATA_BATCH_SIZE:100}
+  asyncProfilerTaskQueryMaxSize: ${SW_STORAGE_BANYANDB_ASYNC_PROFILER_TASK_QUERY_MAX_SIZE:200}
+
+  # Authentication (optional)
+  user: ${SW_STORAGE_BANYANDB_USER:""}
+  password: ${SW_STORAGE_BANYANDB_PASSWORD:""}
+
+  # TLS (optional)
+  sslTrustCAPath: ${SW_STORAGE_BANYANDB_SSL_TRUST_CA_PATH:""}
+
+  cleanupUnusedTopNRules: ${SW_STORAGE_BANYANDB_CLEANUP_UNUSED_TOPN_RULES:true}
+
+# =============================================================================
+# Group Settings - Data Storage Configuration
+# =============================================================================
+groups:
+  # General records storage
+  records:
+    shardNum: ${SW_STORAGE_BANYANDB_RECORDS_SHARD_NUM:1}
+    segmentInterval: ${SW_STORAGE_BANYANDB_RECORDS_SI_DAYS:1}
+    ttl: ${SW_STORAGE_BANYANDB_RECORDS_TTL_DAYS:3}
+    replicas: ${SW_STORAGE_BANYANDB_RECORDS_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Trace data storage
+  trace:
+    shardNum: ${SW_STORAGE_BANYANDB_TRACE_SHARD_NUM:2}
+    segmentInterval: ${SW_STORAGE_BANYANDB_TRACE_SI_DAYS:1}
+    ttl: ${SW_STORAGE_BANYANDB_TRACE_TTL_DAYS:3}
+    replicas: ${SW_STORAGE_BANYANDB_TRACE_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Zipkin trace storage (if using Zipkin)
+  zipkinTrace:
+    shardNum: ${SW_STORAGE_BANYANDB_ZIPKIN_TRACE_SHARD_NUM:2}
+    segmentInterval: ${SW_STORAGE_BANYANDB_ZIPKIN_TRACE_SI_DAYS:1}
+    ttl: ${SW_STORAGE_BANYANDB_ZIPKIN_TRACE_TTL_DAYS:3}
+    replicas: ${SW_STORAGE_BANYANDB_ZIPKIN_TRACE_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Log data storage
+  recordsLog:
+    shardNum: ${SW_STORAGE_BANYANDB_LOG_SHARD_NUM:2}
+    segmentInterval: ${SW_STORAGE_BANYANDB_LOG_SI_DAYS:1}
+    ttl: ${SW_STORAGE_BANYANDB_LOG_TTL_DAYS:3}
+    replicas: ${SW_STORAGE_BANYANDB_LOG_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Browser error logs
+  recordsBrowserErrorLog:
+    shardNum: ${SW_STORAGE_BANYANDB_BROWSER_ERROR_LOG_SHARD_NUM:2}
+    segmentInterval: ${SW_STORAGE_BANYANDB_BROWSER_ERROR_LOG_SI_DAYS:1}
+    ttl: ${SW_STORAGE_BANYANDB_BROWSER_ERROR_LOG_TTL_DAYS:3}
+    replicas: ${SW_STORAGE_BANYANDB_BROWSER_ERROR_LOG_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Minute-level metrics
+  metricsMinute:
+    shardNum: ${SW_STORAGE_BANYANDB_METRICS_MINUTE_SHARD_NUM:2}
+    segmentInterval: ${SW_STORAGE_BANYANDB_METRICS_MINUTE_SI_DAYS:1}
+    ttl: ${SW_STORAGE_BANYANDB_METRICS_MINUTE_TTL_DAYS:7}
+    replicas: ${SW_STORAGE_BANYANDB_METRICS_MINUTE_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Hour-level metrics
+  metricsHour:
+    shardNum: ${SW_STORAGE_BANYANDB_METRICS_HOUR_SHARD_NUM:1}
+    segmentInterval: ${SW_STORAGE_BANYANDB_METRICS_HOUR_SI_DAYS:5}
+    ttl: ${SW_STORAGE_BANYANDB_METRICS_HOUR_TTL_DAYS:15}
+    replicas: ${SW_STORAGE_BANYANDB_METRICS_HOUR_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Day-level metrics
+  metricsDay:
+    shardNum: ${SW_STORAGE_BANYANDB_METRICS_DAY_SHARD_NUM:1}
+    segmentInterval: ${SW_STORAGE_BANYANDB_METRICS_DAY_SI_DAYS:15}
+    ttl: ${SW_STORAGE_BANYANDB_METRICS_DAY_TTL_DAYS:15}
+    replicas: ${SW_STORAGE_BANYANDB_METRICS_DAY_REPLICAS:0}
+    enableWarmStage: false
+    enableColdStage: false
+
+  # Metadata storage
+  metadata:
+    shardNum: ${SW_STORAGE_BANYANDB_METADATA_SHARD_NUM:2}
+    segmentInterval: ${SW_STORAGE_BANYANDB_METADATA_SI_DAYS:15}
+    ttl: ${SW_STORAGE_BANYANDB_METADATA_TTL_DAYS:15}
+    replicas: ${SW_STORAGE_BANYANDB_METADATA_REPLICAS:0}
+
+  # Property storage (UI, profiling)
+  property:
+    shardNum: ${SW_STORAGE_BANYANDB_PROPERTY_SHARD_NUM:1}
+    replicas: ${SW_STORAGE_BANYANDB_PROPERTY_REPLICAS:0}
