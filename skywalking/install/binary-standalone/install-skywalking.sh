@@ -6,10 +6,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$SCRIPT_DIR"
 
-# Configuration
-SKYWALKING_VERSION="${SKYWALKING_VERSION:-10.3.0}"
+# Configuration — override via argument or env var
+SKYWALKING_VERSION="${1:-${SKYWALKING_VERSION:-10.3.0}}"
 SKYWALKING_HOME="$PROJECT_DIR/skywalking-oap"
 DOWNLOAD_DIR="$PROJECT_DIR/downloads"
 
@@ -53,7 +53,7 @@ download_skywalking() {
 
     mkdir -p "$DOWNLOAD_DIR"
 
-    DOWNLOAD_URL="https://dlcdn.apache.org/skywalking/${SKYWALKING_VERSION}/apache-skywalking-apm-${SKYWALKING_VERSION}.tar.gz"
+    DOWNLOAD_URL="https://dlcdn.apache.org/skywalking/${SKYWALKING_VERSION}/apache-skywalking-apm-${SKYWALKING_VERSION}-bin.tar.gz"
     TARBALL="$DOWNLOAD_DIR/skywalking-${SKYWALKING_VERSION}.tar.gz"
 
     if [[ -f "$TARBALL" ]]; then
@@ -112,15 +112,17 @@ configure_banyandb_storage() {
 
     log_info "Storage configured to use BanyanDB"
 
-    # Copy custom config if exists
-    if [[ -f "$PROJECT_DIR/conf/application.yml" ]]; then
+    # Copy custom config if exists (from conf/ in the same directory)
+    CONF_DIR="$PROJECT_DIR/conf"
+
+    if [[ -f "$CONF_DIR/application.yml" ]]; then
         log_info "Applying custom application.yml..."
-        cp "$PROJECT_DIR/conf/application.yml" "$CONFIG_FILE"
+        cp "$CONF_DIR/application.yml" "$CONFIG_FILE"
     fi
 
-    if [[ -f "$PROJECT_DIR/conf/bydb.yaml" ]]; then
+    if [[ -f "$CONF_DIR/bydb.yaml" ]]; then
         log_info "Applying custom bydb.yaml..."
-        cp "$PROJECT_DIR/conf/bydb.yaml" "$SKYWALKING_HOME/config/bydb.yaml"
+        cp "$CONF_DIR/bydb.yaml" "$SKYWALKING_HOME/config/bydb.yaml"
     fi
 }
 

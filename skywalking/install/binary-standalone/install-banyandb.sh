@@ -6,10 +6,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$SCRIPT_DIR"
 
-# Configuration
-BANYANDB_VERSION="${BANYANDB_VERSION:-0.9.0}"
+# Configuration — override via argument or env var
+BANYANDB_VERSION="${1:-${BANYANDB_VERSION:-0.9.0}}"
 BANYANDB_HOME="$PROJECT_DIR/banyandb"
 DOWNLOAD_DIR="$PROJECT_DIR/downloads"
 
@@ -43,6 +43,23 @@ detect_platform() {
         *)       log_error "Unsupported architecture: $ARCH"; exit 1 ;;
     esac
 
+    # BanyanDB server binaries are only available for Linux.
+    # macOS users must build from source or use Docker.
+    if [[ "$OS" == "darwin" ]]; then
+        log_warn "BanyanDB server binaries are only available for Linux (amd64/arm64)."
+        log_warn "The official tarball does not include macOS banyand-server binaries."
+        log_warn ""
+        log_warn "Options for macOS:"
+        log_warn "  1. Use Docker: docker run -d -p 17912:17912 -p 17913:17913 apache/skywalking-banyandb:${BANYANDB_VERSION} standalone"
+        log_warn "  2. Build from source: https://skywalking.apache.org/docs/skywalking-banyandb/latest/installation/binaries/"
+        log_warn ""
+        read -p "Continue downloading the tarball anyway (contains Linux binaries only)? (y/n): " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 0
+        fi
+    fi
+
     log_info "Detected platform: ${OS}-${ARCH}"
 }
 
@@ -54,8 +71,9 @@ download_banyandb() {
 
     mkdir -p "$DOWNLOAD_DIR"
 
-    DOWNLOAD_URL="https://dlcdn.apache.org/skywalking/banyandb/${BANYANDB_VERSION}/apache-skywalking-banyandb-${BANYANDB_VERSION}-banyand-${OS}-${ARCH}.tar.gz"
-    TARBALL="$DOWNLOAD_DIR/banyandb-${BANYANDB_VERSION}.tar.gz"
+    # Single universal tarball — contains multi-platform binaries inside bin/
+    DOWNLOAD_URL="https://dlcdn.apache.org/skywalking/banyandb/${BANYANDB_VERSION}/skywalking-banyandb-${BANYANDB_VERSION}-banyand.tgz"
+    TARBALL="$DOWNLOAD_DIR/banyandb-${BANYANDB_VERSION}.tgz"
 
     if [[ -f "$TARBALL" ]]; then
         log_info "BanyanDB tarball already exists, skipping download"
@@ -73,7 +91,7 @@ download_banyandb() {
 install_banyandb() {
     log_info "Installing BanyanDB..."
 
-    TARBALL="$DOWNLOAD_DIR/banyandb-${BANYANDB_VERSION}.tar.gz"
+    TARBALL="$DOWNLOAD_DIR/banyandb-${BANYANDB_VERSION}.tgz"
 
     # Remove existing installation
     if [[ -d "$BANYANDB_HOME" ]]; then
@@ -88,6 +106,23 @@ install_banyandb() {
     # Create data directory
     mkdir -p "$PROJECT_DIR/data/banyandb"
 
+    # Select the correct binary for this platform
+    # Tarball contains: bin/banyand-server-slim-linux-{amd64,arm64}
+    #                    bin/banyand-server-static-linux-{amd64,arm64}
+    BINARY_NAME="banyand-server-static-${OS}-${ARCH}"
+    BINARY_PATH="$BANYANDB_HOME/bin/$BINARY_NAME"
+
+    if [[ -f "$BINARY_PATH" ]]; then
+        chmod +x "$BINARY_PATH"
+        # Create a symlink for convenience
+        ln -sf "bin/$BINARY_NAME" "$BANYANDB_HOME/banyand"
+        log_info "Selected binary: $BINARY_NAME"
+    else
+        log_warn "Binary $BINARY_NAME not found in tarball."
+        log_warn "Available binaries:"
+        ls -1 "$BANYANDB_HOME/bin/" 2>/dev/null || echo "  (none)"
+    fi
+
     log_info "BanyanDB installed to: $BANYANDB_HOME"
 }
 
@@ -97,9 +132,8 @@ install_banyandb() {
 verify_installation() {
     log_info "Verifying BanyanDB installation..."
 
-    if [[ -f "$BANYANDB_HOME/banyand" ]]; then
-        chmod +x "$BANYANDB_HOME/banyand"
-        log_info "BanyanDB binary found and made executable"
+    if [[ -f "$BANYANDB_HOME/banyand" ]] || [[ -L "$BANYANDB_HOME/banyand" ]]; then
+        log_info "BanyanDB binary found and ready"
 
         # Show version
         "$BANYANDB_HOME/banyand" --version 2>/dev/null || true
@@ -107,6 +141,8 @@ verify_installation() {
         return 0
     else
         log_error "BanyanDB binary not found!"
+        log_error "Available files in bin/:"
+        ls -1 "$BANYANDB_HOME/bin/" 2>/dev/null || echo "  (none)"
         return 1
     fi
 }
