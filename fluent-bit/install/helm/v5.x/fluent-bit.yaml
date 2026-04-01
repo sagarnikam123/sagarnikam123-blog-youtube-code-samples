@@ -1,0 +1,199 @@
+service:
+  flush: 5
+  log_level: info
+  http_server: on
+  http_listen: 0.0.0.0
+  http_port: 2020
+  # Hot reload — reload config without restarting the pod
+  hot_reload: on
+  # Filesystem buffering — spill to disk when memory is full
+  storage.path: /var/log/flb-storage/
+  storage.sync: normal
+  storage.checksum: off
+  storage.max_chunks_up: 128
+  storage.backlog.mem_limit: 10M
+  storage.metrics: on
+
+pipeline:
+  inputs:
+    - name: tail
+      path: /var/log/containers/*.log
+      # Exclude system/infra/monitoring namespaces — reduces noise and resource usage
+      exclude_path: >-
+        /var/log/containers/*_kube-system_*.log,
+        /var/log/containers/*_kube-public_*.log,
+        /var/log/containers/*_kube-node-lease_*.log,
+        /var/log/containers/*_kubernetes-dashboard_*.log,
+        /var/log/containers/*_default_*.log,
+        /var/log/containers/*_monitoring_*.log,
+        /var/log/containers/*_monitoring-testing_*.log,
+        /var/log/containers/*_prometheus_*.log,
+        /var/log/containers/*_ingress-nginx_*.log,
+        /var/log/containers/*_nginx_*.log,
+        /var/log/containers/*_nginx-external_*.log,
+        /var/log/containers/*_cert-manager_*.log,
+        /var/log/containers/*_external-dns_*.log,
+        /var/log/containers/*_otel_*.log,
+        /var/log/containers/*_otel-log_*.log,
+        /var/log/containers/*_ot-operators_*.log,
+        /var/log/containers/*_opentelemetry-operator-system_*.log,
+        /var/log/containers/*_tracing_*.log,
+        /var/log/containers/*_amazon-cloudwatch_*.log,
+        /var/log/containers/*_aws-observability_*.log,
+        /var/log/containers/*_cloudability_*.log,
+        /var/log/containers/*_kubecost_*.log,
+        /var/log/containers/*_datadog_*.log,
+        /var/log/containers/*_karpenter_*.log,
+        /var/log/containers/*_keda_*.log,
+        /var/log/containers/*_castai-agent_*.log,
+        /var/log/containers/*_castai-live_*.log,
+        /var/log/containers/*_argo_*.log,
+        /var/log/containers/*_redis_*.log,
+        /var/log/containers/*_kafka-lag-exporter_*.log,
+        /var/log/containers/*_warpstream_*.log,
+        /var/log/containers/*_housekeeping_*.log
+      # Built-in multiline parsers — docker and cri only (java/python/go via filter below)
+      multiline.parser: docker, cri
+      tag: kube.*
+      # Larger buffers — reduces syscalls, better throughput (default: 32k)
+      buffer_chunk_size: 256k
+      buffer_max_size: 512k
+      # Accept long lines instead of dropping them
+      skip_long_lines: false
+      skip_empty_lines: true
+      # Filesystem buffering — spill to disk when mem_buf_limit is reached
+      storage.type: filesystem
+      storage.pause_on_chunks_overlimit: off
+      mem_buf_limit: 20MB
+      # Track file positions — prevents re-reading on restart
+      db: /var/log/flb_kube.db
+      db.sync: normal
+      refresh_interval: 10
+      rotate_wait: 30
+      read_from_head: false
+      # Run in separate thread for better CPU utilization
+      threaded: true
+
+  filters:
+    # -------------------------------------------------------------------------
+    # STEP 1 — Multiline (MUST be first filter — re-emits to head of pipeline)
+    # Handles Java, Python, Go, Ruby stack traces across multiple log lines
+    # buffer + emitter_storage.type: filesystem ensures no loss under backpressure
+    # -------------------------------------------------------------------------
+    - name: multiline
+      match: "kube.*"
+      multiline.key_content: log
+      multiline.parser: java, python, go
+      buffer: true
+      flush_ms: 2000
+      emitter_mem_buf_limit: 10M
+      emitter_storage.type: filesystem
+
+    # -------------------------------------------------------------------------
+    # STEP 2 — Grep: drop noisy/unwanted log lines before any enrichment
+    # Saves CPU on kubernetes filter + Lua for logs we don't need
+    # -------------------------------------------------------------------------
+    - name: grep
+      match: "kube.*"
+      # Drop Kubernetes liveness/readiness probe logs and empty lines
+      exclude: log (GET \/(health|healthz|readyz|livez|metrics|ping).*" 200|^\s*$)
+
+    # -------------------------------------------------------------------------
+    # STEP 3 — Kubernetes: enrich with pod/namespace/container metadata
+    # annotations: false — skip annotations (noisy, large)
+    # merge_log: true — merges parsed JSON log fields into the record
+    # -------------------------------------------------------------------------
+    - name: kubernetes
+      match: "kube.*"
+      kube_url: https://kubernetes.default.svc:443
+      kube_ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      kube_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      merge_log: true
+      keep_log: false
+      k8s-logging.parser: on
+      k8s-logging.exclude: on
+      annotations: false
+      labels: false
+      buffer_size: 256k
+
+    # -------------------------------------------------------------------------
+    # STEP 4 — Nest: lift kubernetes.* fields to top level for manipulation
+    # -------------------------------------------------------------------------
+    - name: nest
+      match: "kube.*"
+      operation: lift
+      nested_under: kubernetes
+      add_prefix: kubernetes_
+
+    # -------------------------------------------------------------------------
+    # STEP 5 — Record modifier: remove unwanted kubernetes metadata fields
+    # remove_key accepts a YAML list — multiple keys in one pass, fully valid
+    # -------------------------------------------------------------------------
+    - name: record_modifier
+      match: "kube.*"
+      remove_key:
+        - kubernetes_annotations
+        - kubernetes_labels
+        - kubernetes_container_image
+        - kubernetes_container_hash
+        - kubernetes_docker_id
+        - kubernetes_pod_ip
+        - kubernetes
+
+    # -------------------------------------------------------------------------
+    # STEP 6 — Lua: clean up log field only (trim newlines, unescape chars)
+    # protected_mode: true prevents crash on bad input
+    # -------------------------------------------------------------------------
+    - name: lua
+      match: "kube.*"
+      call: process
+      protected_mode: true
+      code: |
+        function process(tag, timestamp, record)
+          -- Clean up log field: trim trailing newline, unescape characters
+          if record["log"] ~= nil then
+            local log = record["log"]
+            -- strip literal newline character at end
+            log = log:gsub("\n$", "")
+            -- strip escaped \n string at end
+            log = log:gsub("\\n$", "")
+            -- unescape \" -> "
+            log = log:gsub('\\"', '"')
+            -- unescape triple-escaped quotes in nested JSON strings
+            log = log:gsub('\\\\\\\\"', '\\"')
+            record["log"] = log
+          end
+          return 1, timestamp, record
+        end
+
+    # -------------------------------------------------------------------------
+    # AWS metadata filter — ONLY enable on EKS/EC2, comment out otherwise
+    # Adds: ec2_instance_id, availability_zone to every log record
+    # Requires: instance metadata service enabled on EC2 node
+    # -------------------------------------------------------------------------
+    # - name: aws
+    #   match: "kube.*"
+    #   imds_version: v2
+    #   az: true
+    #   ec2_instance_id: true
+    #   ec2_instance_type: false
+    #   private_ip: false
+    #   account_id: false
+    #   hostname: false
+    #   vpc_id: false
+
+  outputs:
+    - name: loki
+      match: "*"
+      host: loki-gateway.loki.svc.cluster.local
+      port: 80
+      uri: /loki/api/v1/push
+      # Index labels — used for log stream selection in Grafana/LogQL
+      labels: job=fluent-bit, namespace=$kubernetes_namespace_name, pod=$kubernetes_pod_name, container=$kubernetes_container_name, node=$kubernetes_host, pod_id=$kubernetes_pod_id
+      auto_kubernetes_labels: off
+      line_format: json
+      http_user:
+      http_passwd:
+      # Backpressure — limit filesystem queue size per output
+      storage.total_limit_size: 10M
+      retry_limit: 3
