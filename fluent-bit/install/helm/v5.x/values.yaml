@@ -8,13 +8,15 @@ image:
 kind: DaemonSet
 
 # -- Increased resources to handle buffering and multiline parsing
+# Production: requests cpu=200m memory=256Mi, limits cpu=500m memory=512Mi
+# Minikube/dev: requests cpu=50m memory=64Mi, limits cpu=200m memory=128Mi
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
     cpu: 200m
-    memory: 256Mi
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
 
 # -- Volumes: varlog, docker containers, filesystem buffer storage, db
 daemonSetVolumes:
