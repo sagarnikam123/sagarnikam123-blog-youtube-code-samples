@@ -13,6 +13,8 @@ service:
   storage.max_chunks_up: 128
   storage.backlog.mem_limit: 10M
   storage.metrics: on
+  # Delete chunks that are corrupted/irrecoverable — prevents disk fill-up
+  storage.delete_irrecoverable_chunks: on
 
 pipeline:
   inputs:
@@ -114,7 +116,8 @@ pipeline:
       k8s-logging.exclude: on
       annotations: false
       labels: false
-      buffer_size: 256k
+      # 0 = unlimited — avoids truncating large pod metadata responses
+      buffer_size: 0
 
     # -------------------------------------------------------------------------
     # STEP 4 — Nest: lift kubernetes.* fields to top level for manipulation
