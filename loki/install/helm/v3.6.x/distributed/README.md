@@ -81,7 +81,7 @@ helm search repo grafana/loki --versions
 helm show values grafana/loki
 
 # Show default values for specific version
-helm show values grafana/loki --version 6.49.0
+helm show values grafana/loki --version 6.53.0
 
 # Save default values to file (already saved as default-values.yaml in parent directory)
 helm show values grafana/loki > ../default-values.yaml
@@ -109,7 +109,7 @@ helm install loki grafana/loki \
 # Install specific chart version
 helm install loki grafana/loki \
   -f distributed/values.yaml \
-  --version 6.49.0 \
+  --version 6.53.0 \
   -n loki --create-namespace
 ```
 
