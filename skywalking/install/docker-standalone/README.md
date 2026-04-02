@@ -1,352 +1,321 @@
-# SkyWalking Docker Standalone with Monitoring Features
+# SkyWalking Docker Standalone - Complete Setup
 
-Single-node Docker deployment with BanyanDB storage and optional monitoring for databases, message queues, gateways, and infrastructure.
+Complete SkyWalking deployment with BanyanDB storage, fuzzy-train log generators, Teams webhook alerting, and sample monitoring services.
 
 ## Quick Start
 
 ```bash
-# Start core SkyWalking only
+# Start everything
 docker compose up -d
 
-# Start with sample services (MySQL, Redis, Nginx, PostgreSQL, MongoDB, Elasticsearch) for testing
-docker compose --profile examples up -d
+# View logs
+docker compose logs -f
 
-# Access UI
-open http://localhost:8080
+# Stop everything
+docker compose down
+
+# Stop and remove all data
+docker compose down -v
 ```
 
-## Architecture
+## What's Included
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Docker Network                                     │
-│                                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                          │
-│  │  BanyanDB   │  │  OAP Server │  │     UI      │                          │
-│  │  Port:17912 │◄─┤  gRPC:11800 │◄─┤  Port:8080  │                          │
-│  │  Metrics:   │  │  HTTP:12800 │  │             │                          │
-│  │    2121     │  │             │  │             │                          │
-│  └─────────────┘  └──────▲──────┘  └─────────────┘                          │
-│                          │                                                   │
-│                          │ OTLP                                              │
-│                          │                                                   │
-│                   ┌──────┴──────┐                                            │
-│                   │    OTel     │◄─── Prometheus Scrape                      │
-│                   │  Collector  │                                            │
-│                   └──────▲──────┘                                            │
-│                          │                                                   │
-│    ┌─────────────────────┼─────────────────────┐                             │
-│    │         │           │           │         │                             │
-│ ┌──┴──┐  ┌───┴───┐  ┌────┴────┐  ┌───┴───┐  ┌──┴──┐                         │
-│ │MySQL│  │ Redis │  │PostgreSQL│ │MongoDB│  │Nginx│  ... (Exporters)        │
-│ └─────┘  └───────┘  └─────────┘  └───────┘  └─────┘                         │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### Core Services
+- **SkyWalking OAP Server** (10.3.0) - APM backend with Teams webhook alerting
+- **SkyWalking UI** (10.3.0) - Web interface at http://localhost:8080
+- **BanyanDB** (0.9.0) - High-performance storage backend
 
-## Available Profiles
+### Log Generators
+- **fuzzy-train-python** - Python log generator (1 log/sec)
+- **fuzzy-train-java** - Java log generator (1 log/sec)
 
-| Profile | Description | What it starts |
-|---------|-------------|----------------|
-| `examples` | Sample services + exporters for testing | MySQL, PostgreSQL, Redis, MongoDB, Elasticsearch, Nginx + their exporters |
-| `monitoring` | ALL exporters (no sample services) | All exporters |
-| **Databases** | | |
-| `mysql` | MySQL monitoring | MySQL exporter |
-| `postgresql` | PostgreSQL monitoring | PostgreSQL exporter |
-| `redis` | Redis monitoring | Redis exporter |
-| `mongodb` | MongoDB monitoring | MongoDB exporter |
-| `elasticsearch` | Elasticsearch monitoring | Elasticsearch exporter |
-| **Message Queues** | | |
-| `kafka` | Kafka monitoring | Kafka exporter |
-| `rabbitmq` | RabbitMQ monitoring | RabbitMQ exporter |
-| `pulsar` | Apache Pulsar monitoring | Scrapes built-in metrics |
-| `rocketmq` | Apache RocketMQ monitoring | RocketMQ exporter |
-| `activemq` | Apache ActiveMQ monitoring | JMX exporter |
-| **Gateways** | | |
-| `nginx` | Nginx monitoring | Nginx exporter |
-| `apisix` | Apache APISIX monitoring | Scrapes built-in Prometheus plugin |
-| `kong` | Kong Gateway monitoring | Scrapes built-in Prometheus plugin |
-| **Stream Processing** | | |
-| `flink` | Apache Flink monitoring | Scrapes built-in Prometheus reporter |
-| **Infrastructure** | | |
-| `infrastructure` | Linux VM monitoring | Node exporter |
-| `banyandb` | BanyanDB self-monitoring | Scrapes BanyanDB metrics |
+### Monitoring Stack
+- **OpenTelemetry Collector** - Metrics collection and forwarding
+- **Prometheus Exporters** - MySQL, PostgreSQL, Redis, MongoDB, Elasticsearch, Nginx
 
-## Usage Examples
+### Sample Services
+- **MySQL 8.0** - Port 3307
+- **PostgreSQL 17** - Port 5433
+- **Redis 7** - Port 6379
+- **MongoDB 8** - Port 27017
+- **Elasticsearch 8.17** - Port 9200
+- **Nginx 1.27** - Port 8081
 
-### Testing with Sample Services
+## Access Points
 
+| Service | URL | Description |
+|---------|-----|-------------|
+| SkyWalking UI | http://localhost:8080 | Main web interface |
+| OAP HTTP API | http://localhost:12800 | REST API |
+| OAP gRPC | localhost:11800 | Agent connections |
+| OAP Metrics | http://localhost:1234/metrics | Prometheus metrics |
+| BanyanDB Health | http://localhost:17913/api/healthz | Storage health check |
+| MySQL | localhost:3307 | Sample database |
+| PostgreSQL | localhost:5433 | Sample database |
+| Redis | localhost:6379 | Sample cache |
+| MongoDB | localhost:27017 | Sample NoSQL |
+| Elasticsearch | http://localhost:9200 | Sample search engine |
+| Nginx | http://localhost:8081 | Sample web server |
+
+## Viewing Fuzzy-Train Logs
+
+1. Open SkyWalking UI: http://localhost:8080
+2. Wait 1-2 minutes for services to register
+3. Select "General Service" layer from the dropdown
+4. Find services: `fuzzy-train-python` or `fuzzy-train-java`
+5. Click on the service name
+6. Go to the "Log" tab to view generated logs
+
+## Teams Webhook Alerting
+
+Alerts are configured in `config/alarm-settings.yml` and will be sent to the Microsoft Teams webhook for:
+- Service response time > 1s
+- Service success rate < 80%
+- High percentile response times
+- Instance/endpoint performance issues
+- Database access delays
+
+To update the webhook URL, edit `config/alarm-settings.yml` and restart OAP:
 ```bash
-# Start everything including sample databases
-docker compose --profile examples up -d
-
-# This starts:
-# - Core: BanyanDB, OAP, UI
-# - Sample services: MySQL, PostgreSQL, Redis, MongoDB, Elasticsearch, Nginx
-# - Exporters: All database and nginx exporters
-# - OTel Collector
+docker compose restart oap
 ```
 
-### Monitoring Your Own Services
+## Helper Scripts
 
+### Start with Health Checks
 ```bash
-# 1. Copy and edit environment file
-cp .env.example .env
-
-# 2. Configure your service endpoints in .env
-# MYSQL_HOST=your-mysql-host
-# REDIS_HOST=your-redis-host
-# KAFKA_BROKERS=your-kafka:9092
-
-# 3. Start with specific profiles
-docker compose --profile mysql --profile redis --profile kafka up -d
+./start-fuzzy-train.sh
 ```
+This script:
+- Starts all services
+- Waits for OAP to be healthy
+- Shows access points and tips
 
-### Enable All Monitoring
-
+### Stop Services
 ```bash
-docker compose --profile monitoring up -d
+./stop-fuzzy-train.sh
 ```
 
-### Monitor BanyanDB Storage
-
+### Check Health
 ```bash
-# BanyanDB metrics are always available at port 2121
-# Enable scraping with banyandb profile
-docker compose --profile banyandb up -d
+./check-health.sh
 ```
 
-## Viewing Dashboards
+## Service Management
 
-After starting with `--profile examples`:
+### Start all services
+```bash
+docker compose up -d
+```
 
-1. Open http://localhost:8080
-2. Wait 1-2 minutes for metrics to be collected
-3. Navigate to:
-   - **Marketplace → Self Observability** - OAP server metrics
-   - **MySQL** menu - MySQL database metrics
-   - **PostgreSQL** menu - PostgreSQL database metrics
-   - **Redis** menu - Redis cache metrics
-   - **MongoDB** menu - MongoDB database metrics
-   - **Elasticsearch** menu - Elasticsearch cluster metrics
-   - **Nginx** menu - Nginx web server metrics
+### Start specific services
+```bash
+docker compose up -d oap ui fuzzy-train-java
+```
 
-## Core Services Ports
+### View logs
+```bash
+# All services
+docker compose logs -f
 
-| Service | Port | Description |
-|---------|------|-------------|
-| UI | 8080 | Web interface |
-| OAP gRPC | 11800 | Agent communication |
-| OAP HTTP | 12800 | REST API |
-| BanyanDB gRPC | 17912 | Storage backend |
-| BanyanDB HTTP | 17913 | Health check |
-| BanyanDB Metrics | 2121 | Prometheus metrics |
-| OTel Collector | 4317/4318 | OTLP receiver |
+# Specific service
+docker compose logs -f oap
+docker compose logs -f fuzzy-train-java
 
-### Sample Services Ports (with `--profile examples`)
+# Last 100 lines
+docker compose logs --tail 100 oap
+```
 
-| Service | Port | Description |
-|---------|------|-------------|
-| Sample MySQL | 3307 | Test MySQL instance |
-| Sample PostgreSQL | 5433 | Test PostgreSQL instance |
-| Sample Redis | 6379 | Test Redis instance |
-| Sample MongoDB | 27017 | Test MongoDB instance |
-| Sample Elasticsearch | 9200 | Test Elasticsearch instance |
-| Sample Nginx | 8081 | Test Nginx instance |
+### Check status
+```bash
+docker compose ps
+```
+
+### Restart a service
+```bash
+docker compose restart oap
+```
+
+### Stop all services
+```bash
+docker compose down
+```
+
+### Stop and remove volumes (clean slate)
+```bash
+docker compose down -v
+```
 
 ## Configuration
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+You can customize the setup by setting environment variables before running `docker compose up`:
 
 ```bash
-# SkyWalking versions
-SKYWALKING_VERSION=10.3.0
-BANYANDB_VERSION=0.9.0
+# Example: Change ports
+export OAP_GRPC_PORT=11800
+export OAP_HTTP_PORT=12800
+export UI_PORT=8080
 
-# MySQL monitoring target
-MYSQL_HOST=sample-mysql
-MYSQL_PORT=3306
-MYSQL_USER=exporter
-MYSQL_EXPORTER_PASSWORD=exporterpassword
+# Example: Adjust log generation rate
+export FUZZY_TRAIN_PYTHON_LPS=5  # 5 logs per second
+export FUZZY_TRAIN_JAVA_LPS=5
 
-# PostgreSQL monitoring target
-POSTGRES_HOST=sample-postgresql
-POSTGRES_PORT=5432
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
+# Example: Change data retention
+export RECORD_TTL=7  # days
+export METRICS_TTL=14  # days
 
-# Redis monitoring target
-REDIS_HOST=sample-redis
-REDIS_PORT=6379
-
-# MongoDB monitoring target
-MONGODB_HOST=sample-mongodb
-MONGODB_PORT=27017
-
-# Elasticsearch monitoring target
-ES_HOST=sample-elasticsearch
-ES_PORT=9200
-
-# Kafka monitoring target
-KAFKA_BROKERS=kafka:9092
-
-# RabbitMQ monitoring target
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_MANAGEMENT_PORT=15672
-RABBITMQ_USER=guest
-RABBITMQ_PASSWORD=guest
+docker compose up -d
 ```
 
-### OTel Collector Configuration
+### Alarm Configuration
 
-The OTel Collector config is in `otel-collector/config.yaml`. Key points:
+Edit `config/alarm-settings.yml` to:
+- Add/remove alarm rules
+- Change thresholds
+- Update Teams webhook URL
+- Configure silence periods
 
-- **job_name must match SkyWalking's OTel rules**:
-  - `mysql-monitoring` for MySQL
-  - `postgresql-monitoring` for PostgreSQL
-  - `redis-monitoring` for Redis
-  - `mongodb-monitoring` for MongoDB
-  - `elasticsearch-monitoring` for Elasticsearch
-  - `kafka-monitoring` for Kafka
-  - `rabbitmq-monitoring` for RabbitMQ
-  - `pulsar-monitoring` for Pulsar
-  - `rocketmq-monitoring` for RocketMQ
-  - `activemq-monitoring` for ActiveMQ
-  - `nginx-monitoring` for Nginx
-  - `apisix-monitoring` for APISIX
-  - `kong-monitoring` for Kong
-  - `flink-monitoring` for Flink
-  - `banyandb-monitoring` for BanyanDB
-  - `skywalking-so11y` for OAP self-observability
-  - `vm-monitoring` for Linux VMs
+After editing, restart OAP:
+```bash
+docker compose restart oap
+```
 
-- **Required labels**:
-  - `host_name` - Service hostname
-  - `service_instance_id` - Instance identifier
+## Monitoring External Services
+
+The setup includes exporters for the sample services. To monitor your own external services:
+
+1. Update exporter configurations in `docker-compose.yml`
+2. Change connection strings to point to your services
+3. Restart the exporters:
+```bash
+docker compose restart mysqld-exporter postgres-exporter redis-exporter
+```
 
 ## Troubleshooting
 
-### Check service status
-
+### OAP not starting
 ```bash
+# Check logs
+docker compose logs oap
+
+# Common issues:
+# - BanyanDB not healthy: wait longer or check banyandb logs
+# - Port conflicts: change ports in docker-compose.yml
+# - Memory issues: increase JAVA_OPTS in docker-compose.yml
+```
+
+### Fuzzy-train services not visible in UI
+```bash
+# 1. Check if services are running
+docker compose ps | grep fuzzy-train
+
+# 2. Check logs for connection issues
+docker compose logs fuzzy-train-java
+docker compose logs fuzzy-train-python
+
+# 3. Wait 1-2 minutes for registration
+# 4. Ensure "General Service" layer is selected in UI
+```
+
+### No logs appearing
+```bash
+# Check if log generators are running
+docker compose logs fuzzy-train-java
+docker compose logs fuzzy-train-python
+
+# Verify OAP is receiving logs
+docker compose logs oap | grep -i log
+```
+
+### Teams alerts not working
+```bash
+# 1. Verify alarm-settings.yml has correct webhook URL
+cat config/alarm-settings.yml | grep -A 5 webhook
+
+# 2. Check OAP logs for alarm triggers
+docker compose logs oap | grep -i alarm
+
+# 3. Test webhook manually with curl
+curl -X POST <your-webhook-url> \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Test alert from SkyWalking"}'
+```
+
+### Sample services not starting
+```bash
+# Check which service is failing
 docker compose ps
+
+# View specific service logs
+docker compose logs sample-mysql
+docker compose logs sample-elasticsearch
+
+# Common issues:
+# - Port conflicts: change ports in docker-compose.yml
+# - Memory issues: Elasticsearch needs at least 512MB
+# - Volume permissions: check Docker volume permissions
 ```
 
-### Check OTel Collector logs
+## Resource Requirements
 
+### Minimum
+- CPU: 2 cores
+- RAM: 4GB
+- Disk: 10GB
+
+### Recommended
+- CPU: 4 cores
+- RAM: 8GB
+- Disk: 20GB
+
+### Per Service Memory Usage (Approximate)
+- OAP: 512MB-1GB
+- BanyanDB: 200-500MB
+- UI: 100MB
+- Elasticsearch: 512MB-1GB
+- MySQL: 200-400MB
+- PostgreSQL: 100-200MB
+- MongoDB: 200-400MB
+- Other services: 50-100MB each
+
+## Data Persistence
+
+All data is stored in Docker volumes:
+- `banyandb-data` - SkyWalking metrics and traces
+- `sample-mysql-data` - MySQL data
+- `sample-postgresql-data` - PostgreSQL data
+- `sample-redis-data` - Redis data
+- `sample-mongodb-data` - MongoDB data
+- `sample-elasticsearch-data` - Elasticsearch data
+
+To backup data:
 ```bash
-docker compose logs otel-collector
+docker run --rm -v banyandb-data:/data -v $(pwd):/backup alpine tar czf /backup/banyandb-backup.tar.gz /data
 ```
 
-### Verify metrics are being scraped
-
+To restore data:
 ```bash
-# Check collector metrics
-curl http://localhost:8888/metrics
-
-# Check OAP health
-curl http://localhost:12800/healthcheck
-
-# Check BanyanDB metrics
-curl http://localhost:2121/metrics
+docker run --rm -v banyandb-data:/data -v $(pwd):/backup alpine tar xzf /backup/banyandb-backup.tar.gz -C /
 ```
 
-### Query services via GraphQL
+## Next Steps
 
-```bash
-# List MySQL services
-curl -s -X POST http://localhost:12800/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ listServices(layer: \"MYSQL\") { name } }"}'
+- **Configure ERROR log detection**: See `NEXT-STEPS.md` for LAL configuration
+- **Add custom services**: Instrument your applications with SkyWalking agents
+- **Customize alarms**: Edit `config/alarm-settings.yml` for your needs
+- **Scale up**: Move to Kubernetes for production deployments
 
-# List PostgreSQL services
-curl -s -X POST http://localhost:12800/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ listServices(layer: \"POSTGRESQL\") { name } }"}'
+## Documentation
 
-# List Redis services
-curl -s -X POST http://localhost:12800/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ listServices(layer: \"REDIS\") { name } }"}'
+- [SkyWalking Documentation](https://skywalking.apache.org/docs/)
+- [BanyanDB Documentation](https://skywalking.apache.org/docs/skywalking-banyandb/latest/readme/)
+- [Fuzzy-Train Repository](https://github.com/sagarnikam123/fuzzy-train)
+- [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
 
-# List MongoDB services
-curl -s -X POST http://localhost:12800/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ listServices(layer: \"MONGODB\") { name } }"}'
+## Support
 
-# List Elasticsearch services
-curl -s -X POST http://localhost:12800/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ listServices(layer: \"ELASTICSEARCH\") { name } }"}'
-
-# List OAP self-observability
-curl -s -X POST http://localhost:12800/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ listServices(layer: \"SO11Y_OAP\") { name } }"}'
-
-# List BanyanDB services
-curl -s -X POST http://localhost:12800/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ listServices(layer: \"BANYANDB\") { name } }"}'
-```
-
-### Common Issues
-
-1. **Dashboard not appearing**: Wait 1-2 minutes for metrics to be collected.
-
-2. **"Failed to scrape" in OTel logs**: Target service not reachable. Check network connectivity.
-
-3. **Services show but no metrics**: Verify `job_name` in OTel config matches SkyWalking's OTel rules.
-
-4. **BanyanDB not starting**: Ensure you're using v0.9.0+ with correct flags (`--metadata-root-path`, etc.)
-
-## Commands Reference
-
-```bash
-# Start core only
-docker compose up -d
-
-# Start with sample services
-docker compose --profile examples up -d
-
-# Start with specific monitoring
-docker compose --profile mysql --profile postgresql up -d
-
-# Start with all monitoring (no samples)
-docker compose --profile monitoring up -d
-
-# Stop everything
-docker compose --profile examples down
-
-# Remove all data
-docker compose --profile examples down -v
-
-# View logs
-docker compose logs -f oap
-docker compose logs -f otel-collector
-
-# Restart OTel collector after config change
-docker compose restart otel-collector
-```
-
-## File Structure
-
-```
-docker-standalone/
-├── docker-compose.yml          # Main compose file with profiles
-├── .env.example                # Environment template
-├── README.md                   # This file
-├── otel-collector/
-│   └── config.yaml             # OpenTelemetry Collector configuration
-└── examples/
-    ├── mysql/
-    │   ├── docker-compose.yml  # Standalone MySQL (alternative)
-    │   └── init.sql            # MySQL initialization
-    ├── redis/
-    │   └── docker-compose.yml  # Standalone Redis (alternative)
-    └── nginx/
-        ├── docker-compose.yml  # Standalone Nginx (alternative)
-        └── nginx.conf          # Nginx configuration with stub_status
-```
+For issues and questions:
+- SkyWalking: https://github.com/apache/skywalking/issues
+- This setup: Check logs with `docker compose logs -f`
