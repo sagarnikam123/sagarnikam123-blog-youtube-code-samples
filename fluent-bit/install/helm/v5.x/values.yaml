@@ -27,7 +27,9 @@ daemonSetVolumes:
     hostPath:
       path: /var/lib/docker/containers
   - name: flb-storage
-    emptyDir: {}
+    hostPath:
+      path: /var/log/flb-storage/
+      type: DirectoryOrCreate
   - name: flb-db
     hostPath:
       path: /var/log/flb_kube.db
@@ -59,11 +61,25 @@ args:
 # -- Inline config disabled (managed via fluent-bit.yaml + configmap.yaml)
 # config:
 
-# -- Tolerations to run on all nodes including masters
+# -- Tolerations to run on all nodes including all tainted nodes (matches prod)
 tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists
     effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - operator: Exists
+    effect: NoExecute
+  - operator: Exists
+    effect: NoSchedule
+
+# -- Use host network for lower latency (matches prod)
+hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
+
+# -- Ensure fluent-bit is never evicted under node pressure
+priorityClassName: system-node-critical
 
 # -- Hot reload enabled via Helm chart (triggers SIGHUP on ConfigMap change)
 hotReload:
