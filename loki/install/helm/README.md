@@ -16,6 +16,43 @@ Helm chart configurations for deploying Grafana Loki on Kubernetes.
 | **Simple Scalable** | Medium production | 100GB-1TB/day |
 | **Distributed** | Large production | >1TB/day |
 
+## Checking Available Helm Chart Versions
+
+To check available Loki Helm chart versions:
+
+```bash
+# Add Grafana repo (if not already added)
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+
+# List all available Loki chart versions
+helm search repo grafana/loki --versions
+
+# List latest 10 versions
+helm search repo grafana/loki --versions | head -10
+
+# Show chart info for specific version
+helm show chart grafana/loki --version 6.49.0
+
+# Show all info (chart + values + readme)
+helm show all grafana/loki --version 6.49.0
+```
+
+## Getting Default Values
+
+To get the default values.yaml from the Loki Helm chart:
+
+```bash
+# Get default values for a specific chart version
+helm show values grafana/loki --version 6.49.0 > default-values.yaml
+
+# Or get latest version
+helm show values grafana/loki > default-values-latest.yaml
+
+# Get values with comments and documentation
+helm show values grafana/loki --version 6.49.0 > default-values-6.49.0.yaml
+```
+
 ## Quick Start
 
 ```bash
