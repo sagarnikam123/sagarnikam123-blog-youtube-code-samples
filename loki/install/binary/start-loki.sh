@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOKI_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # 🔧 EDIT THIS VARIABLE TO CHANGE CONFIG:
-LOKI_CONFIG="$LOKI_ROOT/configs/v3.x/v3.6.x/loki-3.6.x-ui-minio-thanos-memberlist.yaml"
+LOKI_CONFIG="$LOKI_ROOT/configs/v3.x/v3.7.x/loki-3.7.x-ui-filesystem-inmemory.yaml"
 
 # Available configs in configs/v3.x/v3.6.x/:
 #
@@ -60,7 +60,7 @@ echo ""
 if [ ! -f "$LOKI_CONFIG" ]; then
     echo "❌ Config not found: $LOKI_CONFIG"
     echo "Available configs:"
-    ls -1 "$LOKI_ROOT/configs/v3.x/v3.6.x/"
+    ls -1 "$LOKI_ROOT/configs/v3.x/v3.7.x/"
     exit 1
 fi
 
