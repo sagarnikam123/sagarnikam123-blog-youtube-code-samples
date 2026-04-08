@@ -94,7 +94,7 @@ query_range:
     compression: snappy
   cache_results: true
   max_retries: 5
-  parallelise_shardable_queries: true
+  parallelise_shardable_queries: false # default = true
   cache_index_stats_results: true
   index_stats_results_cache:
     cache:

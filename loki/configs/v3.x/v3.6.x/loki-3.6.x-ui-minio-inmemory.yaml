@@ -76,7 +76,7 @@ query_range:
         ttl: 1h
   cache_results: true
   max_retries: 5
-  parallelise_shardable_queries: false
+  parallelise_shardable_queries: false # default = true
   cache_index_stats_results: true
   index_stats_results_cache:
     cache:
