@@ -39,8 +39,8 @@ check_command() {
 STACK_DIR="$HOME/loki-stack"
 DATA_DIR="$HOME/.loki-data"
 ARCHIVE_DIR="$HOME/loki-stack/archive"
-LOKI_VERSION="3.6.3"
-GRAFANA_VERSION="12.3.1"
+LOKI_VERSION="3.7.1"
+GRAFANA_VERSION="12.4.2"
 PROMETHEUS_VERSION="3.5.0"
 
 # Detect OS and architecture
