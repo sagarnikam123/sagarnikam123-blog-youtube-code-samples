@@ -1,0 +1,147 @@
+# =============================================================================
+# SkyWalking Alarm Rules with Microsoft Teams Webhook
+# =============================================================================
+# Alarm rules for monitoring service health and performance
+# Alerts are sent to Microsoft Teams via webhook
+# =============================================================================
+
+rules:
+  # ---------------------------------------------------------------------------
+  # Service Performance Rules
+  # ---------------------------------------------------------------------------
+
+  # Service average response time > 1s in last 3 minutes
+  service_resp_time_rule:
+    expression: sum(service_resp_time > 1000) >= 3
+    period: 10
+    silence-period: 10
+    message: "Service {name} average response time is more than 1s in last 3 minutes."
+    tags:
+      level: WARNING
+
+  # Service success rate < 80% in last 2 minutes
+  service_sla_rule:
+    expression: sum((service_sla / 100) < 80) >= 2
+    period: 10
+    silence-period: 10
+    message: "Successful rate of service {name} is lower than 80% in last 2 minutes."
+    tags:
+      level: CRITICAL
+
+  # Service response time percentile > 1s
+  service_resp_time_percentile_rule:
+    expression: sum(service_percentile{p='50,75,90,95,99'} > 1000) >= 3
+    period: 10
+    silence-period: 10
+    message: "Percentile response time of service {name} alarm in 3 minutes of last 10 minutes."
+    tags:
+      level: WARNING
+
+  # ---------------------------------------------------------------------------
+  # Instance Performance Rules
+  # ---------------------------------------------------------------------------
+
+  # Service instance average response time > 1s in last 2 minutes
+  service_instance_resp_time_rule:
+    expression: sum(service_instance_resp_time > 1000) >= 2
+    period: 10
+    silence-period: 10
+    message: "Service instance {name} average response time is more than 1s in last 2 minutes."
+    tags:
+      level: WARNING
+
+  # ---------------------------------------------------------------------------
+  # Endpoint Performance Rules
+  # ---------------------------------------------------------------------------
+
+  # Endpoint average response time > 1s in last 2 minutes
+  endpoint_resp_time_rule:
+    expression: sum(endpoint_resp_time > 1000) >= 2
+    period: 10
+    silence-period: 10
+    message: "Endpoint {name} average response time is more than 1s in last 2 minutes."
+    tags:
+      level: WARNING
+
+  # ---------------------------------------------------------------------------
+  # Database Performance Rules
+  # ---------------------------------------------------------------------------
+
+  # Database access average response time > 1s in last 2 minutes
+  database_access_resp_time_rule:
+    expression: sum(database_access_resp_time > 1000) >= 2
+    period: 10
+    silence-period: 10
+    message: "Database access {name} average response time is more than 1s in last 2 minutes."
+    tags:
+      level: WARNING
+
+  # ---------------------------------------------------------------------------
+  # Endpoint Relation Rules
+  # ---------------------------------------------------------------------------
+
+  # Endpoint relation average response time > 1s in last 2 minutes
+  endpoint_relation_resp_time_rule:
+    expression: sum(endpoint_relation_resp_time > 1000) >= 2
+    period: 10
+    silence-period: 10
+    message: "Endpoint relation {name} average response time is more than 1s in last 2 minutes."
+    tags:
+      level: WARNING
+
+  # ---------------------------------------------------------------------------
+  # Log Error Rules - TEMPORARILY DISABLED
+  # ---------------------------------------------------------------------------
+  # These rules are commented out to allow OAP to start successfully.
+  # Once OAP is running and LAL/MAL are generating metrics, we'll verify
+  # the actual metric names and re-enable these rules.
+  # ---------------------------------------------------------------------------
+
+  # # Detect ANY ERROR logs in fuzzy-train-java service (immediate alert)
+  # fuzzy_train_java_error_detected_rule:
+  #   expression: log_error_count{service='fuzzy-train-java'} > 0
+  #   period: 1
+  #   silence-period: 3
+  #   message: "🚨 ERROR detected in fuzzy-train-java service! Check logs immediately."
+  #   tags:
+  #     level: CRITICAL
+  #     service: fuzzy-train-java
+
+  # # High error log count for fuzzy-train-java (more than 5 in 1 minute)
+  # fuzzy_train_java_high_error_count_rule:
+  #   expression: log_error_count{service='fuzzy-train-java'} > 5
+  #   period: 1
+  #   silence-period: 5
+  #   message: "⚠️ High ERROR count in fuzzy-train-java: More than 5 ERROR logs in last minute."
+  #   tags:
+  #     level: CRITICAL
+  #     service: fuzzy-train-java
+
+  # # General ERROR log detection for all services
+  # service_error_log_rule:
+  #   expression: log_error_count > 3
+  #   period: 1
+  #   silence-period: 5
+  #   message: "Service {name} has more than 3 ERROR logs in last minute."
+  #   tags:
+  #     level: CRITICAL
+
+  # # High warning log count
+  # service_warning_log_rule:
+  #   expression: log_warn_count > 20
+  #   period: 1
+  #   silence-period: 10
+  #   message: "Service {name} has more than 20 WARN logs in last minute."
+  #   tags:
+  #     level: WARNING
+
+# =============================================================================
+# Webhook Configuration - Microsoft Teams
+# =============================================================================
+hooks:
+  webhook:
+    teams-alerts:
+      is-default: true
+      urls:
+        # Microsoft Teams webhook URL from UAT environment
+        - https://default3d08c29d04bc44cca8673238f9d6e4.01.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/eedba587755f4a1ab3bfc24043ecca0d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=KQe6e02uzatx84L94u-iUDjyg56UQm7pxveo91giPtY
