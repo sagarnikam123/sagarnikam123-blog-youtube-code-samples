@@ -1,0 +1,114 @@
+# Deploys one pod per log format simultaneously
+# Useful to test Fluent Bit parsing across all formats at once
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fuzzy-train-json
+  namespace: fuzzy-train
+  labels:
+    app: fuzzy-train
+    format: json
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fuzzy-train
+      format: json
+  template:
+    metadata:
+      labels:
+        app: fuzzy-train
+        format: json
+    spec:
+      containers:
+        - name: fuzzy-train-json
+          image: sagarnikam123/fuzzy-train:2.2.0
+          args: ["--log-format", "JSON", "--lines-per-second", "2", "--time-zone", "UTC", "--output", "stdout"]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fuzzy-train-logfmt
+  namespace: fuzzy-train
+  labels:
+    app: fuzzy-train
+    format: logfmt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fuzzy-train
+      format: logfmt
+  template:
+    metadata:
+      labels:
+        app: fuzzy-train
+        format: logfmt
+    spec:
+      containers:
+        - name: fuzzy-train-logfmt
+          image: sagarnikam123/fuzzy-train:2.2.0
+          args: ["--log-format", "logfmt", "--lines-per-second", "2", "--time-zone", "UTC", "--output", "stdout"]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fuzzy-train-apache
+  namespace: fuzzy-train
+  labels:
+    app: fuzzy-train
+    format: apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fuzzy-train
+      format: apache
+  template:
+    metadata:
+      labels:
+        app: fuzzy-train
+        format: apache
+    spec:
+      containers:
+        - name: fuzzy-train-apache
+          image: sagarnikam123/fuzzy-train:2.2.0
+          args: ["--log-format", "apache common", "--lines-per-second", "2", "--time-zone", "UTC", "--output", "stdout"]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fuzzy-train-syslog
+  namespace: fuzzy-train
+  labels:
+    app: fuzzy-train
+    format: syslog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fuzzy-train
+      format: syslog
+  template:
+    metadata:
+      labels:
+        app: fuzzy-train
+        format: syslog
+    spec:
+      containers:
+        - name: fuzzy-train-syslog
+          image: sagarnikam123/fuzzy-train:2.2.0
+          args: ["--log-format", "syslog", "--lines-per-second", "2", "--time-zone", "UTC", "--output", "stdout"]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 128Mi}

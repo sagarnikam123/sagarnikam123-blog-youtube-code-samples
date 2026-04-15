@@ -1,0 +1,31 @@
+# Loki SingleBinary - AWS EKS Overrides
+#
+# Install:
+#   helm install loki grafana/loki -n loki --create-namespace \
+#     --version 6.49.0 \
+#     -f values-base.yaml -f values-eks.yaml
+#
+# Prerequisites:
+#   - EKS cluster with EBS CSI driver installed
+#   - StorageClass 'gp3' available (or modify below)
+
+# Use EBS gp3 storage class
+singleBinary:
+  persistence:
+    storageClass: gp3
+
+# Standard security context for EKS
+loki:
+  podSecurityContext:
+    fsGroup: 10001
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+
+# LoadBalancer for external access (creates AWS NLB)
+gateway:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internal

@@ -1,0 +1,10 @@
+services:
+  fluent-bit:
+    image: fluent/fluent-bit:5.0.1
+    container_name: fluent-bit
+    volumes:
+      - ./fluent-bit.yaml:/fluent-bit/etc/fluent-bit.yaml:ro
+    ports:
+      - "2020:2020"   # HTTP server / metrics
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluent-bit.yaml"]
+    restart: unless-stopped

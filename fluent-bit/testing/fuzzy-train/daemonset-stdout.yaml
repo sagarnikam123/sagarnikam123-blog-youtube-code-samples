@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fuzzy-train-daemonset
+  namespace: fuzzy-train
+  labels:
+    app: fuzzy-train-daemonset
+spec:
+  selector:
+    matchLabels:
+      app: fuzzy-train-daemonset
+  template:
+    metadata:
+      labels:
+        app: fuzzy-train-daemonset
+        format: json
+        output: stdout
+    spec:
+      containers:
+        - name: fuzzy-train
+          image: sagarnikam123/fuzzy-train:2.2.0
+          args:
+            - "--log-format"
+            - "JSON"
+            - "--lines-per-second"
+            - "5"
+            - "--min-log-length"
+            - "90"
+            - "--max-log-length"
+            - "150"
+            - "--time-zone"
+            - "UTC"
+            - "--output"
+            - "stdout"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

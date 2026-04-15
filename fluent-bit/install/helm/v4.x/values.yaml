@@ -1,0 +1,55 @@
+# -- Image
+image:
+  repository: fluent/fluent-bit
+  tag: "4.2.3.1"
+  pullPolicy: IfNotPresent
+
+# -- DaemonSet (default) or Deployment
+kind: DaemonSet
+
+# -- Resource limits
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
+
+# -- Fluent Bit config (YAML format recommended in v4.x)
+daemonSetVolumes:
+  - name: varlog
+    hostPath:
+      path: /var/log
+  - name: varlibdockercontainers
+    hostPath:
+      path: /var/lib/docker/containers
+
+daemonSetVolumeMounts:
+  - name: varlog
+    mountPath: /var/log
+  - name: varlibdockercontainers
+    mountPath: /var/lib/docker/containers
+    readOnly: true
+
+# -- Use external ConfigMap instead of inline config
+# Create it first: kubectl create configmap fluent-bit-config \
+#   --from-file=fluent-bit.yaml=fluent-bit.yaml -n fluent-bit
+existingConfigMap: fluent-bit-config
+
+# -- Inline config disabled (managed via fluent-bit.yaml + configmap.yaml)
+# config:
+
+# -- Tolerations to run on all nodes including masters
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+# -- ServiceMonitor for Prometheus (optional)
+serviceMonitor:
+  enabled: false
+
+# -- Hot reload (v4.x feature)
+hotReload:
+  enabled: false

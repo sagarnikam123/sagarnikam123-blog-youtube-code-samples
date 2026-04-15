@@ -1,0 +1,24 @@
+# Standalone ConfigMap generated from fluent-bit.yaml
+# Apply before helm install/upgrade:
+#   kubectl create namespace fluent-bit
+#   kubectl create configmap fluent-bit-config \
+#     --from-file=fluent-bit.yaml=fluent-bit.yaml \
+#     -n fluent-bit --dry-run=client -o yaml | kubectl apply -f -
+#
+# Update config without helm upgrade:
+#   kubectl create configmap fluent-bit-config \
+#     --from-file=fluent-bit.yaml=fluent-bit.yaml \
+#     -n fluent-bit --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl rollout restart daemonset/fluent-bit -n fluent-bit
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: fluent-bit
+  labels:
+    app: fluent-bit
+data:
+  fluent-bit.yaml: |
+    # -- contents synced from fluent-bit.yaml --
+    # Regenerate this ConfigMap using the command above
+    # instead of editing this file directly.

@@ -1,0 +1,71 @@
+---
+# FluentBit CR - tells the operator to deploy the Fluent Bit DaemonSet
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: FluentBit
+metadata:
+  name: fluent-bit
+  namespace: fluent-operator
+  labels:
+    app.kubernetes.io/name: fluent-bit
+spec:
+  image: fluent/fluent-bit:2.2.2
+  positionDB:
+    hostPath:
+      path: /var/lib/fluent-bit/
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+---
+# ClusterInput - tail container logs from all nodes
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterInput
+metadata:
+  name: tail
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+spec:
+  tail:
+    tag: kube.*
+    path: /var/log/containers/*.log
+    parser: docker
+    refreshIntervalSeconds: 10
+    memBufLimit: 5MB
+    skipLongLines: true
+    db: /var/lib/fluent-bit/tail-db
+    dbSync: Normal
+---
+# ClusterFilter - enrich logs with Kubernetes metadata
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterFilter
+metadata:
+  name: kubernetes
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+spec:
+  match: kube.*
+  filters:
+    - kubernetes:
+        kubeURL: https://kubernetes.default.svc:443
+        kubeCAFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        kubeTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+        labels: false
+        annotations: false
+---
+# ClusterOutput - stdout (replace with Loki/ES in production)
+apiVersion: fluentbit.fluent.io/v1alpha2
+kind: ClusterOutput
+metadata:
+  name: stdout
+  labels:
+    fluentbit.fluent.io/enabled: "true"
+spec:
+  match: "*"
+  stdout: {}

@@ -1,0 +1,36 @@
+# -- Image
+image:
+  repository: grafana/grafana
+  tag: "12.3.1"
+  pullPolicy: IfNotPresent
+
+# -- Admin credentials
+adminUser: admin
+# adminPassword: ""  # auto-generated if not set, retrieve with:
+# kubectl get secret -n grafana grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+
+# -- Persistence
+persistence:
+  enabled: false  # set true for production
+
+# -- Resources
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# -- Loki datasource pre-configured
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki-gateway.loki.svc.cluster.local
+        isDefault: true
+        jsonData:
+          maxLines: 1000

@@ -1,4 +1,4 @@
-# Loki Single Binary Mode - v3.6.x
+# Loki Monolithic Mode - v3.6.x
 
 ## Overview
 
@@ -29,7 +29,7 @@ All Loki components run in one process - simplest deployment option.
 ## Install
 
 ```bash
-cd /path/to/loki/install/helm/v3.6.x/single-binary
+cd /path/to/loki/install/helm/v3.6.x/monolithic
 ```
 
 ### Minikube

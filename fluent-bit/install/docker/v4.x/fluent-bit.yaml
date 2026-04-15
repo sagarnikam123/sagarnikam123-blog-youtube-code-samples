@@ -1,0 +1,16 @@
+service:
+  flush: 5
+  log_level: info
+  http_server: true
+  http_listen: 0.0.0.0
+  http_port: 2020
+
+pipeline:
+  inputs:
+    - name: tail
+      path: /var/log/*.log
+      tag: app.*
+
+  outputs:
+    - name: stdout
+      match: "*"

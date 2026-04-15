@@ -103,7 +103,9 @@ When memory fills up, logs spill to disk instead of being dropped.
 **Required volume mounts** (already in `values.yaml`):
 ```yaml
 - name: flb-storage
-  emptyDir: {}                    # use hostPath for persistence across restarts
+  hostPath:
+    path: /var/log/flb-storage/
+    type: DirectoryOrCreate
   mountPath: /var/log/flb-storage/
 - name: flb-db
   hostPath:
@@ -171,6 +173,24 @@ See [Hot Reload](#hot-reload-1) under Operations for how to trigger it.
 - Helm 3.x
 - kubectl configured
 - Loki running at `loki-gateway.loki.svc.cluster.local` (port 80)
+
+### RBAC
+
+The Helm chart (`fluent/fluent-bit`) automatically creates all required RBAC resources:
+
+| Resource | Name | Scope |
+|----------|------|-------|
+| ServiceAccount | `fluent-bit` | namespace: `fluent-bit` |
+| ClusterRole | `fluent-bit` | cluster-wide |
+| ClusterRoleBinding | `fluent-bit` | binds SA → ClusterRole |
+
+**ClusterRole permissions granted:**
+
+| API Group | Resources | Verbs | Why |
+|-----------|-----------|-------|-----|
+| `""` (core) | `namespaces`, `pods`, `pods/logs`, `nodes`, `nodes/proxy` | `get`, `list`, `watch` | Kubernetes filter enriches logs with pod/namespace/node metadata from across all namespaces |
+
+> ClusterRole (not Role) is required because Fluent Bit runs as a DaemonSet and reads logs from pods across **all namespaces**.
 
 ---
 

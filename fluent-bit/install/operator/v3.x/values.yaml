@@ -1,0 +1,28 @@
+# -- Operator image
+operator:
+  image:
+    repository: kubesphere/fluent-operator
+    tag: "v3.7.0"
+    pullPolicy: IfNotPresent
+
+# -- Fluent Bit managed by the operator
+fluentbit:
+  enable: true
+  image:
+    repository: fluent/fluent-bit
+    tag: "3.0.4"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+# -- Fluentd (disabled by default, enable if needed)
+fluentd:
+  enable: false
+
+# -- Namespace where operator is deployed
+namespaceOverride: "fluent-operator"

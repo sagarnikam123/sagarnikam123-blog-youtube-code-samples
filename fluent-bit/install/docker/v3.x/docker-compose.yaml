@@ -1,0 +1,9 @@
+services:
+  fluent-bit:
+    image: fluent/fluent-bit:3.0.4
+    container_name: fluent-bit
+    volumes:
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    ports:
+      - "2020:2020"   # HTTP server / metrics
+    restart: unless-stopped

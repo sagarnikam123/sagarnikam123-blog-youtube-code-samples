@@ -1,4 +1,4 @@
-# Loki v3.6.x - SingleBinary Mode (Base Configuration)
+# Loki v3.6.x - Monolithic Mode (Base Configuration)
 #
 # Install with platform overlay:
 #   helm install loki grafana/loki -n loki --create-namespace \

@@ -1,0 +1,8 @@
+# This ConfigMap is auto-generated from fluent-bit.yaml via kustomize.
+# Preferred: use kustomize (see kustomization.yaml)
+#   kubectl apply -k .
+#
+# Alternative: generate manually without kustomize
+#   kubectl create configmap fluent-bit-config \
+#     --from-file=fluent-bit.yaml=fluent-bit.yaml \
+#     -n fluent-bit --dry-run=client -o yaml | kubectl apply -f -
