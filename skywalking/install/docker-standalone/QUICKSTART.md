@@ -72,7 +72,7 @@ curl http://localhost:17913/api/healthz
 ### Test Teams webhook?
 ```bash
 curl -X POST \
-  'https://default3d08c29d04bc44cca8673238f9d6e4.01.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/eedba587755f4a1ab3bfc24043ecca0d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=KQe6e02uzatx84L94u-iUDjyg56UQm7pxveo91giPtY' \
+  '<YOUR_POWER_AUTOMATE_WEBHOOK_URL>' \
   -H 'Content-Type: application/json' \
   -d '[{"scopeId":1,"scope":"SERVICE","name":"test","id0":"test","id1":"","ruleName":"test_rule","alarmMessage":"Test alert","startTime":1234567890000,"tags":[{"key":"level","value":"WARNING"}]}]'
 ```
