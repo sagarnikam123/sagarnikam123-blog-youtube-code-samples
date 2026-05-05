@@ -5,7 +5,7 @@
 
 ### What makes this course different
 
-- **23 modules** from absolute basics to production patterns
+- **29 modules** from absolute basics to production patterns
 - **Every example is runnable** on your laptop — no cloud accounts needed
 - **Challenges** in key modules — problem statements with no solutions, forcing you to build from scratch
 - **Troubleshooting module** — intentionally broken configs to debug (the skill nobody teaches)
@@ -23,6 +23,8 @@
 | Terragrunt | 1.0.2 | [Install Guide](https://terragrunt.gruntwork.io/docs/getting-started/install/) |
 | Docker | 29.4.0 | [Docker Install](https://docs.docker.com/get-docker/) |
 | Ollama | >= 0.21 | [Ollama Install](https://ollama.com/download) (module 23) |
+| LocalStack | Latest | [LocalStack Install](https://docs.localstack.cloud/getting-started/installation/) (module 24) |
+| Vault | Latest | [Vault Install](https://developer.hashicorp.com/vault/install) (module 25, dev mode via Docker) |
 | Minikube | 1.38.1 | [Minikube Install](https://minikube.sigs.k8s.io/docs/start/) (modules 19-20) |
 | kubectl | 1.35.4 | [kubectl Install](https://kubernetes.io/docs/tasks/tools/) (modules 19-20) |
 | Helm CLI | 4.1.4 | [Helm Install](https://helm.sh/docs/intro/install/) (module 20) |
@@ -42,6 +44,9 @@ Modules 19-20:  Kubernetes + Helm           → Real-world infrastructure (Minik
 Module  21:     Broken configs              → Debugging & troubleshooting skills
 Module  22:     Patterns & checklists       → Production readiness
 Module  23:     Ollama + Docker             → AI infrastructure as code
+Modules 24-25:  LocalStack + Vault          → AWS practice (free) + secrets management
+Module  26:     Reference guide             → Ecosystem, OpenTofu, CDKTF, what's next
+Modules 27-29:  GitHub + PostgreSQL + Utils → Real-world providers (free)
 ```
 
 ---
@@ -73,6 +78,12 @@ Module  23:     Ollama + Docker             → AI infrastructure as code
 | 21 | [Troubleshooting](./21-troubleshooting/) | `21-troubleshooting/` | Debug intentionally broken configs — cycles, drift, version conflicts |
 | 22 | [Real-World Patterns](./22-real-world-patterns/) | `22-real-world-patterns/` | Tagging, secrets, CI/CD, code review, project structure |
 | 23 | [Terraform + Local AI](./23-terraform-and-ai/) | `23-terraform-and-ai/` | Query Ollama API, AI-generated configs, deploy Ollama with Docker |
+| 24 | [AWS Locally — LocalStack](./24-localstack-aws/) | `24-localstack-aws/` | S3, DynamoDB, SQS, IAM — all free and local via LocalStack |
+| 25 | [Secrets with Vault](./25-vault-secrets/) | `25-vault-secrets/` | KV secrets, policies, AppRole auth, dynamic database credentials |
+| 26 | [Ecosystem & What's Next](./26-ecosystem-and-beyond/) | `26-ecosystem-and-beyond/` | OpenTofu, CDKTF, CI/CD tools, policy-as-code, ecosystem tools |
+| 27 | [GitHub Provider](./27-github-provider/) | `27-github-provider/` | Repos, branch protection, Actions secrets, webhooks |
+| 28 | [PostgreSQL Provider](./28-postgresql-provider/) | `28-postgresql-provider/` | Databases, roles, schemas, grants, extensions (Docker) |
+| 29 | [Utility Providers](./29-utility-providers/) | `29-utility-providers/` | TLS certs, archive/zip, time resources, DNS lookups |
 
 ---
 
@@ -89,6 +100,14 @@ Module  23:     Ollama + Docker             → AI infrastructure as code
 | **terraform_data** | Built-in | Replacement for null_resource (Terraform 1.4+) |
 | **Kubernetes** | `hashicorp/kubernetes` | Manage K8s namespaces, deployments, services, configmaps, secrets |
 | **Helm** | `hashicorp/helm` | Deploy and manage Helm charts on Kubernetes |
+| **AWS** | `hashicorp/aws` | AWS resources (S3, DynamoDB, SQS, IAM) — via LocalStack locally |
+| **Vault** | `hashicorp/vault` | Manage secrets, policies, auth methods in HashiCorp Vault |
+| **GitHub** | `integrations/github` | Manage repos, branch protection, Actions secrets, webhooks |
+| **PostgreSQL** | `cyrilgdn/postgresql` | Manage databases, roles, schemas, grants, extensions |
+| **TLS** | `hashicorp/tls` | Generate private keys, certificates, CSRs locally |
+| **Archive** | `hashicorp/archive` | Create zip/tar archives from source files |
+| **Time** | `hashicorp/time` | Time-based resources (delays, offsets, rotation) |
+| **DNS** | `hashicorp/dns` | Read-only DNS record lookups |
 
 ---
 
@@ -97,7 +116,7 @@ Module  23:     Ollama + Docker             → AI infrastructure as code
 ```bash
 # Clone the repo
 git clone <repo-url>
-cd terraform
+cd terraform/course
 
 # Go to any module
 cd 01-introduction/01-hello-terraform
