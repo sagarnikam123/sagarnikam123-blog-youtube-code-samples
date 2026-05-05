@@ -1,0 +1,27 @@
+# Custom Helm values for Nginx
+# These override the chart's default values.yaml
+
+replicaCount: 2
+
+service:
+  type: NodePort
+  nodePorts:
+    http: 30101
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+podLabels:
+  managed-by: terraform
+  environment: learning
+
+metrics:
+  enabled: false
+
+autoscaling:
+  enabled: false
