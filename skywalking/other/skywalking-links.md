@@ -120,6 +120,9 @@ https://skywalking.apache.org/docs/main/next/en/setup/backend/advanced-deploymen
 https://skywalking.apache.org/docs/main/next/en/setup/backend/ttl/
 https://skywalking.apache.org/docs/main/next/en/setup/backend/endpoint-grouping-rules/
 https://skywalking.apache.org/docs/main/next/en/setup/backend/dynamical-logging/
+https://skywalking.apache.org/docs/main/next/en/setup/backend/grpc-security/
+https://skywalking.apache.org/docs/main/next/en/setup/backend/backend-telemetry/
+https://skywalking.apache.org/docs/main/next/en/setup/backend/backend-load-balancer/
 https://skywalking.apache.org/docs/main/next/en/setup/backend/backend-health-check/
 https://skywalking.apache.org/docs/main/next/en/setup/backend/circuit-breaking/
 
@@ -466,6 +469,56 @@ https://skywalking.apache.org/docs/skywalking-satellite/next/en/guides/contribut
 https://skywalking.apache.org/docs/skywalking-satellite/next/en/guides/contribution/how-to-release/
 https://skywalking.apache.org/docs/skywalking-satellite/next/en/guides/test/how-to-unit-test/
 https://skywalking.apache.org/docs/skywalking-satellite/next/en/guides/compile/how-to-compile/
+
+---
+
+# Apache SkyWalking Horizon UI
+
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/readme/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/design-target/
+
+## Compatibility
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/compatibility/oap-version/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/compatibility/required-modules/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/compatibility/ports/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/compatibility/cluster-status/
+
+## Setup
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/overview/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/container-image/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/horizon-yaml/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/server/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/oap/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/auth/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/rbac/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/session/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/audit/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/files/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/setup/debug-log/
+
+## Acccess Control
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/access-control/local-backend/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/access-control/ldap-backend/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/access-control/break-glass/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/access-control/rbac/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/access-control/audit-log/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/access-control/admin-pages/
+
+## Customization
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/customization/menu-structure/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/customization/layer-templates/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/customization/overview-templates/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/customization/adding-a-new-layer/
+
+
+## Components
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/components/overview-widgets/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/components/dashboard-widgets/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/components/charts/
+
+## Operate
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/operate/cluster-metadata/
+https://skywalking.apache.org/docs/skywalking-horizon-ui/next/operate/inspect/
 
 ---
 
