@@ -608,6 +608,13 @@ https://skywalking.apache.org/docs/skywalking-python/next/en/setup/faq/how-to-bu
 ---
 
 # Blog
+https://skywalking.apache.org/blog/2026-04-30-mini-program-monitoring-with-skywalking/
+https://skywalking.apache.org/blog/2026-04-08-traceql/
+https://skywalking.apache.org/blog/2026-04-05-virtual-genai-monitoring/
+https://skywalking.apache.org/blog/2026-04-02-envoy-ai-gateway-monitoring/
+https://skywalking.apache.org/blog/2026-03-13-skywalking-graalvm-distro-design-and-benchmarks/
+https://skywalking.apache.org/blog/2026-03-13-how-ai-changed-the-economics-of-architecture/
+https://skywalking.apache.org/blog/2026-03-08-agentic-vibe-coding/
 https://skywalking.apache.org/blog/2026-01-01-skywalking-2025-year-in-review/
 https://skywalking.apache.org/blog/2024-04-19-flink-monitoring-by-skywalking/
 https://skywalking.apache.org/blog/2025-03-06-introduction-to-skywalking-ruby/
