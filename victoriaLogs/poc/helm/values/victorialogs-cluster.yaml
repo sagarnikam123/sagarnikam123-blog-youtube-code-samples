@@ -1,0 +1,57 @@
+# =============================================================================
+# VictoriaLogs Cluster — Helm Values for EKS (if single-node isn't enough)
+# Chart: vm/victoria-logs-cluster
+# Docs: https://docs.victoriametrics.com/helm/victorialogs-cluster/
+# =============================================================================
+# Use this if daily ingest exceeds what a single node can handle (typically >500GB/day)
+# or if you need HA with replication.
+# =============================================================================
+
+# VictoriaLogs Cluster has three components:
+# - vlinsert: accepts incoming logs, distributes to vlstorage nodes
+# - vlstorage: stores logs on disk
+# - vlselect: handles queries, reads from vlstorage
+
+vlinsert:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+
+vlstorage:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  persistentVolume:
+    enabled: true
+    storageClass: "gp3"
+    size: 500Gi
+  extraArgs:
+    retentionPeriod: "30d"
+
+vlselect:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  service:
+    type: ClusterIP
+    port: 9428

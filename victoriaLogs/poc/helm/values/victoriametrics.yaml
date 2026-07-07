@@ -1,0 +1,25 @@
+# =============================================================================
+# VictoriaMetrics Single — Stores recording rule metrics & alert state
+# Chart: vm/victoria-metrics-single
+# =============================================================================
+
+server:
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+  persistentVolume:
+    enabled: true
+    storageClass: "gp3"
+    size: 50Gi
+
+  extraArgs:
+    retentionPeriod: "30d"
+
+  service:
+    type: ClusterIP
+    port: 8428

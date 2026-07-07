@@ -1,0 +1,82 @@
+# =============================================================================
+# vmalert Rules for VictoriaLogs PoC
+# =============================================================================
+# type: vlogs — tells vmalert these are LogsQL expressions, not PromQL
+# interval: how often vmalert evaluates the rule
+# vmalert auto-appends _time:<interval> to each query
+# =============================================================================
+
+groups:
+  # ---------------------------------------------------------------------------
+  # Alert: High error count across all services
+  # ---------------------------------------------------------------------------
+  - name: ErrorAlerts
+    type: vlogs
+    interval: 1m
+    rules:
+      - alert: HighErrorCount
+        expr: '* error OR "status":5* | stats by (service, cluster) count() as error_count | filter error_count:>5'
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High error count on {{ $labels.service }} in cluster {{ $labels.cluster }}"
+          description: "Service {{ $labels.service }} has {{ $value }} errors in the last minute (cluster: {{ $labels.cluster }})"
+
+      - alert: CriticalErrorSpike
+        expr: '* error OR "status":5* | stats by (service, cluster) count() as error_count | filter error_count:>50'
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "CRITICAL error spike on {{ $labels.service }} in cluster {{ $labels.cluster }}"
+          description: "Service {{ $labels.service }} has {{ $value }} errors — immediate attention required"
+
+  # ---------------------------------------------------------------------------
+  # Alert: 4xx client errors exceeding threshold
+  # ---------------------------------------------------------------------------
+  - name: ClientErrors
+    type: vlogs
+    interval: 1m
+    rules:
+      - alert: High4xxRate
+        expr: '* "status":4* | stats by (service, cluster) count() as client_errors | filter client_errors:>20'
+        for: 3m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High 4xx rate on {{ $labels.service }}"
+          description: "{{ $value }} client errors in the last minute on {{ $labels.service }}"
+
+  # ---------------------------------------------------------------------------
+  # Alert: No logs received (service might be down)
+  # ---------------------------------------------------------------------------
+  - name: ServiceHealth
+    type: vlogs
+    interval: 2m
+    rules:
+      - alert: NoLogsReceived
+        expr: '_time:5m {service="fuzzy-train"} | stats count() as log_count | filter log_count:<1'
+        for: 5m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "No logs from fuzzy-train in the last 5 minutes"
+          description: "The fuzzy-train service may be down — no logs received"
+
+  # ---------------------------------------------------------------------------
+  # Recording Rule: Count logs per service per minute (generates metrics)
+  # ---------------------------------------------------------------------------
+  - name: LogMetrics
+    type: vlogs
+    interval: 1m
+    rules:
+      - record: logs_per_service_per_minute
+        expr: '* | stats by (service, cluster, region) count() as logs_total'
+
+      - record: errors_per_service_per_minute
+        expr: '* error OR "status":5* | stats by (service, cluster, region) count() as errors'

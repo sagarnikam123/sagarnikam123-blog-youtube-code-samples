@@ -1,0 +1,61 @@
+# =============================================================================
+# vmalert Rules — Binary PoC
+# =============================================================================
+
+groups:
+  # ---------------------------------------------------------------------------
+  # Alerting: Error count thresholds
+  # ---------------------------------------------------------------------------
+  - name: ErrorAlerts
+    type: vlogs
+    interval: 1m
+    rules:
+      - alert: HighErrorCount
+        expr: '* error OR "status":5* | stats by (service, cluster) count() as error_count | filter error_count:>5'
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High error count on {{ $labels.service }} (cluster: {{ $labels.cluster }})"
+          description: "{{ $value }} errors in the last minute"
+
+      - alert: CriticalErrorSpike
+        expr: '* error OR "status":5* | stats by (service, cluster) count() as error_count | filter error_count:>50'
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "CRITICAL error spike on {{ $labels.service }}"
+          description: "{{ $value }} errors — immediate attention required"
+
+  # ---------------------------------------------------------------------------
+  # Alerting: 4xx client errors
+  # ---------------------------------------------------------------------------
+  - name: ClientErrors
+    type: vlogs
+    interval: 1m
+    rules:
+      - alert: High4xxRate
+        expr: '* "status":4* | stats by (service, cluster) count() as client_errors | filter client_errors:>20'
+        for: 3m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High 4xx rate on {{ $labels.service }}"
+          description: "{{ $value }} client errors in the last minute"
+
+  # ---------------------------------------------------------------------------
+  # Recording Rules: Generate metrics from logs
+  # ---------------------------------------------------------------------------
+  - name: LogMetrics
+    type: vlogs
+    interval: 1m
+    rules:
+      - record: logs_per_service_per_minute
+        expr: '* | stats by (service, cluster, region) count() as logs_total'
+
+      - record: errors_per_service_per_minute
+        expr: '* error OR "status":5* | stats by (service, cluster, region) count() as errors'

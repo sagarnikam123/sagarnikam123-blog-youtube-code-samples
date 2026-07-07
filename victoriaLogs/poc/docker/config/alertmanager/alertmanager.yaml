@@ -1,0 +1,89 @@
+# =============================================================================
+# AlertManager Configuration - PoC
+# =============================================================================
+# For production, replace webhook URLs with actual:
+#   - Microsoft Teams: Use Power Automate webhook or prometheus-msteams adapter
+#   - OpsGenie: Use OpsGenie API integration
+#
+# This PoC config routes alerts to a local webhook receiver for testing.
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default-receiver
+  group_by: ['alertname', 'service', 'cluster']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts → OpsGenie + Teams
+    - match:
+        severity: critical
+      receiver: opsgenie-and-teams
+      continue: true
+
+    # Warning alerts → Teams only
+    - match:
+        severity: warning
+      receiver: teams-only
+
+receivers:
+  # Default: logs to AlertManager UI (http://localhost:9093)
+  - name: default-receiver
+    webhook_configs:
+      - url: 'http://host.docker.internal:5001/webhook'
+        send_resolved: true
+
+  # Production: OpsGenie + Teams simultaneously
+  # For PoC: both point to local webhook for testing
+  - name: opsgenie-and-teams
+    webhook_configs:
+      # --- OpsGenie ---
+      # Replace with: https://api.opsgenie.com/v2/alerts
+      # Use opsgenie_configs in production:
+      # opsgenie_configs:
+      #   - api_key: '<OPSGENIE_API_KEY>'
+      #     message: '{{ .GroupLabels.alertname }} on {{ .GroupLabels.service }}'
+      #     priority: 'P1'
+      #     tags: 'victorialogs,{{ .GroupLabels.cluster }}'
+      - url: 'http://host.docker.internal:5001/webhook/opsgenie'
+        send_resolved: true
+
+      # --- Microsoft Teams ---
+      # Replace with Power Automate webhook URL or use prometheus-msteams adapter
+      # In production, use a webhook adapter like:
+      #   docker run -p 2000:2000 quay.io/prometheusmsteams/prometheus-msteams:v1.5.2
+      #   with -teams.incoming-webhook-url=<YOUR_TEAMS_WEBHOOK>
+      - url: 'http://host.docker.internal:5001/webhook/teams'
+        send_resolved: true
+
+  - name: teams-only
+    webhook_configs:
+      # --- Microsoft Teams ---
+      - url: 'http://host.docker.internal:5001/webhook/teams'
+        send_resolved: true
+
+# =============================================================================
+# PRODUCTION CONFIGURATION (uncomment & replace for real setup):
+# =============================================================================
+#
+# receivers:
+#   - name: opsgenie-and-teams
+#     opsgenie_configs:
+#       - api_key: '<OPSGENIE_API_KEY>'
+#         message: '{{ .GroupLabels.alertname }} | {{ .GroupLabels.service }} | {{ .GroupLabels.cluster }}'
+#         description: '{{ .CommonAnnotations.description }}'
+#         priority: '{{ if eq .GroupLabels.severity "critical" }}P1{{ else }}P3{{ end }}'
+#         tags: 'victorialogs,{{ .GroupLabels.cluster }},{{ .GroupLabels.region }}'
+#     webhook_configs:
+#       # prometheus-msteams adapter URL
+#       - url: 'http://prometheus-msteams:2000/teams-channel'
+#         send_resolved: true
+#
+#   - name: teams-only
+#     webhook_configs:
+#       - url: 'http://prometheus-msteams:2000/teams-channel'
+#         send_resolved: true

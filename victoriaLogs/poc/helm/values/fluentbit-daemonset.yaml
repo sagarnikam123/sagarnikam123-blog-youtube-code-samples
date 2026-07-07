@@ -1,0 +1,126 @@
+# =============================================================================
+# Fluent Bit DaemonSet — Deployed on EACH app EKS cluster
+# Chart: fluent/fluent-bit
+# Repo: helm repo add fluent https://fluent.github.io/helm-charts
+# =============================================================================
+# This pushes logs from all pods in the cluster to VictoriaLogs.
+# The CLUSTER_NAME and AWS_REGION env vars distinguish clusters.
+# =============================================================================
+
+# Environment variables — set per-cluster during helm install:
+#   --set env[0].name=CLUSTER_NAME,env[0].value=app-prod
+#   --set env[1].name=AWS_REGION,env[1].value=us-east-1
+
+env:
+  - name: CLUSTER_NAME
+    value: "app-prod"          # Override per cluster
+  - name: AWS_REGION
+    value: "us-east-1"         # Override per cluster
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+
+tolerations:
+  - operator: Exists
+    effect: NoSchedule
+
+config:
+  service: |
+    [SERVICE]
+        Flush         5
+        Log_Level     warn
+        Daemon        off
+        Parsers_File  /fluent-bit/etc/parsers.conf
+
+  inputs: |
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        multiline.parser  docker, cri
+        Tag               kube.*
+        Refresh_Interval  10
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        DB                /var/log/fluentbit-state.db
+
+  filters: |
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude On
+        Labels              On
+        Annotations         Off
+
+    [FILTER]
+        Name          record_modifier
+        Match         *
+        Record        cluster ${CLUSTER_NAME}
+        Record        region ${AWS_REGION}
+        Record        environment production
+
+    [FILTER]
+        Name          nest
+        Match         *
+        Operation     lift
+        Nested_under  kubernetes
+        Add_prefix    k8s.
+
+    [FILTER]
+        Name          modify
+        Match         *
+        Rename        k8s.namespace_name namespace
+        Rename        k8s.container_name container
+        Rename        k8s.pod_name pod
+        Rename        k8s.labels.app service
+        # Fallback: use container_name as service if app label is missing
+        # Rename      k8s.container_name service
+
+  outputs: |
+    [OUTPUT]
+        Name             http
+        Match            *
+        Host             victorialogs.internal.company.com
+        Port             9428
+        URI              /insert/jsonline?_stream_fields=cluster,region,namespace,service&_msg_field=log&_time_field=date
+        Format           json_lines
+        Json_date_format iso8601
+        compress         gzip
+        Retry_Limit      5
+        net.keepalive    on
+        net.keepalive_idle_timeout 30
+        # TLS (if NLB is TLS-terminated)
+        # tls             on
+        # tls.verify      off
+
+  # Custom parsers
+  customParsers: |
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name        cri
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z

@@ -1,0 +1,80 @@
+# =============================================================================
+# prometheus-msteams — Adapter that converts Prometheus/AlertManager alerts
+# to Microsoft Teams webhook card format
+# =============================================================================
+# Deployment: Simple deployment with configmap
+# Image: quay.io/prometheusmsteams/prometheus-msteams:v1.5.2
+# Repo: https://github.com/prometheus-msteams/prometheus-msteams
+# =============================================================================
+#
+# NOTE: This is not a Helm chart values file — it's a set of raw K8s manifests.
+# Deploy these directly or wrap in a Helm chart.
+#
+# Usage:
+#   kubectl apply -f prometheus-msteams.yaml -n observability
+# =============================================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-msteams-config
+  namespace: observability
+data:
+  config.yaml: |
+    connectors:
+      - critical-alerts: "<TEAMS_CRITICAL_WEBHOOK_URL>"
+      - warning-alerts: "<TEAMS_WARNING_WEBHOOK_URL>"
+      - default: "<TEAMS_DEFAULT_WEBHOOK_URL>"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-msteams
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-msteams
+  template:
+    metadata:
+      labels:
+        app: prometheus-msteams
+    spec:
+      containers:
+        - name: prometheus-msteams
+          image: quay.io/prometheusmsteams/prometheus-msteams:v1.5.2
+          ports:
+            - containerPort: 2000
+          args:
+            - "-config-file=/etc/config/config.yaml"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-msteams-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-msteams
+  namespace: observability
+spec:
+  selector:
+    app: prometheus-msteams
+  ports:
+    - port: 2000
+      targetPort: 2000
+  type: ClusterIP

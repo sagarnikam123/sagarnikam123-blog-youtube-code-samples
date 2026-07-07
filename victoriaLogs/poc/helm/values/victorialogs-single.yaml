@@ -1,0 +1,70 @@
+# =============================================================================
+# VictoriaLogs Single — Helm Values for EKS
+# Chart: vm/victoria-logs-single
+# Docs: https://docs.victoriametrics.com/helm/victorialogs-single/
+# =============================================================================
+
+server:
+  image:
+    tag: latest
+
+  # Resources — adjust based on PoC results
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+
+  # Persistent storage
+  persistentVolume:
+    enabled: true
+    storageClass: "gp3"
+    size: 500Gi
+    accessModes:
+      - ReadWriteOnce
+
+  # VictoriaLogs flags
+  extraArgs:
+    retentionPeriod: "30d"
+    # Stream fields for multi-cluster separation
+    # These are set at ingest time via _stream_fields query param
+
+  # Service — Internal NLB for cross-EKS cluster access
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    port: 9428
+
+  # Tolerations/affinity for dedicated node group (optional)
+  # nodeSelector:
+  #   nodegroup: observability
+  # tolerations:
+  #   - key: "dedicated"
+  #     operator: "Equal"
+  #     value: "observability"
+  #     effect: "NoSchedule"
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  # Probes
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 9428
+    initialDelaySeconds: 5
+    periodSeconds: 15
+
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 9428
+    initialDelaySeconds: 30
+    periodSeconds: 30

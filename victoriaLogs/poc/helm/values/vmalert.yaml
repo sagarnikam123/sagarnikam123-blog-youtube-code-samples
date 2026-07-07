@@ -1,0 +1,85 @@
+# =============================================================================
+# vmalert — Evaluates LogsQL rules against VictoriaLogs
+# Chart: vm/victoria-metrics-alert
+# =============================================================================
+
+server:
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  # Point to VictoriaLogs as datasource
+  datasource:
+    url: "http://victorialogs-victoria-logs-single-server:9428"
+
+  # AlertManager endpoint
+  notifier:
+    alertmanager:
+      url: "http://alertmanager:9093"
+
+  # Remote write for recording rules + alert state
+  remote:
+    write:
+      url: "http://victoriametrics-victoria-metrics-single-server:8428"
+    read:
+      url: "http://victoriametrics-victoria-metrics-single-server:8428"
+
+  # Default rule type is vlogs (LogsQL)
+  extraArgs:
+    rule.defaultRuleType: "vlogs"
+    evaluationInterval: "1m"
+
+  # Alert rules from ConfigMap
+  config:
+    alerts:
+      groups:
+        - name: ErrorAlerts
+          type: vlogs
+          interval: 1m
+          rules:
+            - alert: HighErrorCount
+              expr: '* error OR "status":5* | stats by (service, cluster, region) count() as error_count | filter error_count:>10'
+              for: 3m
+              labels:
+                severity: warning
+                team: platform
+              annotations:
+                summary: "High error count on {{ $labels.service }} in {{ $labels.cluster }}"
+                description: "{{ $value }} errors in the last minute"
+
+            - alert: CriticalErrorSpike
+              expr: '* error OR "status":5* | stats by (service, cluster, region) count() as error_count | filter error_count:>100'
+              for: 2m
+              labels:
+                severity: critical
+                team: sre
+              annotations:
+                summary: "CRITICAL: {{ $labels.service }} in {{ $labels.cluster }} ({{ $labels.region }})"
+                description: "{{ $value }} errors — page SRE immediately"
+
+        - name: ServiceHealth
+          type: vlogs
+          interval: 2m
+          rules:
+            - alert: NoLogsFromService
+              expr: '_time:5m * | stats by (service, cluster) count() as log_count | filter log_count:<1'
+              for: 5m
+              labels:
+                severity: critical
+                team: sre
+              annotations:
+                summary: "No logs from {{ $labels.service }} in {{ $labels.cluster }}"
+                description: "Service may be down — zero logs in the last 5 minutes"
+
+        - name: LogMetrics
+          type: vlogs
+          interval: 1m
+          rules:
+            - record: logs_total_per_minute
+              expr: '* | stats by (service, cluster, region, namespace) count() as logs_total'
+            - record: errors_per_minute
+              expr: '* error OR "status":5* | stats by (service, cluster, region) count() as errors'

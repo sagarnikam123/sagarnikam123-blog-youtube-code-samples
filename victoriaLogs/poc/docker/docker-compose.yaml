@@ -1,0 +1,140 @@
+version: "3.8"
+
+# =============================================================================
+# VictoriaLogs PoC - Local Mac Setup
+# =============================================================================
+# Components:
+#   1. VictoriaLogs       - Log storage & query engine
+#   2. vmalert            - Evaluates LogsQL alerting rules against VL
+#   3. AlertManager       - Routes alerts to Teams/OpsGenie (simulated locally)
+#   4. VictoriaMetrics    - Stores recording rule metrics & alert state
+#   5. Grafana            - Dashboards + log exploration
+#   6. Fluent Bit         - Collects logs from fuzzy-train and pushes to VL
+#   7. fuzzy-train        - Fake log generator (your tool)
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # VictoriaLogs - Single node log database
+  # ---------------------------------------------------------------------------
+  victorialogs:
+    image: victoriametrics/victoria-logs:latest
+    container_name: victorialogs
+    ports:
+      - "9428:9428"
+    volumes:
+      - vlogs-data:/vlogs
+    command:
+      - "-storageDataPath=/vlogs"
+      - "-retentionPeriod=7d"
+      - "-httpListenAddr=:9428"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # VictoriaMetrics - Stores recording rule results & alert state
+  # ---------------------------------------------------------------------------
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/victoria-metrics-data
+    command:
+      - "-storageDataPath=/victoria-metrics-data"
+      - "-retentionPeriod=7d"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # vmalert - Evaluates alerting/recording rules against VictoriaLogs
+  # ---------------------------------------------------------------------------
+  vmalert:
+    image: victoriametrics/vmalert:latest
+    container_name: vmalert
+    ports:
+      - "8880:8880"
+    volumes:
+      - ./config/vmalert:/etc/vmalert
+    command:
+      - "-rule=/etc/vmalert/*.yaml"
+      - "-datasource.url=http://victorialogs:9428"
+      - "-notifier.url=http://alertmanager:9093"
+      - "-remoteWrite.url=http://victoriametrics:8428"
+      - "-remoteRead.url=http://victoriametrics:8428"
+      - "-rule.defaultRuleType=vlogs"
+      - "-evaluationInterval=30s"
+      - "-httpListenAddr=:8880"
+    depends_on:
+      - victorialogs
+      - victoriametrics
+      - alertmanager
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # AlertManager - Routes alerts (Teams + OpsGenie simulation)
+  # ---------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./config/alertmanager/alertmanager.yaml:/etc/alertmanager/alertmanager.yaml
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yaml"
+      - "--storage.path=/alertmanager"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Grafana - Dashboards & Log exploration
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=victoriametrics-logs-datasource
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - victorialogs
+      - victoriametrics
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Fluent Bit - Collects logs from fuzzy-train, pushes to VictoriaLogs
+  # ---------------------------------------------------------------------------
+  fluentbit:
+    image: fluent/fluent-bit:latest
+    container_name: fluentbit
+    volumes:
+      - ./config/fluentbit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./config/fluentbit/parsers.conf:/fluent-bit/etc/parsers.conf
+      - app-logs:/var/log/app
+    depends_on:
+      - victorialogs
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # fuzzy-train - Fake log generator
+  # Generates realistic microservice logs (JSON) to /var/log/app/app.log
+  # If fuzzy-train isn't available as Docker image, use flog as fallback
+  # ---------------------------------------------------------------------------
+  fuzzy-train:
+    image: mingrammer/flog:latest
+    container_name: fuzzy-train
+    # flog generates Apache/JSON logs to stdout; we write to a shared volume
+    command: ["-f", "json", "-d", "2s", "-l", "-w"]
+    volumes:
+      - app-logs:/var/log/app
+    restart: unless-stopped
+
+volumes:
+  vlogs-data:
+  vm-data:
+  grafana-data:
+  app-logs:

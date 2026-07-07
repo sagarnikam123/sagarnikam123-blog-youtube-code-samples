@@ -1,0 +1,76 @@
+# =============================================================================
+# Grafana — Dashboards + Log Exploration for Developers
+# Chart: grafana/grafana
+# =============================================================================
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Install VictoriaLogs datasource plugin
+plugins:
+  - victoriametrics-logs-datasource
+
+# Admin password (use ExternalSecret in production)
+adminPassword: "admin"
+
+# Ingress for developer access
+ingress:
+  enabled: true
+  ingressClassName: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "<ACM_CERT_ARN>"
+    alb.ingress.kubernetes.io/group.name: "observability"
+  hosts:
+    - grafana.internal.company.com
+  tls:
+    - hosts:
+        - grafana.internal.company.com
+
+# Datasources auto-provisioning
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: VictoriaLogs
+        type: victoriametrics-logs-datasource
+        access: proxy
+        url: http://victorialogs-victoria-logs-single-server:9428
+        isDefault: true
+        editable: true
+
+      - name: VictoriaMetrics
+        type: prometheus
+        access: proxy
+        url: http://victoriametrics-victoria-metrics-single-server:8428
+        editable: true
+
+# Persistence for dashboards
+persistence:
+  enabled: true
+  storageClassName: "gp3"
+  size: 10Gi
+
+# Grafana.ini overrides
+grafana.ini:
+  server:
+    root_url: https://grafana.internal.company.com
+  # SSO / OIDC (uncomment and configure for production)
+  # auth.generic_oauth:
+  #   enabled: true
+  #   name: SSO
+  #   client_id: <CLIENT_ID>
+  #   client_secret: <CLIENT_SECRET>
+  #   scopes: openid profile email
+  #   auth_url: https://sso.company.com/authorize
+  #   token_url: https://sso.company.com/token
+  #   api_url: https://sso.company.com/userinfo
