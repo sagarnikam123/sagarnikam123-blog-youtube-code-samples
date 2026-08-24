@@ -1,0 +1,16 @@
+# Parseable distributed — Helm values
+# Replace placeholders before installing.
+parseable:
+  store: s3-store
+  s3:
+    url: "https://s3.amazonaws.com"
+    bucket: "replace-with-bucket"
+    region: "us-east-1"
+    accessKey: "replace-with-access-key"
+    secretKey: "replace-with-secret-key"
+
+ingestor:
+  replicas: 2
+
+querier:
+  replicas: 2

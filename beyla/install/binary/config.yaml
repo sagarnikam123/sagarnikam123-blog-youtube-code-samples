@@ -1,0 +1,21 @@
+# Beyla configuration — standalone binary
+# Instruments all services on port 8080 and exports OTLP + Prometheus metrics.
+
+discovery:
+  instrument:
+    - open_ports: 8080
+
+otel_traces_export:
+  endpoint: http://localhost:4318
+
+otel_metrics_export:
+  endpoint: http://localhost:4318
+
+prometheus_export:
+  port: 9400
+  path: /metrics
+
+routes:
+  unmatched: heuristic
+
+log_level: INFO

@@ -1,0 +1,13 @@
+# VictoriaLogs cluster — default values
+# Configure storage, replicas, and resources for the target cluster.
+vlstorage:
+  replicaCount: 2
+  persistentVolume:
+    enabled: true
+    size: 50Gi
+
+vlinsert:
+  replicaCount: 2
+
+vlselect:
+  replicaCount: 2

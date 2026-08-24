@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: beyla
+  namespace: beyla
+  labels:
+    app: beyla
+spec:
+  selector:
+    matchLabels:
+      app: beyla
+  template:
+    metadata:
+      labels:
+        app: beyla
+    spec:
+      hostPID: true
+      serviceAccountName: beyla
+      containers:
+        - name: beyla
+          image: grafana/beyla:2.8.4
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 9400
+              name: metrics
+          volumeMounts:
+            - name: beyla-config
+              mountPath: /etc/beyla
+          env:
+            - name: BEYLA_CONFIG_PATH
+              value: /etc/beyla/beyla-config.yaml
+      volumes:
+        - name: beyla-config
+          configMap:
+            name: beyla-config
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: beyla
+  namespace: beyla
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: beyla
+subjects:
+  - kind: ServiceAccount
+    name: beyla
+    namespace: beyla
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,49 @@
+# ClickHouse — Docker Compose cluster (2 shards + Keeper)
+services:
+  clickhouse-keeper:
+    image: clickhouse/clickhouse-keeper:25.5
+    container_name: clickhouse-keeper
+    restart: unless-stopped
+    ports:
+      - "9181:9181"
+    volumes:
+      - keeper-data:/var/lib/clickhouse-keeper
+      - ./config/keeper.xml:/etc/clickhouse-keeper/config.xml:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 9181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse-01:
+    image: clickhouse/clickhouse-server:25.5
+    container_name: clickhouse-01
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ch01-data:/var/lib/clickhouse
+      - ./config/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+    depends_on:
+      clickhouse-keeper:
+        condition: service_healthy
+
+  clickhouse-02:
+    image: clickhouse/clickhouse-server:25.5
+    container_name: clickhouse-02
+    restart: unless-stopped
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    volumes:
+      - ch02-data:/var/lib/clickhouse
+      - ./config/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+    depends_on:
+      clickhouse-keeper:
+        condition: service_healthy
+
+volumes:
+  keeper-data:
+  ch01-data:
+  ch02-data:

@@ -1,0 +1,26 @@
+# Parseable standalone — Docker Compose
+# Single-node with local disk storage for benchmarking.
+services:
+  parseable:
+    image: parseable/parseable:${PARSEABLE_VERSION:-latest}
+    container_name: parseable
+    restart: unless-stopped
+    command: ["parseable", "local-store"]
+    environment:
+      - P_USERNAME=${P_USERNAME:-admin}
+      - P_PASSWORD=${P_PASSWORD:-admin}
+    ports:
+      - "${PARSEABLE_PORT:-8000}:8000"
+    volumes:
+      - parseable-data:/parseable/data
+      - parseable-staging:/parseable/staging
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/api/v1/liveness"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  parseable-data:
+  parseable-staging:

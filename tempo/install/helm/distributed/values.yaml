@@ -1,0 +1,30 @@
+# Tempo Helm — distributed mode (production)
+# Requires object storage (S3/GCS/MinIO)
+storage:
+  trace:
+    backend: s3
+    s3:
+      bucket: tempo-traces
+      endpoint: s3.amazonaws.com
+      region: us-east-1
+      # Use IRSA or set access_key/secret_key
+
+distributor:
+  replicas: 2
+
+ingester:
+  replicas: 3
+  persistence:
+    enabled: true
+    size: 10Gi
+
+querier:
+  replicas: 2
+
+compactor:
+  replicas: 1
+
+metricsGenerator:
+  enabled: true
+  remoteWrite:
+    - url: http://mimir:9009/api/v1/push

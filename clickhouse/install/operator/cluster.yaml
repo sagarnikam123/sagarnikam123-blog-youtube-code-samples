@@ -1,0 +1,41 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: clickhouse
+  namespace: clickhouse
+spec:
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+        templates:
+          podTemplate: clickhouse-pod
+          volumeClaimTemplate: data-volume
+    zookeeper:
+      nodes:
+        - host: clickhouse-keeper
+          port: 9181
+  templates:
+    podTemplates:
+      - name: clickhouse-pod
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:25.5
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 4Gi
+                limits:
+                  cpu: "4"
+                  memory: 8Gi
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Gi

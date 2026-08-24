@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mysqld-exporter
+  namespace: mariadb-test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mysqld-exporter-secret-reader
+  namespace: mariadb-test
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["mariadb-user"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mysqld-exporter-secret-reader-binding
+  namespace: mariadb-test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mysqld-exporter-secret-reader
+subjects:
+- kind: ServiceAccount
+  name: mysqld-exporter
+  namespace: mariadb-test
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysqld-exporter
+  namespace: mariadb-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysqld-exporter
+  template:
+    metadata:
+      labels:
+        app: mysqld-exporter
+    spec:
+      serviceAccountName: mysqld-exporter
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        fsGroup: 65534
+      initContainers:
+      - name: init-creds
+        image: docker.io/bitnami/kubectl:latest
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          USER=$(kubectl get secret mariadb-user -n mariadb-test -o jsonpath='{.data.username}' | base64 -d)
+          PASS=$(kubectl get secret mariadb-user -n mariadb-test -o jsonpath='{.data.password}' | base64 -d)
+          # v0.20.0 reads credentials from my.cnf and supports tls=preferred.
+          printf '[client]\nuser=%s\npassword="%s"\nhost=mariadb.mariadb-test.svc.cluster.local\nport=3306\ntls=preferred\n' "$USER" "$PASS" > /shared/.my.cnf
+          chmod 400 /shared/.my.cnf
+          echo "Credentials written (user=$USER, password length=${#PASS})"
+        volumeMounts:
+        - name: shared-creds
+          mountPath: /shared
+      containers:
+      - name: mysqld-exporter
+        image: prom/mysqld-exporter:v0.20.0
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          exec mysqld_exporter \
+            --config.my-cnf=/shared/.my.cnf \
+            --collect.global_status \
+            --collect.global_variables \
+            --no-collect.slave_status
+        ports:
+        - containerPort: 9104
+          name: metrics
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        volumeMounts:
+        - name: shared-creds
+          mountPath: /shared
+          readOnly: true
+      volumes:
+      - name: shared-creds
+        emptyDir:
+          medium: Memory

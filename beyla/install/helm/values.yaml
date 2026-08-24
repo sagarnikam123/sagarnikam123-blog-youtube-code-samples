@@ -1,0 +1,15 @@
+# Beyla Helm values — self-hosted OTLP export
+config:
+  data:
+    discovery:
+      instrument:
+        - k8s_namespace: default
+    otel_traces_export:
+      endpoint: http://otel-collector.monitoring:4318
+    otel_metrics_export:
+      endpoint: http://otel-collector.monitoring:4318
+    prometheus_export:
+      port: 9400
+      path: /metrics
+    routes:
+      unmatched: heuristic

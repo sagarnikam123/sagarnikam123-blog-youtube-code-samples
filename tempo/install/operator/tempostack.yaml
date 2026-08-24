@@ -1,0 +1,25 @@
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoStack
+metadata:
+  name: tempo
+  namespace: tempo
+spec:
+  storageSize: 10Gi
+  storage:
+    secret:
+      name: tempo-s3-credentials
+      type: s3
+  resources:
+    total:
+      limits:
+        cpu: "4"
+        memory: 8Gi
+  template:
+    distributor:
+      replicas: 2
+    ingester:
+      replicas: 3
+    querier:
+      replicas: 2
+    compactor:
+      replicas: 1

@@ -1,0 +1,35 @@
+# Beyla — Docker Compose example
+# Instruments an example Go HTTP service and exports OTLP to a local collector.
+services:
+  # Example application to instrument
+  example-app:
+    image: ghcr.io/grafana/beyla-demo/greeting:latest
+    container_name: example-app
+    ports:
+      - "8080:8080"
+
+  # Beyla auto-instrumentation via eBPF
+  beyla:
+    image: grafana/beyla:2.8.4
+    container_name: beyla
+    privileged: true
+    pid: "service:example-app"
+    environment:
+      - BEYLA_OPEN_PORT=8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - BEYLA_PROMETHEUS_PORT=9400
+    ports:
+      - "9400:9400"
+    depends_on:
+      - example-app
+
+  # OTel Collector (receives OTLP from Beyla)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
