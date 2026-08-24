@@ -1,0 +1,31 @@
+# Vector: file logs → VRL transform → Elasticsearch
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+    read_from: beginning
+
+transforms:
+  parse:
+    type: remap
+    inputs: [app_logs]
+    source: |
+      . = parse_json!(.message)
+      .@timestamp = now()
+      .host = get_hostname!()
+
+sinks:
+  elasticsearch:
+    type: elasticsearch
+    inputs: [parse]
+    endpoints:
+      - http://localhost:9200
+    bulk:
+      index: "app-logs-%Y.%m.%d"
+    encoding:
+      except_fields: [source_type]

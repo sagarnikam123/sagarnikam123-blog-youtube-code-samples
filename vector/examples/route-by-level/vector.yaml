@@ -1,0 +1,54 @@
+# Vector: file logs → route by level → errors to Loki, all to S3
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+    read_from: beginning
+
+transforms:
+  parse:
+    type: remap
+    inputs: [app_logs]
+    source: |
+      . = parse_json!(.message)
+      .level = downcase(string!(.level)) ?? "info"
+      .host = get_hostname!()
+
+  route_by_level:
+    type: route
+    inputs: [parse]
+    route:
+      errors:
+        type: vrl
+        source: '.level == "error" || .level == "fatal"'
+
+sinks:
+  # Errors go to Loki for alerting
+  loki_errors:
+    type: loki
+    inputs: [route_by_level.errors]
+    endpoint: http://localhost:3100
+    labels:
+      service: app
+      level: "{{ level }}"
+    encoding:
+      codec: json
+
+  # Everything (including errors) goes to S3 for long-term storage
+  s3_archive:
+    type: aws_s3
+    inputs: [parse]
+    bucket: my-log-archive
+    region: us-east-1
+    key_prefix: "logs/%Y/%m/%d/"
+    compression: gzip
+    encoding:
+      codec: ndjson
+    batch:
+      max_bytes: 10485760
+      timeout_secs: 300

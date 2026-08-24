@@ -1,0 +1,43 @@
+# Vector: file → parse → filter errors only → dedupe → Elasticsearch
+# Multi-transform pipeline: source → remap → filter → dedupe → sink
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+
+transforms:
+  parse:
+    type: remap
+    inputs: [app_logs]
+    source: |
+      . = parse_json!(.message)
+      .host = get_hostname!()
+
+  errors_only:
+    type: filter
+    inputs: [parse]
+    condition:
+      type: vrl
+      source: '.level == "error" || .level == "fatal"'
+
+  dedupe:
+    type: dedupe
+    inputs: [errors_only]
+    fields:
+      match:
+        - message
+        - host
+
+sinks:
+  elasticsearch:
+    type: elasticsearch
+    inputs: [dedupe]
+    endpoints:
+      - http://localhost:9200
+    bulk:
+      index: "errors-%Y.%m.%d"

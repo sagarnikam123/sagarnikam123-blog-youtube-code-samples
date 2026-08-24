@@ -1,0 +1,22 @@
+# Vector: StatsD metrics → incremental_to_absolute → Prometheus exporter
+# Replace StatsD aggregator with Vector
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  statsd:
+    type: statsd
+    address: 0.0.0.0:8125
+    mode: udp
+
+transforms:
+  to_absolute:
+    type: incremental_to_absolute
+    inputs: [statsd]
+
+sinks:
+  prometheus:
+    type: prometheus_exporter
+    inputs: [to_absolute]
+    address: 0.0.0.0:9598

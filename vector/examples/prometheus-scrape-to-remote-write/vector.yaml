@@ -1,0 +1,26 @@
+# Vector: Prometheus scrape → tag cardinality limit → remote_write
+# Replaces a Prometheus server for scraping + remote writing
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  scrape:
+    type: prometheus_scrape
+    endpoints:
+      - http://localhost:9090/metrics
+      - http://localhost:8080/metrics
+    scrape_interval_secs: 15
+
+transforms:
+  limit_cardinality:
+    type: tag_cardinality_limit
+    inputs: [scrape]
+    mode: exact
+    value_limit: 500
+
+sinks:
+  remote_write:
+    type: prometheus_remote_write
+    inputs: [limit_cardinality]
+    endpoint: http://mimir:9009/api/v1/push

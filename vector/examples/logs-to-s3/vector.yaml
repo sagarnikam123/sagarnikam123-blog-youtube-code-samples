@@ -1,0 +1,33 @@
+# Vector: file logs → batch → AWS S3
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+    read_from: beginning
+
+transforms:
+  add_metadata:
+    type: remap
+    inputs: [app_logs]
+    source: |
+      .host = get_hostname!()
+      .environment = "production"
+
+sinks:
+  s3:
+    type: aws_s3
+    inputs: [add_metadata]
+    bucket: my-log-bucket
+    region: us-east-1
+    key_prefix: "logs/year=%Y/month=%m/day=%d/"
+    compression: gzip
+    encoding:
+      codec: ndjson
+    batch:
+      max_bytes: 10485760  # 10 MB
+      timeout_secs: 300    # 5 minutes

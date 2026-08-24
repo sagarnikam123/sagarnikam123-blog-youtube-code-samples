@@ -1,0 +1,24 @@
+# Vector Helm — Aggregator role (StatefulSet)
+# Receives events from Vector agents and routes to backends
+role: Aggregator
+
+customConfig:
+  api:
+    enabled: true
+    address: 0.0.0.0:8686
+  sources:
+    vector_agents:
+      type: vector
+      address: 0.0.0.0:6000
+  transforms:
+    enrich:
+      type: remap
+      inputs: [vector_agents]
+      source: |
+        .environment = "production"
+  sinks:
+    console:
+      type: console
+      inputs: [enrich]
+      encoding:
+        codec: json

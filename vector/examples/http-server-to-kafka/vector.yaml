@@ -1,0 +1,27 @@
+# Vector: HTTP server (receive webhooks) → VRL parse → Kafka
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  webhooks:
+    type: http_server
+    address: 0.0.0.0:8080
+    encoding: json
+
+transforms:
+  enrich:
+    type: remap
+    inputs: [webhooks]
+    source: |
+      .received_at = now()
+      .source = "webhook"
+
+sinks:
+  kafka:
+    type: kafka
+    inputs: [enrich]
+    bootstrap_servers: "localhost:9092"
+    topic: webhooks
+    encoding:
+      codec: json

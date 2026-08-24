@@ -1,0 +1,31 @@
+# Vector: syslog (UDP/TCP) → parse → Elasticsearch
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  syslog_udp:
+    type: syslog
+    mode: udp
+    address: 0.0.0.0:514
+
+  syslog_tcp:
+    type: syslog
+    mode: tcp
+    address: 0.0.0.0:1514
+
+transforms:
+  enrich:
+    type: remap
+    inputs: [syslog_udp, syslog_tcp]
+    source: |
+      .environment = "production"
+
+sinks:
+  elasticsearch:
+    type: elasticsearch
+    inputs: [enrich]
+    endpoints:
+      - http://localhost:9200
+    bulk:
+      index: "syslog-%Y.%m.%d"

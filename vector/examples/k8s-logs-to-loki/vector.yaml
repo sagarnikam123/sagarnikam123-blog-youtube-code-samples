@@ -1,0 +1,29 @@
+# Vector: Kubernetes pod logs → enrich with K8s metadata → Loki
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  kubernetes_logs:
+    type: kubernetes_logs
+
+transforms:
+  enrich:
+    type: remap
+    inputs: [kubernetes_logs]
+    source: |
+      .cluster = "production"
+      .level = downcase(string!(.level)) ?? "info"
+
+sinks:
+  loki:
+    type: loki
+    inputs: [enrich]
+    endpoint: http://loki-gateway.loki.svc.cluster.local
+    labels:
+      namespace: "{{ kubernetes.pod_namespace }}"
+      pod: "{{ kubernetes.pod_name }}"
+      container: "{{ kubernetes.container_name }}"
+      cluster: "{{ cluster }}"
+    encoding:
+      codec: json

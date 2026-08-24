@@ -1,0 +1,30 @@
+# Vector: AWS S3 (read log files from bucket) → parse → ClickHouse
+# Process historical logs from S3 into ClickHouse for analytics
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  s3_logs:
+    type: aws_s3
+    region: us-east-1
+    sqs:
+      queue_url: https://sqs.us-east-1.amazonaws.com/123456789/log-notifications
+    compression: gzip
+
+transforms:
+  parse:
+    type: remap
+    inputs: [s3_logs]
+    source: |
+      . = parse_json!(.message)
+      .ingested_at = now()
+
+sinks:
+  clickhouse:
+    type: clickhouse
+    inputs: [parse]
+    endpoint: http://localhost:8123
+    database: default
+    table: s3_logs
+    skip_unknown_fields: true

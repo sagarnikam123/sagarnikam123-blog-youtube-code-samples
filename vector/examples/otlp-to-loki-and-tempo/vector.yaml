@@ -1,0 +1,43 @@
+# Vector: OpenTelemetry (OTLP) source → route logs vs traces → Loki + HTTP (Tempo)
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  otlp:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+    http:
+      address: 0.0.0.0:4318
+
+transforms:
+  route_signals:
+    type: route
+    inputs: [otlp]
+    route:
+      logs:
+        type: vrl
+        source: 'exists(.message) || exists(.body)'
+      traces:
+        type: vrl
+        source: 'exists(.trace_id)'
+
+sinks:
+  loki:
+    type: loki
+    inputs: [route_signals.logs]
+    endpoint: http://localhost:3100
+    labels:
+      source: otlp
+      service: "{{ resource.service.name }}"
+    encoding:
+      codec: json
+
+  tempo:
+    type: http
+    inputs: [route_signals.traces]
+    uri: http://localhost:3200/api/traces
+    method: post
+    encoding:
+      codec: json

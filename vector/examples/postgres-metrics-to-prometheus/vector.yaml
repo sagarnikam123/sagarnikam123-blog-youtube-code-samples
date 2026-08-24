@@ -1,0 +1,18 @@
+# Vector: PostgreSQL metrics → Prometheus exporter
+# Scrapes pg_stat metrics and exposes them for Prometheus
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  postgres:
+    type: postgresql_metrics
+    endpoints:
+      - "postgres://vector:password@localhost:5432/postgres"
+    scrape_interval_secs: 15
+
+sinks:
+  prometheus:
+    type: prometheus_exporter
+    inputs: [postgres]
+    address: 0.0.0.0:9598

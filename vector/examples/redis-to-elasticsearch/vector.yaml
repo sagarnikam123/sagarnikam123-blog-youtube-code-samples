@@ -1,0 +1,29 @@
+# Vector: Redis pub/sub → VRL parse → Elasticsearch
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  redis:
+    type: redis
+    url: redis://localhost:6379
+    data_type: channel
+    key: "logs:*"
+
+transforms:
+  parse:
+    type: remap
+    inputs: [redis]
+    source: |
+      . = parse_json!(.message)
+      .timestamp = now()
+      .source = "redis"
+
+sinks:
+  elasticsearch:
+    type: elasticsearch
+    inputs: [parse]
+    endpoints:
+      - http://localhost:9200
+    bulk:
+      index: "redis-logs-%Y.%m.%d"

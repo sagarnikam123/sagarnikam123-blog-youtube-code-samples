@@ -1,0 +1,36 @@
+# Vector: Kafka topic → parse JSON → ClickHouse
+# Requires a ClickHouse table:
+#   CREATE TABLE events (
+#     timestamp DateTime64(3),
+#     event_type String,
+#     user_id String,
+#     payload String
+#   ) ENGINE = MergeTree() ORDER BY timestamp
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  kafka:
+    type: kafka
+    bootstrap_servers: "localhost:9092"
+    group_id: vector-consumer
+    topics:
+      - events
+
+transforms:
+  parse:
+    type: remap
+    inputs: [kafka]
+    source: |
+      . = parse_json!(.message)
+      .timestamp = now()
+
+sinks:
+  clickhouse:
+    type: clickhouse
+    inputs: [parse]
+    endpoint: http://localhost:8123
+    database: default
+    table: events
+    skip_unknown_fields: true

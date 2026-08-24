@@ -1,0 +1,29 @@
+# Vector: host_metrics → aggregate (reduce resolution) → InfluxDB
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  host_metrics:
+    type: host_metrics
+    collectors:
+      - cpu
+      - memory
+      - disk
+      - network
+    scrape_interval_secs: 5
+
+transforms:
+  aggregate:
+    type: aggregate
+    inputs: [host_metrics]
+    interval_ms: 60000  # aggregate 5s samples into 1m
+
+sinks:
+  influxdb:
+    type: influxdb_metrics
+    inputs: [aggregate]
+    endpoint: http://localhost:8086
+    org: my-org
+    bucket: metrics
+    token: my-token

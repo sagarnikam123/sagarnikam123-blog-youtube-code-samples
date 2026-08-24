@@ -1,0 +1,21 @@
+# Vector: host metrics → Prometheus remote_write → VictoriaMetrics
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  host_metrics:
+    type: host_metrics
+    collectors:
+      - cpu
+      - memory
+      - disk
+      - network
+    scrape_interval_secs: 15
+
+sinks:
+  victoriametrics:
+    type: prometheus_remote_write
+    inputs: [host_metrics]
+    endpoint: http://localhost:8428/api/v1/write
+    # VictoriaMetrics accepts Prometheus remote_write natively

@@ -1,0 +1,32 @@
+# Vector: Fluent Bit/Fluentd forward → VRL enrich → OpenSearch
+# Drop-in replacement for Fluentd → OpenSearch plugin
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  fluent:
+    type: fluent
+    address: 0.0.0.0:24224
+
+transforms:
+  enrich:
+    type: remap
+    inputs: [fluent]
+    source: |
+      .environment = "staging"
+      .pipeline = "vector"
+
+sinks:
+  opensearch:
+    type: elasticsearch
+    inputs: [enrich]
+    api_version: v7
+    endpoints:
+      - http://localhost:9200
+    bulk:
+      index: "fluent-logs-%Y.%m.%d"
+    auth:
+      strategy: basic
+      user: admin
+      password: admin

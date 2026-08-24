@@ -1,0 +1,40 @@
+# Vector: file logs → VRL transform → ClickHouse
+# Requires a ClickHouse table:
+#   CREATE TABLE logs (
+#     timestamp DateTime64(3),
+#     host String,
+#     level String,
+#     message String
+#   ) ENGINE = MergeTree() ORDER BY timestamp
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+    read_from: beginning
+
+transforms:
+  parse:
+    type: remap
+    inputs: [app_logs]
+    source: |
+      parsed = parse_json(.message) ?? {}
+      .timestamp = now()
+      .host = get_hostname!()
+      .level = parsed.level ?? "info"
+      .message = parsed.msg ?? .message
+
+sinks:
+  clickhouse:
+    type: clickhouse
+    inputs: [parse]
+    endpoint: http://localhost:8123
+    database: default
+    table: logs
+    encoding:
+      timestamp_format: unix
+    skip_unknown_fields: true

@@ -1,0 +1,35 @@
+# Vector: exec (run a command periodically) → VRL parse → Loki
+# Useful for scraping CLI tools, custom scripts, or health checks
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  disk_usage:
+    type: exec
+    command:
+      - df
+      - -h
+    mode: scheduled
+    scheduled:
+      exec_interval_secs: 60
+
+transforms:
+  parse:
+    type: remap
+    inputs: [disk_usage]
+    source: |
+      .host = get_hostname!()
+      .source = "disk_usage"
+      .timestamp = now()
+
+sinks:
+  loki:
+    type: loki
+    inputs: [parse]
+    endpoint: http://localhost:3100
+    labels:
+      job: disk-usage
+      host: "{{ host }}"
+    encoding:
+      codec: text

@@ -1,0 +1,25 @@
+# Vector default config — collects host logs and prints to console
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  host_logs:
+    type: file
+    include:
+      - /var/log/**/*.log
+
+transforms:
+  parse_logs:
+    type: remap
+    inputs: [host_logs]
+    source: |
+      .timestamp = now()
+      .host = get_hostname!()
+
+sinks:
+  console_out:
+    type: console
+    inputs: [parse_logs]
+    encoding:
+      codec: json

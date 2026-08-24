@@ -1,0 +1,29 @@
+# Vector: Splunk HEC source (replace Splunk) → VRL → Elasticsearch
+# Drop-in replacement: accept Splunk HEC format, store in Elasticsearch
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  splunk_hec:
+    type: splunk_hec
+    address: 0.0.0.0:8088
+    # Accepts data from any Splunk Universal Forwarder or HEC client
+
+transforms:
+  normalize:
+    type: remap
+    inputs: [splunk_hec]
+    source: |
+      .@timestamp = .timestamp ?? now()
+      .source_type = .source_type ?? "unknown"
+      del(.timestamp)
+
+sinks:
+  elasticsearch:
+    type: elasticsearch
+    inputs: [normalize]
+    endpoints:
+      - http://localhost:9200
+    bulk:
+      index: "splunk-migrated-%Y.%m.%d"

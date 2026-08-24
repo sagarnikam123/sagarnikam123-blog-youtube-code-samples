@@ -1,0 +1,83 @@
+# Vector: multiple sources → enrich → route → multiple sinks
+# Full fan-in / fan-out topology
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+  system_logs:
+    type: journald
+    include_units:
+      - sshd
+      - nginx
+  host_metrics:
+    type: host_metrics
+    collectors: [cpu, memory, disk]
+    scrape_interval_secs: 15
+
+transforms:
+  parse_app:
+    type: remap
+    inputs: [app_logs]
+    source: |
+      . = parse_json!(.message)
+      .source = "app"
+      .host = get_hostname!()
+
+  enrich_system:
+    type: remap
+    inputs: [system_logs]
+    source: |
+      .source = "system"
+      .host = get_hostname!()
+
+  route:
+    type: route
+    inputs: [parse_app, enrich_system]
+    route:
+      errors:
+        type: vrl
+        source: '.level == "error" || .level == "fatal"'
+      access:
+        type: vrl
+        source: 'contains(string!(.message), "GET") || contains(string!(.message), "POST")'
+
+sinks:
+  # All logs to Loki
+  loki_all:
+    type: loki
+    inputs: [parse_app, enrich_system]
+    endpoint: http://localhost:3100
+    labels:
+      source: "{{ source }}"
+      host: "{{ host }}"
+    encoding:
+      codec: json
+
+  # Errors only to Elasticsearch for alerting
+  es_errors:
+    type: elasticsearch
+    inputs: [route.errors]
+    endpoints:
+      - http://localhost:9200
+    bulk:
+      index: "errors-%Y.%m.%d"
+
+  # Access logs to ClickHouse for analytics
+  ch_access:
+    type: clickhouse
+    inputs: [route.access]
+    endpoint: http://localhost:8123
+    database: default
+    table: access_logs
+    skip_unknown_fields: true
+
+  # Metrics to VictoriaMetrics
+  vm_metrics:
+    type: prometheus_remote_write
+    inputs: [host_metrics]
+    endpoint: http://localhost:8428/api/v1/write

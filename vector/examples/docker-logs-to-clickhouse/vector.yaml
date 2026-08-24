@@ -1,0 +1,31 @@
+# Vector: Docker container logs → VRL parse → ClickHouse
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  docker:
+    type: docker_logs
+    include_containers:
+      - "app-*"
+      - "api-*"
+
+transforms:
+  parse:
+    type: remap
+    inputs: [docker]
+    source: |
+      parsed = parse_json(.message) ?? {}
+      .timestamp = now()
+      .container = .container_name
+      .level = parsed.level ?? "info"
+      .message = parsed.msg ?? .message
+
+sinks:
+  clickhouse:
+    type: clickhouse
+    inputs: [parse]
+    endpoint: http://localhost:8123
+    database: default
+    table: docker_logs
+    skip_unknown_fields: true

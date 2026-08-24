@@ -1,0 +1,44 @@
+# Vector: file logs → extract metrics from logs → Prometheus exporter
+# Converts log events into counters/gauges without a separate metrics pipeline
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+    read_from: beginning
+
+transforms:
+  parse:
+    type: remap
+    inputs: [app_logs]
+    source: |
+      . = parse_json!(.message)
+
+  to_metrics:
+    type: log_to_metric
+    inputs: [parse]
+    metrics:
+      - type: counter
+        field: status
+        name: http_requests_total
+        tags:
+          method: "{{ method }}"
+          status: "{{ status }}"
+          path: "{{ path }}"
+      - type: histogram
+        field: duration_ms
+        name: http_request_duration_ms
+        tags:
+          method: "{{ method }}"
+          path: "{{ path }}"
+
+sinks:
+  prometheus:
+    type: prometheus_exporter
+    inputs: [to_metrics]
+    address: 0.0.0.0:9598
+    # Scrape at http://localhost:9598/metrics

@@ -1,0 +1,19 @@
+# Vector — Docker Compose (agent mode)
+services:
+  vector:
+    image: timberio/vector:0.57.X-alpine
+    container_name: vector
+    restart: unless-stopped
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/log:/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "8686:8686"   # Vector API (health, metrics)
+    environment:
+      - VECTOR_CONFIG=/etc/vector/vector.yaml
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8686/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

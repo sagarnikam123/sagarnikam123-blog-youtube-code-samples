@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: vector
+data:
+  vector.yaml: |
+    api:
+      enabled: true
+      address: 0.0.0.0:8686
+    sources:
+      kubernetes_logs:
+        type: kubernetes_logs
+      host_metrics:
+        type: host_metrics
+        collectors:
+          - cpu
+          - memory
+          - disk
+          - network
+    transforms:
+      enrich:
+        type: remap
+        inputs: [kubernetes_logs]
+        source: |
+          .cluster = "my-cluster"
+    sinks:
+      stdout:
+        type: console
+        inputs: [enrich, host_metrics]
+        encoding:
+          codec: json

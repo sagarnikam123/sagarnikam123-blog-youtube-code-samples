@@ -1,0 +1,25 @@
+# Vector: host metrics → Prometheus exporter (scrape endpoint)
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  host_metrics:
+    type: host_metrics
+    collectors:
+      - cpu
+      - memory
+      - disk
+      - network
+      - filesystem
+    scrape_interval_secs: 15
+
+  internal_metrics:
+    type: internal_metrics
+
+sinks:
+  prometheus_exporter:
+    type: prometheus_exporter
+    inputs: [host_metrics, internal_metrics]
+    address: 0.0.0.0:9598
+    # Scrape this at http://localhost:9598/metrics

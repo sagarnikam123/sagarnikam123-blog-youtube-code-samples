@@ -1,0 +1,17 @@
+# Vector: NGINX stub_status metrics → Prometheus exporter
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  nginx:
+    type: nginx_metrics
+    endpoints:
+      - http://localhost:8080/stub_status
+    scrape_interval_secs: 15
+
+sinks:
+  prometheus:
+    type: prometheus_exporter
+    inputs: [nginx]
+    address: 0.0.0.0:9598

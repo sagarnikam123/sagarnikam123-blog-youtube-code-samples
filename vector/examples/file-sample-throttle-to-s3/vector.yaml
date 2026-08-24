@@ -1,0 +1,43 @@
+# Vector: high-volume file logs → sample 10% → throttle → S3
+# Cost reduction pipeline: keep 10% of debug logs, rate-limit the rest
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  verbose_logs:
+    type: file
+    include:
+      - /var/log/verbose-app/*.log
+
+transforms:
+  parse:
+    type: remap
+    inputs: [verbose_logs]
+    source: |
+      . = parse_json!(.message)
+
+  sample:
+    type: sample
+    inputs: [parse]
+    rate: 10  # keep 1 in 10
+
+  throttle:
+    type: throttle
+    inputs: [sample]
+    threshold: 1000
+    window_secs: 60
+
+sinks:
+  s3:
+    type: aws_s3
+    inputs: [throttle]
+    bucket: sampled-logs
+    region: us-east-1
+    key_prefix: "sampled/%Y/%m/%d/"
+    compression: gzip
+    encoding:
+      codec: ndjson
+    batch:
+      max_bytes: 5242880
+      timeout_secs: 60

@@ -1,0 +1,26 @@
+# Vector: demo_logs generator → VRL parse → console
+# Zero-dependency example — no external services needed
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  demo:
+    type: demo_logs
+    format: json
+    interval: 1.0
+
+transforms:
+  parse:
+    type: remap
+    inputs: [demo]
+    source: |
+      . = parse_json!(.message)
+      .processed_at = now()
+
+sinks:
+  console:
+    type: console
+    inputs: [parse]
+    encoding:
+      codec: json

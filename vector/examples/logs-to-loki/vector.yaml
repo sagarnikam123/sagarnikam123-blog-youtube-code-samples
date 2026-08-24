@@ -1,0 +1,33 @@
+# Vector: file logs → VRL transform → Grafana Loki
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
+sources:
+  app_logs:
+    type: file
+    include:
+      - /var/log/app/*.log
+    read_from: beginning
+
+  docker_logs:
+    type: docker_logs
+
+transforms:
+  enrich:
+    type: remap
+    inputs: [app_logs, docker_logs]
+    source: |
+      .level = downcase(string!(.level)) ?? "info"
+      .service = .container_name ?? "app"
+
+sinks:
+  loki:
+    type: loki
+    inputs: [enrich]
+    endpoint: http://localhost:3100
+    labels:
+      service: "{{ service }}"
+      level: "{{ level }}"
+    encoding:
+      codec: json
