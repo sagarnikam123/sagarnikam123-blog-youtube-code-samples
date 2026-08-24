@@ -1,0 +1,5 @@
+# Obtain this ID from the ClickStack UI or API.
+logs_source_id = "replace-with-clickstack-logs-source-id"
+
+# Set this only for a non-default self-hosted team.
+# team_id = "replace-with-clickstack-team-id"
