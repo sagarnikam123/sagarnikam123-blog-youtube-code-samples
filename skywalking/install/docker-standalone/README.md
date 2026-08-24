@@ -98,7 +98,7 @@ This script:
 
 ### Check Health
 ```bash
-./check-health.sh
+../../scripts/check-health.sh
 ```
 
 ## Service Management
@@ -319,3 +319,38 @@ docker run --rm -v banyandb-data:/data -v $(pwd):/backup alpine tar xzf /backup/
 For issues and questions:
 - SkyWalking: https://github.com/apache/skywalking/issues
 - This setup: Check logs with `docker compose logs -f`
+
+
+---
+
+## Benchmark Usage
+
+This setup is used as the SkyWalking platform in the observability benchmark.
+
+### OTLP Ingestion
+
+The OTel Collector accepts OTLP telemetry on standard ports:
+
+| Protocol | Endpoint |
+|:---------|:---------|
+| OTLP gRPC | localhost:4317 |
+| OTLP HTTP | localhost:4318 |
+| OAP gRPC (native) | localhost:11800 |
+
+All three signal types (traces, metrics, logs) flow through the OTel Collector → OAP Server → BanyanDB.
+
+### Benchmark Health Check
+
+```bash
+# Quick health verification
+curl -sf http://localhost:12800/healthcheck && echo "OAP OK"
+curl -sf http://localhost:17913/api/healthz && echo "BanyanDB OK"
+curl -sf http://localhost:8080 > /dev/null && echo "UI OK"
+```
+
+### Key Differences from Other Platforms
+
+- SkyWalking OAP is JVM-based — `JAVA_OPTS` controls memory (default: 512m-1024m)
+- BanyanDB is purpose-built for SkyWalking (not a generic TSDB)
+- Native agent protocol on gRPC 11800 (in addition to OTLP)
+- Multi-arch: OAP and UI images support ARM64 + AMD64; BanyanDB supports AMD64 (ARM64 may need verification)

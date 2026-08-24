@@ -1,0 +1,6 @@
+host: "localhost"
+httpProtocol: http
+
+global:
+  # Replace with a StorageClass in the target cluster.
+  storageClass: ""

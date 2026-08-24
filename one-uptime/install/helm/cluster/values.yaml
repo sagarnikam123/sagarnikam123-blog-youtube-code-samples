@@ -1,0 +1,9 @@
+host: "replace-with-hostname"
+httpProtocol: https
+
+global:
+  # Replace with a production StorageClass.
+  storageClass: "replace-with-storage-class"
+
+# Add chart-version-specific replica, persistence, ingress, and database
+# settings here after reviewing the upstream configuration reference.

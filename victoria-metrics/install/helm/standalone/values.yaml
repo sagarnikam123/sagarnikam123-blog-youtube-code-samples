@@ -1,0 +1,5 @@
+# Chart defaults install the Kubernetes monitoring stack.
+# Keep persistence disabled for disposable local validation, or configure a
+# StorageClass and retention before using this outside a test cluster.
+grafana:
+  enabled: true

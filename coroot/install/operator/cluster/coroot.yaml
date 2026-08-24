@@ -1,0 +1,20 @@
+apiVersion: coroot.com/v1
+kind: Coroot
+metadata:
+  name: coroot
+  namespace: coroot
+spec:
+  clickhouse:
+    shards: 1
+    replicas: 1
+    storage:
+      size: 50Gi
+  nodeAgent:
+    logCollector:
+      collectLogEntries: true
+    ebpfTracer:
+      enabled: true
+      sampling: "1.0"
+    ebpfProfiler:
+      enabled: true
+  clusterAgent: {}

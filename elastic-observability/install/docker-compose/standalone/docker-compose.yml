@@ -1,0 +1,110 @@
+# =============================================================================
+# Elastic Observability - Docker Compose Setup for Benchmarking
+# =============================================================================
+# Elasticsearch + Kibana + APM Server (with native OTLP support)
+# Security disabled for benchmark simplicity.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Access:
+#   - Kibana UI:     http://localhost:${KIBANA_PORT:-5601}
+#   - APM Server:    http://localhost:${APM_PORT:-8200}
+#   - OTLP gRPC:    localhost:${OTLP_GRPC_PORT:-4317} (via APM Server)
+#   - OTLP HTTP:    localhost:${OTLP_HTTP_PORT:-4318} (via APM Server)
+# =============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # Elasticsearch (single-node, security disabled)
+  # --------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.17.0}
+    container_name: elastic-es
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - "ES_JAVA_OPTS=${ES_JAVA_OPTS:--Xms2g -Xmx2g}"
+      - cluster.name=benchmark
+    ports:
+      - "${ES_PORT:-9200}:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks:
+      - elastic
+
+  # --------------------------------------------------------------------------
+  # Kibana (Observability UI)
+  # --------------------------------------------------------------------------
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-8.17.0}
+    container_name: elastic-kibana
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
+      - telemetry.enabled=false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status | grep -q 'available'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks:
+      - elastic
+
+  # --------------------------------------------------------------------------
+  # APM Server (OTLP ingestion → Elasticsearch)
+  # --------------------------------------------------------------------------
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:${ELASTIC_VERSION:-8.17.0}
+    container_name: elastic-apm
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "${APM_PORT:-8200}:8200"
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_HTTP_PORT:-4318}:4318"
+    command: >
+      apm-server -e
+        -E apm-server.host=0.0.0.0:8200
+        -E output.elasticsearch.hosts=["http://elasticsearch:9200"]
+        -E apm-server.auth.anonymous.enabled=true
+        -E apm-server.auth.anonymous.allow_agent=["*"]
+        -E apm-server.auth.anonymous.allow_service=["*"]
+        -E apm-server.auth.anonymous.rate_limit.event_limit=0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8200/ | grep -q 'publish_ready'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - elastic
+
+networks:
+  elastic:
+    driver: bridge
+
+volumes:
+  es-data:

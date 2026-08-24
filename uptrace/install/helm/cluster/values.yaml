@@ -1,0 +1,3 @@
+# Keep production credentials in Kubernetes Secrets or an external secret manager.
+# Configure external/clustered ClickHouse, PostgreSQL, and Redis here using
+# the values documented by the selected chart version.

@@ -1,0 +1,14 @@
+# Replace every placeholder before installing.
+config:
+  ZO_S3_PROVIDER: "s3"
+  ZO_S3_BUCKET_NAME: "replace-me"
+  ZO_S3_REGION_NAME: "us-east-1"
+
+# Prefer workload identity/IRSA. If credentials are required, use a Secret
+# instead of committing access keys to this file.
+auth:
+  ZO_S3_ACCESS_KEY: "replace-me"
+  ZO_S3_SECRET_KEY: "replace-me"
+
+serviceAccount:
+  annotations: {}

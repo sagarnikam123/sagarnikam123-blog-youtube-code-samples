@@ -1,0 +1,17 @@
+eck-elasticsearch:
+  enabled: true
+  nodeSets:
+    - name: default
+      count: 1
+      config:
+        node.roles: [master, data, ingest]
+
+eck-kibana:
+  enabled: true
+  spec:
+    count: 1
+
+eck-apm-server:
+  enabled: true
+  spec:
+    count: 1

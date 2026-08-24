@@ -1,0 +1,6 @@
+# Replace with a real StorageClass and production sizing before use.
+global:
+  storageClass: ""
+
+clickhouse:
+  installCustomStorageClass: true

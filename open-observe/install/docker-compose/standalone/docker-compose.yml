@@ -1,0 +1,57 @@
+# =============================================================================
+# OpenObserve - Docker Compose Setup for Benchmarking
+# =============================================================================
+# Single-binary observability platform (Rust). Natively accepts OTLP for
+# logs, metrics, and traces — no separate collector needed.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Access:
+#   - OpenObserve UI:  http://localhost:${OPENOBSERVE_UI_PORT:-5080}
+#   - OTLP gRPC:       localhost:${OTLP_GRPC_PORT:-5081}
+#   - OTLP HTTP:       localhost:${OTLP_HTTP_PORT:-5082}
+# =============================================================================
+
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:${OPENOBSERVE_VERSION:-v0.92.2}
+    container_name: openobserve
+    restart: unless-stopped
+    ports:
+      - "${OPENOBSERVE_UI_PORT:-5080}:5080"
+      - "${OTLP_GRPC_PORT:-5081}:5081"
+      - "${OTLP_HTTP_PORT:-5082}:5082"
+    environment:
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL:-root@example.com}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD:-Complexpass#123}
+      ZO_DATA_DIR: ${ZO_DATA_DIR:-/data}
+      ZO_TELEMETRY_ENABLED: ${ZO_TELEMETRY_ENABLED:-false}
+      # OTLP gRPC port
+      ZO_GRPC_PORT: "5081"
+      # OTLP HTTP is served on the main HTTP port at /api/{org}/v1/{signal}
+      # Additional route: /v1/traces, /v1/metrics, /v1/logs on port 5082
+      ZO_HTTP_PORT: "5080"
+      ZO_OTLP_HTTP_PORT: "5082"
+    volumes:
+      - openobserve-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: ${ZO_MAX_MEMORY:-4096}m
+    networks:
+      - openobserve
+
+networks:
+  openobserve:
+    driver: bridge
+
+volumes:
+  openobserve-data:

@@ -1,0 +1,20 @@
+# Coroot Community Edition Helm values for benchmarking (k3s single-node)
+# Install:
+#   helm repo add coroot https://coroot.github.io/helm-charts
+#   helm repo update coroot
+#   helm install -n coroot --create-namespace coroot-operator coroot/coroot-operator
+#   helm install -n coroot coroot coroot/coroot-ce -f values.yaml
+
+clickhouse:
+  shards: 1
+  replicas: 1
+  storage:
+    size: 50Gi
+
+# Node agent deployed as DaemonSet (eBPF, requires kernel 5.8+)
+nodeAgent:
+  enabled: true
+
+# Cluster agent for DB metrics
+clusterAgent:
+  enabled: true

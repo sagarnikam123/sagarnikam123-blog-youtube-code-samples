@@ -1,0 +1,4 @@
+# Configure VMCluster/VLCluster/VTCluster resources and persistence using the
+# chart values for the selected release. Production sizing is workload-specific.
+grafana:
+  enabled: true

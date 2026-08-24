@@ -1,0 +1,50 @@
+# Data Prepper pipeline configuration for OTLP → OpenSearch
+otel-trace-pipeline:
+  source:
+    otel_trace_source:
+      ssl: false
+  processor:
+    - trace_peer_forwarder:
+  sink:
+    - opensearch:
+        hosts: ["http://opensearch:9200"]
+        insecure: true
+        index_type: trace-analytics-raw
+    - pipeline:
+        name: otel-service-map-pipeline
+
+otel-service-map-pipeline:
+  source:
+    pipeline:
+      name: otel-trace-pipeline
+  processor:
+    - service_map:
+  sink:
+    - opensearch:
+        hosts: ["http://opensearch:9200"]
+        insecure: true
+        index_type: trace-analytics-service-map
+
+otel-metrics-pipeline:
+  source:
+    otel_metrics_source:
+      ssl: false
+  processor:
+    - otel_metrics:
+  sink:
+    - opensearch:
+        hosts: ["http://opensearch:9200"]
+        insecure: true
+        index: otel-metrics-%{yyyy.MM.dd}
+
+otel-logs-pipeline:
+  source:
+    otel_logs_source:
+      ssl: false
+  processor:
+    - otel_logs:
+  sink:
+    - opensearch:
+        hosts: ["http://opensearch:9200"]
+        insecure: true
+        index: otel-logs-%{yyyy.MM.dd}

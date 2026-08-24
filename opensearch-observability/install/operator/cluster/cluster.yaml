@@ -1,0 +1,25 @@
+apiVersion: opensearch.opster.io/v1
+kind: OpenSearchCluster
+metadata:
+  name: observability
+  namespace: opensearch
+spec:
+  general:
+    serviceName: observability
+    version: 2.19.1
+  dashboards:
+    enable: true
+    version: 2.19.1
+    replicas: 1
+  nodePools:
+    - component: masters
+      replicas: 3
+      roles:
+        - cluster_manager
+        - data
+      persistence:
+        pvc:
+          storageClass: ""
+          accessModes:
+            - ReadWriteOnce
+          storage: 50Gi

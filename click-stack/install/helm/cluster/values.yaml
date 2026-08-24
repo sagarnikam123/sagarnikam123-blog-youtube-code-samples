@@ -1,0 +1,2 @@
+# Production sizing is workload-specific. Add chart-version-specific overrides here.
+# Keep credentials in Kubernetes Secrets or an external secret manager.

@@ -1,0 +1,136 @@
+# =============================================================================
+# Uptrace - Docker Compose Setup for Benchmarking
+# =============================================================================
+# Lightweight OTel-native APM: ClickHouse (storage) + PostgreSQL (metadata)
+#   + Redis (cache) + Uptrace server + OTel Collector (ingestion)
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Access:
+#   - Uptrace UI:    http://localhost:${UPTRACE_UI_PORT:-14318}
+#   - OTLP gRPC:     localhost:${OTLP_GRPC_PORT:-4317}
+#   - OTLP HTTP:     localhost:${OTLP_HTTP_PORT:-4318}
+#   - Login:         admin@uptrace.local / admin
+# =============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # ClickHouse (telemetry storage: spans, logs, metrics)
+  # --------------------------------------------------------------------------
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-26.3}
+    container_name: uptrace-clickhouse
+    restart: on-failure
+    environment:
+      CLICKHOUSE_USER: uptrace
+      CLICKHOUSE_PASSWORD: uptrace
+      CLICKHOUSE_DB: uptrace
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    networks:
+      - uptrace
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL (metadata: users, projects, dashboards, alerts)
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-17-alpine}
+    container_name: uptrace-postgres
+    restart: on-failure
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_USER: uptrace
+      POSTGRES_PASSWORD: uptrace
+      POSTGRES_DB: uptrace
+    volumes:
+      - postgres-data:/var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uptrace -d uptrace"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - uptrace
+
+  # --------------------------------------------------------------------------
+  # Redis (cache for query performance)
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: uptrace-redis
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - uptrace
+
+  # --------------------------------------------------------------------------
+  # Uptrace Server (API + UI)
+  # --------------------------------------------------------------------------
+  uptrace:
+    image: uptrace/uptrace:${UPTRACE_VERSION:-2.1.0-beta.5}
+    container_name: uptrace-server
+    restart: on-failure
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${UPTRACE_GRPC_PORT:-14317}:4317"
+      - "${UPTRACE_UI_PORT:-14318}:80"
+    volumes:
+      - ./config/uptrace.yml:/etc/uptrace/config.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - uptrace
+
+  # --------------------------------------------------------------------------
+  # OpenTelemetry Collector (external OTLP ingestion → Uptrace)
+  # --------------------------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.123.0}
+    container_name: uptrace-otel-collector
+    restart: on-failure
+    depends_on:
+      uptrace:
+        condition: service_healthy
+    ports:
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_HTTP_PORT:-4318}:4318"
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - uptrace
+
+networks:
+  uptrace:
+    driver: bridge
+
+volumes:
+  clickhouse-data:
+  postgres-data:

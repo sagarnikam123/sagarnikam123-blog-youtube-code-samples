@@ -1,0 +1,5 @@
+opensearch:
+  singleNode: false
+  replicas: 3
+examples:
+  enabled: false

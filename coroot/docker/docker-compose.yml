@@ -1,0 +1,153 @@
+# =============================================================================
+# Coroot - Docker Compose Setup for Benchmarking
+# =============================================================================
+# eBPF-based observability: Coroot + node-agent + cluster-agent + Prometheus + ClickHouse
+#
+# IMPORTANT: node-agent requires Linux kernel 5.8+ (won't work on macOS).
+# On macOS, Coroot server runs fine for OTLP-based tracing but eBPF metrics
+# will not be collected. Use the K8s/Helm variant for full eBPF support.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Access:
+#   - Coroot UI:     http://localhost:${COROOT_UI_PORT:-8080}
+#   - OTLP gRPC:     localhost:${COROOT_UI_PORT:-8080} (Coroot's built-in receiver)
+#   - Prometheus:    http://localhost:9090 (internal)
+# =============================================================================
+
+name: coroot
+
+services:
+  # --------------------------------------------------------------------------
+  # Coroot Server (API + UI + built-in OTLP receiver)
+  # --------------------------------------------------------------------------
+  coroot:
+    image: ghcr.io/coroot/coroot:${COROOT_VERSION:-latest}
+    container_name: coroot-server
+    restart: always
+    user: root
+    ports:
+      - "${COROOT_UI_PORT:-8080}:8080"
+    command:
+      - '--data-dir=/data'
+      - '--bootstrap-prometheus-url=http://prometheus:9090'
+      - '--bootstrap-refresh-interval=15s'
+      - '--bootstrap-clickhouse-address=clickhouse:9000'
+    environment:
+      - LICENSE_KEY=${LICENSE_KEY:-}
+    volumes:
+      - coroot-data:/data
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - coroot
+
+  # --------------------------------------------------------------------------
+  # Coroot Node Agent (eBPF - Linux only, requires privileged + host PID)
+  # --------------------------------------------------------------------------
+  node-agent:
+    image: ghcr.io/coroot/coroot-node-agent:${NODE_AGENT_VERSION:-latest}
+    container_name: coroot-node-agent
+    restart: always
+    privileged: true
+    pid: "host"
+    volumes:
+      - /sys/kernel/tracing:/sys/kernel/tracing
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/fs/cgroup:/host/sys/fs/cgroup
+      - node-agent-data:/data
+    command:
+      - '--collector-endpoint=http://coroot:8080'
+      - '--cgroupfs-root=/host/sys/fs/cgroup'
+      - '--wal-dir=/data'
+    profiles:
+      - linux  # ponytail: skipped on macOS; run with `docker compose --profile linux up`
+    networks:
+      - coroot
+
+  # --------------------------------------------------------------------------
+  # Coroot Cluster Agent (scrapes DB metrics, forwards to Coroot)
+  # --------------------------------------------------------------------------
+  cluster-agent:
+    image: ghcr.io/coroot/coroot-cluster-agent:${CLUSTER_AGENT_VERSION:-latest}
+    container_name: coroot-cluster-agent
+    restart: always
+    volumes:
+      - cluster-agent-data:/data
+    command:
+      - '--coroot-url=http://coroot:8080'
+      - '--metrics-scrape-interval=15s'
+      - '--metrics-wal-dir=/data'
+    depends_on:
+      - coroot
+    networks:
+      - coroot
+
+  # --------------------------------------------------------------------------
+  # Prometheus (metrics storage with remote write receiver)
+  # --------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.53.5}
+    container_name: coroot-prometheus
+    restart: always
+    volumes:
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - coroot
+
+  # --------------------------------------------------------------------------
+  # ClickHouse (traces, logs, profiles storage)
+  # --------------------------------------------------------------------------
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.3}
+    container_name: coroot-clickhouse
+    restart: always
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - coroot
+
+networks:
+  coroot:
+    driver: bridge
+
+volumes:
+  coroot-data:
+  node-agent-data:
+  cluster-agent-data:
+  prometheus-data:
+  clickhouse-data:

@@ -1,0 +1,6 @@
+# Set this to a StorageClass available in the target cluster.
+global:
+  storageClass: ""
+
+clickhouse:
+  installCustomStorageClass: true

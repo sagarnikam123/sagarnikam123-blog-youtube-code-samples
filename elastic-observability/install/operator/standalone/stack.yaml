@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: elastic-observability
+---
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: observability
+  namespace: elastic-observability
+spec:
+  version: 8.17.0
+  nodeSets:
+    - name: default
+      count: 1
+      config:
+        node.roles: [master, data, ingest]
+---
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: observability
+  namespace: elastic-observability
+spec:
+  version: 8.17.0
+  count: 1
+  elasticsearchRef:
+    name: observability
+---
+apiVersion: apm.k8s.elastic.co/v1
+kind: ApmServer
+metadata:
+  name: observability
+  namespace: elastic-observability
+spec:
+  version: 8.17.0
+  count: 1
+  elasticsearchRef:
+    name: observability
+  kibanaRef:
+    name: observability

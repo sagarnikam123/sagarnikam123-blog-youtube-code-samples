@@ -1,0 +1,8 @@
+opensearch:
+  singleNode: true
+  replicas: 1
+  persistence:
+    size: 2Gi
+  opensearchJavaOpts: "-Xms512m -Xmx512m"
+examples:
+  enabled: false

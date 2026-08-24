@@ -1,0 +1,12 @@
+# OpenObserve Helm standalone — single-node local mode
+# Uses SQLite metadata + local PVC storage. No object store or external DB.
+config:
+  ZO_LOCAL_MODE: "true"
+
+# Persistence for local-mode data
+persistence:
+  enabled: true
+  size: 10Gi
+
+# Single replica
+replicaCount: 1
