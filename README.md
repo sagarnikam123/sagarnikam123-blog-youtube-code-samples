@@ -18,3 +18,9 @@ A curated collection of production-ready code samples, automation frameworks, an
 
 ### 📊 Analytics & Development Tools
 - **[utilities/github-analysis/](utilities/github-analysis/)** - Comprehensive GitHub repository analysis tool with 7 analysis types (issues, commits, contributors, releases, pulls, compare, health) supporting 4 export formats (CSV, JSON, Excel, Markdown) for data-driven insights and repository management.
+
+### 📦 Observability Installation Guide
+- **[INSTALLATION-MATRIX.md](INSTALLATION-MATRIX.md)** - Installation modes, benchmark paths, and reusable platform coverage.
+- **[benchmark/](benchmark/)** - Controlled benchmark deployments and OTLP validation.
+- **[signoz/](signoz/)**, **[open-observe/](open-observe/)**, **[click-stack/](click-stack/)**, **[grafana-lgtm/](grafana-lgtm/)**, **[victoria-metrics/](victoria-metrics/)**, **[uptrace/](uptrace/)**, **[parseable/](parseable/)** - Phase 1 benchmark platforms.
+- **[coroot/](coroot/)**, **[elastic-observability/](elastic-observability/)**, **[opensearch-observability/](opensearch-observability/)**, **[one-uptime/](one-uptime/)**, **[highlight-io/](highlight-io/)** - Phase 2 and extended platform deployments.

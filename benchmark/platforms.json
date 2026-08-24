@@ -1,0 +1,136 @@
+[
+  {
+    "name": "SigNoz",
+    "folder": "signoz",
+    "compose_path": "signoz/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 1,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 3301,
+    "ui_url": "http://localhost:3301"
+  },
+  {
+    "name": "OpenObserve",
+    "folder": "open-observe",
+    "compose_path": "open-observe/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 1,
+    "otlp_grpc_port": 5081,
+    "otlp_http_port": 5082,
+    "ui_port": 5080,
+    "ui_url": "http://localhost:5080"
+  },
+  {
+    "name": "ClickStack",
+    "folder": "click-stack",
+    "compose_path": "click-stack/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 1,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 8080,
+    "ui_url": "http://localhost:8080"
+  },
+  {
+    "name": "Grafana LGTM",
+    "folder": "grafana-lgtm",
+    "compose_path": "grafana-lgtm/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 1,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 3000,
+    "ui_url": "http://localhost:3000"
+  },
+  {
+    "name": "VictoriaMetrics",
+    "folder": "victoria-metrics",
+    "compose_path": "victoria-metrics/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 1,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 3000,
+    "ui_url": "http://localhost:3000"
+  },
+  {
+    "name": "Uptrace",
+    "folder": "uptrace",
+    "compose_path": "uptrace/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 1,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 14318,
+    "ui_url": "http://localhost:14318"
+  },
+  {
+    "name": "Parseable",
+    "folder": "parseable",
+    "compose_path": "parseable/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 1,
+    "otlp_grpc_port": null,
+    "otlp_http_port": 8000,
+    "ui_port": 8000,
+    "ui_url": "http://localhost:8000",
+    "notes": "OTLP HTTP only (no gRPC); traces/metrics/logs on /v1/{traces,metrics,logs}"
+  },
+  {
+    "name": "Apache SkyWalking",
+    "folder": "skywalking/install/docker-standalone",
+    "compose_path": "skywalking/install/docker-standalone/docker-compose.yml",
+    "phase": 2,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 8080,
+    "ui_url": "http://localhost:8080"
+  },
+  {
+    "name": "Coroot",
+    "folder": "coroot/docker",
+    "compose_path": "coroot/docker/docker-compose.yml",
+    "phase": 2,
+    "otlp_grpc_port": 8080,
+    "otlp_http_port": 8080,
+    "ui_port": 8080,
+    "ui_url": "http://localhost:8080",
+    "notes": "Coroot has built-in OTLP receiver on same port as UI"
+  },
+  {
+    "name": "OneUptime",
+    "folder": "one-uptime",
+    "compose_path": "one-uptime/install/docker-compose/standalone/oneuptime-install/docker-compose.yml",
+    "phase": 2,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 80,
+    "ui_url": "http://localhost",
+    "notes": "Requires ./scripts/setup.sh first"
+  },
+  {
+    "name": "Highlight.io",
+    "folder": "highlight-io",
+    "compose_path": "highlight-io/highlight-install/docker/compose.hobby.yml",
+    "phase": 2,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 3000,
+    "ui_url": "http://localhost:3000",
+    "notes": "Requires ./scripts/setup.sh first"
+  },
+  {
+    "name": "Elastic Observability",
+    "folder": "elastic-observability",
+    "compose_path": "elastic-observability/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 2,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 5601,
+    "ui_url": "http://localhost:5601"
+  },
+  {
+    "name": "OpenSearch Observability",
+    "folder": "opensearch-observability",
+    "compose_path": "opensearch-observability/install/docker-compose/standalone/docker-compose.yml",
+    "phase": 2,
+    "otlp_grpc_port": 4317,
+    "otlp_http_port": 4318,
+    "ui_port": 5601,
+    "ui_url": "http://localhost:5601"
+  }
+]
