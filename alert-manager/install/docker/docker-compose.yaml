@@ -1,0 +1,70 @@
+# Alertmanager - Standalone Docker Compose
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f alertmanager
+#
+# Access:
+#   - Alertmanager UI: http://localhost:9093
+#   - Webhook receiver log: docker compose logs webhook-receiver
+
+services:
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ../../configs/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+      - --log.level=info
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9093/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Simple webhook receiver to see alerts in docker logs (for eval/testing)
+  webhook-receiver:
+    image: python:3.12-alpine
+    container_name: webhook-receiver
+    ports:
+      - "5001:5001"
+    command: >
+      python -c "
+      from http.server import HTTPServer, BaseHTTPRequestHandler
+      import json, sys
+      from datetime import datetime
+
+      class Handler(BaseHTTPRequestHandler):
+          def do_POST(self):
+              length = int(self.headers.get('Content-Length', 0))
+              body = self.rfile.read(length)
+              try:
+                  alerts = json.loads(body)
+                  for alert in alerts:
+                      status = alert.get('status', 'unknown')
+                      name = alert.get('labels', {}).get('alertname', 'unknown')
+                      severity = alert.get('labels', {}).get('severity', 'unknown')
+                      summary = alert.get('annotations', {}).get('summary', '')
+                      print(f'[{datetime.now().isoformat()}] [{status.upper()}] [{severity}] {name}: {summary}', flush=True)
+              except Exception as e:
+                  print(f'[{datetime.now().isoformat()}] Parse error: {e}', flush=True)
+              self.send_response(200)
+              self.end_headers()
+
+          def log_message(self, format, *args):
+              pass  # suppress access logs
+
+      print('Webhook receiver listening on :5001', flush=True)
+      HTTPServer(('0.0.0.0', 5001), Handler).serve_forever()
+      "
+    restart: unless-stopped
+
+volumes:
+  alertmanager-data:
