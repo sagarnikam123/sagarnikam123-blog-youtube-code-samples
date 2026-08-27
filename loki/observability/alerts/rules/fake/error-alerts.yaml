@@ -1,0 +1,88 @@
+# Loki Ruler Alert Rules - Error-based alerts
+# Location: mounted into Loki container at /loki/rules/fake/error-alerts.yaml
+# Tenant: "fake" (used when auth_enabled: false)
+#
+# These rules are evaluated by Loki's ruler component (datasource-managed alerts).
+# Firing alerts are sent to Alertmanager at the configured alertmanager_url.
+
+groups:
+  - name: error_rate_alerts
+    interval: 30s
+    rules:
+      # Fires when any job logs more than 0.1 error lines/sec over 5 minutes
+      - alert: HighErrorRate
+        expr: |
+          sum(rate({job=~".+"} |= "ERROR" [5m])) by (job) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+          category: error-rate
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "{{ $labels.job }} is logging errors at {{ printf \"%.2f\" $value }}/s (threshold: 0.5/s)"
+
+      # Fires when error rate exceeds 5/sec — likely an incident
+      - alert: CriticalErrorSpike
+        expr: |
+          sum(rate({job=~".+"} |= "ERROR" [2m])) by (job) > 5
+        for: 1m
+        labels:
+          severity: critical
+          category: error-rate
+        annotations:
+          summary: "Critical error spike on {{ $labels.job }}"
+          description: "{{ $labels.job }} exceeding 5 errors/s for 1+ minute. Value: {{ printf \"%.2f\" $value }}/s"
+
+  - name: error_pattern_alerts
+    interval: 30s
+    rules:
+      # Fires on OOM detection in any log stream
+      - alert: OOMDetected
+        expr: |
+          count_over_time({job=~".+"} |~ "(?i)(OOMKilled|OutOfMemoryError|out of memory)" [5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: resource
+        annotations:
+          summary: "OOM detected in {{ $labels.job }}"
+          description: "Out-of-memory condition found in logs for {{ $labels.job }}"
+
+      # Fires on repeated connection/timeout errors
+      - alert: ConnectionErrors
+        expr: |
+          sum(rate({job=~".+"} |~ "(?i)(connection refused|connection timed out|ECONNREFUSED|ETIMEDOUT)" [5m])) by (job) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          category: connectivity
+        annotations:
+          summary: "Connection errors in {{ $labels.job }}"
+          description: "{{ $labels.job }} logging connection errors at {{ printf \"%.2f\" $value }}/s"
+
+      # Fires on panic/fatal — immediate attention needed
+      - alert: PanicOrFatal
+        expr: |
+          count_over_time({job=~".+"} |~ "(?i)(panic|FATAL|fatal error)" [5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: crash
+        annotations:
+          summary: "Panic/Fatal detected in {{ $labels.job }}"
+          description: "Critical failure (panic or fatal) detected in {{ $labels.job }}"
+
+  - name: http_error_alerts
+    interval: 30s
+    rules:
+      # Fires on elevated HTTP 5xx responses
+      - alert: HTTP5xxElevated
+        expr: |
+          sum(rate({job=~".+"} |~ "(?i)(status[=: ]*5[0-9]{2}|HTTP/[12].[01]\" 5[0-9]{2}|\"status\":5[0-9]{2})" [5m])) by (job) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          category: http
+        annotations:
+          summary: "HTTP 5xx spike on {{ $labels.job }}"
+          description: "{{ $labels.job }} returning 5xx responses at {{ printf \"%.2f\" $value }}/s"

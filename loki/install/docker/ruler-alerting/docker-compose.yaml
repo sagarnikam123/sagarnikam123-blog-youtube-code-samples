@@ -1,0 +1,136 @@
+# Loki Ruler Alerting - Full Stack (Loki + Alertmanager + Log Generator)
+#
+# Evaluates Loki's datasource-managed alerts (ruler) end-to-end:
+#   fuzzy-train → push-logs.sh → Loki → Ruler evaluates LogQL rules → Alertmanager → webhook-receiver
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f webhook-receiver   # watch alerts fire
+#   docker compose logs -f log-generator      # watch generated logs
+#
+# Access:
+#   - Loki API/UI:       http://localhost:3100
+#   - Loki rules API:    http://localhost:3100/loki/api/v1/rules
+#   - Alertmanager UI:   http://localhost:9093
+#   - Grafana:           http://localhost:3000 (admin/admin)
+#
+# Log Generation Options (uncomment one in log-generator service):
+#   1. Direct push via push-logs.sh (default - zero deps)
+#   2. OTLP via curl to /otlp/v1/logs endpoint
+#   3. Fluent-bit (uncomment fluent-bit service below)
+
+services:
+  # ===========================================================================
+  # LOKI - with ruler for datasource-managed alerts
+  # ===========================================================================
+  loki:
+    image: grafana/loki:3.7.6
+    container_name: loki
+    ports:
+      - "3100:3100"
+      - "9095:9095"
+      - "3200:3200"   # OTLP HTTP (if using OTLP ingestion)
+    volumes:
+      - ../../../configs/v3.x/v3.7.x/loki-3.7.x-ruler-alerting-docker.yaml:/etc/loki/config.yaml:ro
+      - ../../../observability/alerts/rules:/loki/rules:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      alertmanager:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ===========================================================================
+  # ALERTMANAGER - receives alerts from Loki ruler
+  # ===========================================================================
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ../../../../alert-manager/configs/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+      - --log.level=info
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9093/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # WEBHOOK RECEIVER - prints fired alerts to container logs
+  # ===========================================================================
+  webhook-receiver:
+    image: python:3.12-alpine
+    container_name: webhook-receiver
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./webhook-receiver.py:/app/webhook-receiver.py:ro
+    command: python /app/webhook-receiver.py
+    restart: unless-stopped
+
+  # ===========================================================================
+  # LOG GENERATOR - fuzzy-train → Loki push API
+  # ===========================================================================
+  # Image: sagarnikam123/fuzzy-train:latest (python:3.12-slim, script at /app/fuzzy-train.py)
+  # Default ENTRYPOINT: ["python", "fuzzy-train.py"] — overridden here to pipe to push-logs.sh
+  log-generator:
+    image: sagarnikam123/fuzzy-train:latest
+    container_name: log-generator
+    volumes:
+      - ./push-logs.sh:/app/push-logs.sh:ro
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        apt-get update -qq && apt-get install -y -qq curl >/dev/null 2>&1
+        echo "[log-generator] Starting fuzzy-train → Loki push (10 lines/sec)"
+        python /app/fuzzy-train.py --lines-per-second 1 --log-format JSON --time-zone UTC | bash /app/push-logs.sh
+    environment:
+      LOKI_URL: http://loki:3100
+      JOB_LABEL: fuzzy-train
+      BATCH_SIZE: "20"
+      BATCH_INTERVAL: "2"
+    depends_on:
+      loki:
+        condition: service_started
+    restart: unless-stopped
+
+  # ===========================================================================
+  # GRAFANA - optional, for viewing logs and alert state
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:13.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+    depends_on:
+      loki:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  loki-data:
+  alertmanager-data:
+  grafana-data:

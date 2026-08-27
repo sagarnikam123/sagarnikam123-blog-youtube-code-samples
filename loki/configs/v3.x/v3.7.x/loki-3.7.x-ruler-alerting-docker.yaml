@@ -1,0 +1,298 @@
+# Loki 3.7.x - Datasource-Managed Alerts (Ruler) - Docker Configuration
+#
+# =============================================================================
+# CONFIGURATION SUMMARY
+# =============================================================================
+# Purpose: Evaluate Loki's built-in ruler for datasource-managed alerting
+# Target: Docker monolithic deployment with ruler + alertmanager integration
+#
+# Key Differences from base config:
+# • Listen addresses: 0.0.0.0 (Docker networking)
+# • Alertmanager URL: http://alertmanager:9093 (Docker service name)
+# • Ruler: enabled with local filesystem rule storage
+# • OTLP: enabled for OpenTelemetry log ingestion
+# • Evaluation: 30s interval for faster feedback during testing
+#
+# Alert Flow:
+#   Logs → Loki Ingester → Ruler evaluates LogQL rules → Alertmanager → Notifications
+#
+# Rule files location (inside container): /loki/rules/fake/
+# =============================================================================
+
+auth_enabled: false
+
+target: all
+
+server:
+  http_listen_address: 0.0.0.0
+  http_listen_port: 3100
+  grpc_listen_address: 0.0.0.0
+  grpc_listen_port: 9095
+  log_format: logfmt
+  log_level: info  # info to see ruler evaluation logs
+
+ui:
+  enabled: true
+  debug: true
+
+# =============================================================================
+# RULER - Datasource-managed alerting engine
+# =============================================================================
+ruler:
+  ruler_client:
+    grpc_compression: snappy
+    connect_timeout: 5s
+  evaluation_interval: 30s   # evaluate rules every 30s (fast feedback for testing)
+  poll_interval: 30s         # check for new/changed rule files every 30s
+  storage:
+    type: local
+    local:
+      directory: /loki/rules  # mount rule files here
+  rule_path: /loki/rules-temp
+  alertmanager_url: http://alertmanager:9093  # Docker service name
+  ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 5s
+    heartbeat_timeout: 1m
+    instance_id: loki-ruler
+    instance_port: 9095
+    instance_addr: 0.0.0.0
+    num_tokens: 128
+  enable_api: true           # enables /loki/api/v1/rules HTTP API
+  query_stats_enabled: true
+  wal:
+    dir: /loki/ruler-wal
+
+# =============================================================================
+# WRITE PATH
+# =============================================================================
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 5s
+    heartbeat_timeout: 1m
+    instance_id: loki-distributor
+    instance_port: 9095
+    instance_addr: 0.0.0.0
+
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      heartbeat_timeout: 1m
+      replication_factor: 1
+    num_tokens: 128
+    heartbeat_period: 5s
+    heartbeat_timeout: 1m
+    join_after: 0s
+    min_ready_duration: 15s
+    readiness_check_ring_health: false
+    address: 0.0.0.0
+    port: 9095
+    id: loki-ingester
+  chunk_retain_period: 0s
+  chunk_idle_period: 30m
+  chunk_block_size: 262144
+  chunk_target_size: 1572864
+  chunk_encoding: snappy
+  max_chunk_age: 2h
+  wal:
+    dir: /loki/wal
+
+ingester_client:
+  pool_config:
+    health_check_ingesters: false
+    remote_timeout: 5s
+  remote_timeout: 5s
+  grpc_client_config:
+    grpc_compression: snappy
+    connect_timeout: 5s
+
+# =============================================================================
+# READ PATH
+# =============================================================================
+querier:
+  query_ingesters_within: 3h
+  max_concurrent: 4
+
+query_scheduler:
+  grpc_client_config:
+    grpc_compression: snappy
+    connect_timeout: 5s
+  use_scheduler_ring: false
+
+frontend:
+  query_stats_enabled: true
+  grpc_client_config:
+    grpc_compression: snappy
+    connect_timeout: 5s
+  address: 0.0.0.0
+  port: 9095
+  encoding: protobuf
+  compress_responses: true
+
+frontend_worker:
+  frontend_address: 0.0.0.0:9095
+  query_frontend_grpc_client:
+    grpc_compression: snappy
+    connect_timeout: 5s
+
+query_range:
+  align_queries_with_step: true
+  results_cache:
+    cache:
+      default_validity: 1h
+      embedded_cache:
+        enabled: true
+    compression: snappy
+  cache_results: true
+  max_retries: 5
+
+# =============================================================================
+# STORAGE
+# =============================================================================
+storage_config:
+  filesystem:
+    directory: /loki/chunks
+  index_cache_validity: 5m
+  index_queries_cache_config:
+    embedded_cache:
+      enabled: true
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-shipper-active
+    cache_location: /loki/tsdb-shipper-cache
+    cache_ttl: 24h
+    index_gateway_client:
+      grpc_client_config:
+        grpc_compression: snappy
+        connect_timeout: 5s
+      server_address: 0.0.0.0:9095
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+      chunks:
+        prefix: chunks_
+        period: 24h
+
+chunk_store_config:
+  chunk_cache_config:
+    default_validity: 1h
+    embedded_cache:
+      enabled: true
+
+# =============================================================================
+# COMPACTOR & RETENTION
+# =============================================================================
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  delete_request_store: filesystem
+  compactor_ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 15s
+    heartbeat_timeout: 1m
+    replication_factor: 1
+    instance_id: loki-compactor
+    instance_port: 9095
+    instance_addr: 0.0.0.0
+
+# =============================================================================
+# LIMITS - includes OTLP support
+# =============================================================================
+limits_config:
+  ingestion_rate_strategy: local
+  ingestion_rate_mb: 4
+  ingestion_burst_size_mb: 6
+  reject_old_samples: false
+  reject_old_samples_max_age: 168h
+  max_line_size: 256KB
+  max_line_size_truncate: true
+  increment_duplicate_timestamp: true
+  discover_log_levels: true
+  max_query_length: 721h
+  max_entries_limit_per_query: 5000
+  query_timeout: 1m
+  split_queries_by_interval: 1h
+  volume_enabled: true
+  retention_period: 168h
+  allow_structured_metadata: true
+  # OTLP support - allows sending logs via OpenTelemetry protocol
+  otlp_config:
+    resource_attributes:
+      attributes_config:
+        - action: index_label
+          attributes:
+            - service.name
+            - service.namespace
+            - deployment.environment
+
+# =============================================================================
+# INDEX GATEWAY
+# =============================================================================
+index_gateway:
+  mode: simple
+  ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 15s
+    heartbeat_timeout: 1m
+    replication_factor: 1
+    instance_id: loki-index-gateway
+    instance_port: 9095
+    instance_addr: 0.0.0.0
+
+# =============================================================================
+# COMMON
+# =============================================================================
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  persist_tokens: false
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+    heartbeat_period: 15s
+    heartbeat_timeout: 1m
+    num_tokens: 128
+    replication_factor: 1
+    instance_id: loki-common
+    instance_port: 9095
+    instance_addr: 0.0.0.0
+  instance_addr: 0.0.0.0
+  compactor_address: 0.0.0.0:3100
+  compactor_grpc_address: 0.0.0.0:9095
+
+pattern_ingester:
+  enabled: false
+
+bloom_build:
+  enabled: false
+
+bloom_gateway:
+  enabled: false
+
+ingest_limits:
+  enabled: false
+
+tracing:
+  enabled: false
+
+analytics:
+  reporting_enabled: false
