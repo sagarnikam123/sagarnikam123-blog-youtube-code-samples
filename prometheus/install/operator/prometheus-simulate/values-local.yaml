@@ -1,0 +1,148 @@
+# Helm values for kube-prometheus-stack
+# Mirrors prod prometheus namespace, scaled for minikube
+# Chart: kube-prometheus-stack 77.10.0
+
+# --- Prometheus ---
+prometheus:
+  prometheusSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/prometheus
+      tag: v3.5.0
+    replicas: 1
+    shards: 1
+    retention: 10d
+    scrapeInterval: 30s        # ponytail: prod uses 5m, 30s for faster local feedback
+    scrapeTimeout: 10s
+    evaluationInterval: 30s    # ponytail: prod uses 1m
+    walCompression: true
+    enableAdminAPI: false
+    disableCompaction: false   # ponytail: prod has true (Thanos handles compaction), local needs self-compaction
+    logFormat: logfmt
+    logLevel: info
+    enableFeatures:
+      - exemplar-storage
+      - native-histograms
+    enableRemoteWriteReceiver: true
+    enableOTLPReceiver: true
+    externalLabels:
+      environment: local-minikube   # prod: global-prod-use1
+    externalUrl: "http://localhost:9090"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+    # ponytail: prod uses 20Gi gp3 PVC. For minikube, emptyDir is simpler and
+    # avoids hostpath-provisioner issues on multi-node clusters.
+    # Uncomment storageSpec if you need persistent data across pod restarts:
+    # storageSpec:
+    #   volumeClaimTemplate:
+    #     spec:
+    #       accessModes: ["ReadWriteOnce"]
+    #       resources:
+    #         requests:
+    #           storage: 5Gi
+    # Match prod: select all ServiceMonitors/PodMonitors/PrometheusRules across namespaces
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    podMonitorSelector: {}
+    ruleNamespaceSelector: {}
+    ruleSelector: {}
+    probeNamespaceSelector: {}
+    probeSelector: {}
+    scrapeConfigNamespaceSelector: {}
+    scrapeConfigSelector:
+      matchLabels:
+        release: prometheus
+    # ponytail: alertmanager connection auto-configured by chart when alertmanager.enabled=true
+    exemplars:
+      maxSize: 100000
+    tsdb:
+      outOfOrderTimeWindow: 0s
+    # Remove prod tolerations for minikube
+    tolerations: []
+    securityContext:
+      fsGroup: 2000
+      runAsGroup: 2000
+      runAsNonRoot: true
+      runAsUser: 1000
+
+# --- Alertmanager ---
+alertmanager:
+  alertmanagerSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/alertmanager
+      tag: v0.28.1
+    replicas: 1    # ponytail: prod has 3, 1 sufficient for local
+    retention: 120h
+    logFormat: logfmt
+    logLevel: info
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    securityContext:
+      fsGroup: 2000
+      runAsGroup: 2000
+      runAsNonRoot: true
+      runAsUser: 1000
+    tolerations: []
+    alertmanagerConfigNamespaceSelector: {}
+    alertmanagerConfigSelector: {}
+
+# --- Grafana ---
+grafana:
+  enabled: true
+  adminPassword: prom-operator
+  service:
+    type: ClusterIP
+
+# --- kube-state-metrics ---
+kubeStateMetrics:
+  enabled: true
+
+# --- node-exporter ---
+nodeExporter:
+  enabled: true
+
+# --- Prometheus Operator ---
+prometheusOperator:
+  enabled: true
+
+# --- Default rules (matches prod PrometheusRules) ---
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    configReloaders: true
+    general: true
+    k8sContainerCpuUsageSecondsTotal: true
+    k8sContainerMemoryCache: true
+    k8sContainerMemoryRss: true
+    k8sContainerMemorySwap: true
+    k8sContainerMemoryWorkingSetBytes: true
+    k8sContainerResource: true
+    k8sPodOwner: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubeStateMetrics: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubernetesSystemApiserver: true
+    kubernetesSystemKubelet: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    nodeNetwork: true
+    nodeRules: true
+    prometheus: true
+    prometheusOperator: true

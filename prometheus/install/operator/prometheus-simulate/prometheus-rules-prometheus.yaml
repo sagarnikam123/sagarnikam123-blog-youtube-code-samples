@@ -1,0 +1,108 @@
+---
+# PrometheusRule: prometheus self-monitoring
+# Source: prod cluster, prometheus namespace
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: prometheus-kube-prometheus-prometheus
+  labels:
+    app: kube-prometheus-stack
+    app.kubernetes.io/instance: prometheus
+    app.kubernetes.io/part-of: kube-prometheus-stack
+    release: prometheus
+spec:
+  groups:
+  - name: prometheus
+    rules:
+    - alert: PrometheusBadConfig
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has failed to reload its configuration.
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheusbadconfig
+        summary: Failed Prometheus configuration reload.
+      expr: max_over_time(prometheus_config_last_reload_successful{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) == 0
+      for: 10m
+      labels:
+        severity: critical
+    - alert: PrometheusNotConnectedToAlertmanagers
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} is not connected to any Alertmanagers.
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheusnotconnectedtoalertmanagers
+        summary: Prometheus is not connected to any Alertmanagers.
+      expr: max_over_time(prometheus_notifications_alertmanagers_discovered{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) < 1
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusTSDBReloadsFailing
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has detected {{$value | humanize}} reload failures over the last 3h.
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheustsdbreloadsfailing
+        summary: Prometheus has issues reloading blocks from disk.
+      expr: increase(prometheus_tsdb_reloads_failures_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[3h]) > 0
+      for: 4h
+      labels:
+        severity: warning
+    - alert: PrometheusTSDBCompactionsFailing
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has detected {{$value | humanize}} compaction failures over the last 3h.
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheustsdbcompactionsfailing
+        summary: Prometheus has issues compacting blocks.
+      expr: increase(prometheus_tsdb_compactions_failed_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[3h]) > 0
+      for: 4h
+      labels:
+        severity: warning
+    - alert: PrometheusNotIngestingSamples
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} is not ingesting samples.
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheusnotingestingsamples
+        summary: Prometheus is not ingesting samples.
+      expr: |-
+        (
+          sum without(type) (rate(prometheus_tsdb_head_samples_appended_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m])) <= 0
+        and
+          (
+            sum without(scrape_job) (prometheus_target_metadata_cache_entries{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}) > 0
+          or
+            sum without(rule_group) (prometheus_rule_group_rules{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}) > 0
+          )
+        )
+      for: 10m
+      labels:
+        severity: warning
+    - alert: PrometheusRemoteStorageFailures
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} failed to send {{ printf "%.1f" $value }}% of the samples to {{ $labels.remote_name}}:{{ $labels.url }}
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheusremotestoragefailures
+        summary: Prometheus fails to send samples to remote storage.
+      expr: |-
+        (
+          (rate(prometheus_remote_storage_failed_samples_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_failed_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]))
+        /
+          (
+            (rate(prometheus_remote_storage_failed_samples_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_failed_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]))
+          +
+            (rate(prometheus_remote_storage_succeeded_samples_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]))
+          )
+        )
+        * 100
+        > 1
+      for: 15m
+      labels:
+        severity: critical
+    - alert: PrometheusRuleFailures
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} has failed to evaluate {{ printf "%.0f" $value }} rules in the last 5m.
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheusrulefailures
+        summary: Prometheus is failing rule evaluations.
+      expr: increase(prometheus_rule_evaluation_failures_total{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) > 0
+      for: 15m
+      labels:
+        severity: critical
+    - alert: PrometheusHighQueryLoad
+      annotations:
+        description: Prometheus {{$labels.namespace}}/{{$labels.pod}} query API has less than 20% available capacity in its query engine for the last 15 minutes.
+        runbook_url: https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheushighqueryload
+        summary: Prometheus is reaching its maximum capacity serving concurrent requests.
+      expr: avg_over_time(prometheus_engine_queries{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) / max_over_time(prometheus_engine_queries_concurrent_max{job="prometheus-kube-prometheus-prometheus",namespace="prometheus"}[5m]) > 0.8
+      for: 15m
+      labels:
+        severity: warning
