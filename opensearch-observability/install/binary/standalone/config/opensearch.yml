@@ -1,0 +1,22 @@
+# OpenSearch 3.8.0 — single-node local-dev config.
+# Security is DISABLED for frictionless local testing. Do NOT use as-is in
+# shared/production environments (see README "Notes").
+
+cluster.name: opensearch-dev
+node.name: node-1
+
+# Data & logs (tarball: relative to install dir; package: /var/lib|/var/log/opensearch)
+path.data: data
+path.logs: logs
+
+# Bind to all interfaces so Dashboards/Data Prepper on the host can reach it.
+# Use a specific IP or 127.0.0.1 to restrict access.
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Single-node bootstrap — no cluster formation / quorum needed.
+discovery.type: single-node
+
+# Disable the Security plugin (plain HTTP, no auth) for local dev only.
+plugins.security.disabled: true

@@ -1,0 +1,12 @@
+# OpenSearch Dashboards 3.8.0 — local-dev config matching opensearch.yml
+# (Security plugin disabled). Do NOT use as-is in shared/production environments.
+
+server.host: "0.0.0.0"
+server.port: 5601
+
+# Point at the local OpenSearch node (plain HTTP, security disabled).
+opensearch.hosts: ["http://localhost:9200"]
+
+# Disable the Dashboards security plugin to match the security-disabled backend.
+opensearch_security.enabled: false
+opensearch_security.multitenancy.enabled: false

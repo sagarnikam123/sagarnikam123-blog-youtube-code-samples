@@ -1,0 +1,10 @@
+# Heap override for OpenSearch — drop this into config/jvm.options.d/heap.options
+# (tarball) or /etc/opensearch/jvm.options.d/heap.options (package).
+#
+# Set heap to ~50% of host RAM, and Xms == Xmx to avoid resize pauses.
+# Example below is for a host with ~4 GB RAM. Adjust to your machine.
+#
+# Do NOT also set heap via OPENSEARCH_JAVA_OPTS — pick one place only, or the
+# JVM sees conflicting -Xms/-Xmx and behaves unexpectedly.
+-Xms2g
+-Xmx2g

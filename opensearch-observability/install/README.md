@@ -2,7 +2,7 @@
 
 | Mode | Status | Path | Notes |
 |:-----|:-------|:-----|:------|
-| Native packages (tar/RPM/DEB) | Available | [`binary/standalone/`](binary/standalone/) | OpenSearch, Dashboards, Data Prepper installed separately |
+| Native packages (tar/DEB/RPM) | Available | [`binary/standalone/`](binary/standalone/) | Latest (3.8.0): OpenSearch + Dashboards + Data Prepper, with local-dev config files |
 | Docker standalone | Available | [`docker/standalone/`](docker/standalone/) | Individual containers on a Docker network |
 | Docker Compose standalone | Available | [`docker-compose/standalone/`](docker-compose/standalone/) | Phase 2 benchmark (single-node, security disabled) |
 | Docker Compose cluster | Available | [`docker-compose/cluster/`](docker-compose/cluster/) | Multi-node local replication testing |
