@@ -6,6 +6,7 @@ ClickHouse is an open-source, column-oriented OLAP database for real-time analyt
 
 | Mode | Guide |
 |:-----|:------|
+| Homebrew (macOS, cask) | [`install/brew/`](install/brew/) |
 | Quick install (single binary) | [`install/binary/`](install/binary/) |
 | DEB/APT (Debian/Ubuntu) | [`install/deb/`](install/deb/) |
 | RPM (RHEL/CentOS) | [`install/rpm/`](install/rpm/) |

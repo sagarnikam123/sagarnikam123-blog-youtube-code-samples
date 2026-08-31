@@ -2,6 +2,7 @@
 
 | Mode | Status | Path | Notes |
 |:-----|:-------|:-----|:------|
+| Homebrew (macOS) | Available | [`brew/`](brew/) | Native macOS install (formula or Postgres.app) |
 | Quick install (pgenv / source) | Available | [`binary/`](binary/) | Build/manage versions locally, no root repo |
 | DEB/APT packages | Available | [`deb/`](deb/) | Debian, Ubuntu — PGDG repo, systemd service |
 | RPM packages | Available | [`rpm/`](rpm/) | RHEL, CentOS, Fedora, Amazon Linux — PGDG repo, systemd |

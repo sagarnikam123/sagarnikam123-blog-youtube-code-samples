@@ -6,6 +6,7 @@ MySQL is the world's most widely used open-source relational database. This dire
 
 | Mode | Guide |
 |:-----|:------|
+| Homebrew (macOS) | [`install/brew/`](install/brew/) |
 | Quick install (generic binary tarball) | [`install/binary/`](install/binary/) |
 | DEB/APT (Debian/Ubuntu) | [`install/deb/`](install/deb/) |
 | RPM (RHEL/CentOS) | [`install/rpm/`](install/rpm/) |

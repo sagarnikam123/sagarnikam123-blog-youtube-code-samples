@@ -6,6 +6,7 @@ PostgreSQL is a powerful open-source object-relational database with strong SQL 
 
 | Mode | Guide |
 |:-----|:------|
+| Homebrew (macOS) | [`install/brew/`](install/brew/) |
 | Quick install (source/binary via pgenv) | [`install/binary/`](install/binary/) |
 | DEB/APT (Debian/Ubuntu) | [`install/deb/`](install/deb/) |
 | RPM (RHEL/CentOS) | [`install/rpm/`](install/rpm/) |

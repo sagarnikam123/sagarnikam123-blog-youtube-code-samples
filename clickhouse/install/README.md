@@ -2,6 +2,7 @@
 
 | Mode | Status | Path | Notes |
 |:-----|:-------|:-----|:------|
+| Homebrew (macOS) | Available | [`brew/`](brew/) | Cask — single binary, no `brew services` |
 | Quick install (curl → binary) | Available | [`binary/`](binary/) | Single binary, no deps, all platforms |
 | DEB/APT packages | Available | [`deb/`](deb/) | Debian, Ubuntu — systemd services |
 | RPM packages | Available | [`rpm/`](rpm/) | RHEL, CentOS, Fedora — systemd services |

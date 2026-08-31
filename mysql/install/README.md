@@ -2,6 +2,7 @@
 
 | Mode | Status | Path | Notes |
 |:-----|:-------|:-----|:------|
+| Homebrew (macOS) | Available | [`brew/`](brew/) | Native macOS install, `brew services` (launchd) |
 | Generic binary tarball | Available | [`binary/`](binary/) | Self-contained tarball, all Linux, manual init |
 | DEB/APT packages | Available | [`deb/`](deb/) | Debian, Ubuntu — systemd service |
 | RPM packages | Available | [`rpm/`](rpm/) | RHEL, CentOS, Fedora, Amazon Linux — systemd service |
