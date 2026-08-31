@@ -107,19 +107,68 @@ sudo systemctl enable --now opensearch
 
 ## OpenSearch Dashboards
 
-Install the matching **3.8.0** Dashboards distribution (tarball shown; DEB/RPM analogous).
+The web UI for OpenSearch — Discover, visualizations, Query Workbench, Dev Tools, and the observability plugins. Install the version matching your OpenSearch node (**3.8.0** here). Distribution packages bundle a compatible Node.js runtime (3.5+ ships Node.js 22), so no separate Node install is needed.
+
+### Tarball
 
 ```bash
 OPENSEARCH_VERSION="3.8.0"
-wget "https://artifacts.opensearch.org/releases/bundle/opensearch-dashboards/${OPENSEARCH_VERSION}/opensearch-dashboards-${OPENSEARCH_VERSION}-linux-x64.tar.gz"
-tar -xzf "opensearch-dashboards-${OPENSEARCH_VERSION}-linux-x64.tar.gz"
+ARCH="x64"        # or arm64
+wget "https://artifacts.opensearch.org/releases/bundle/opensearch-dashboards/${OPENSEARCH_VERSION}/opensearch-dashboards-${OPENSEARCH_VERSION}-linux-${ARCH}.tar.gz"
+tar -xzf "opensearch-dashboards-${OPENSEARCH_VERSION}-linux-${ARCH}.tar.gz"
 cd "opensearch-dashboards-${OPENSEARCH_VERSION}"
 
 cp /path/to/config/opensearch_dashboards.yml config/opensearch_dashboards.yml
-./bin/opensearch-dashboards
+./bin/opensearch-dashboards        # foreground; Ctrl-C to stop
 ```
 
-Open `http://localhost:5601`.
+### Debian/APT package
+
+```bash
+OPENSEARCH_VERSION="3.8.0"
+curl -SLO "https://artifacts.opensearch.org/releases/bundle/opensearch-dashboards/${OPENSEARCH_VERSION}/opensearch-dashboards-${OPENSEARCH_VERSION}-linux-x64.deb"
+sudo dpkg -i "opensearch-dashboards-${OPENSEARCH_VERSION}-linux-x64.deb"
+
+sudo cp config/opensearch_dashboards.yml /etc/opensearch-dashboards/opensearch_dashboards.yml
+sudo systemctl enable --now opensearch-dashboards
+sudo systemctl status opensearch-dashboards
+```
+
+### RPM package
+
+```bash
+OPENSEARCH_VERSION="3.8.0"
+sudo curl -SLO "https://artifacts.opensearch.org/releases/bundle/opensearch-dashboards/${OPENSEARCH_VERSION}/opensearch-dashboards-${OPENSEARCH_VERSION}-linux-x64.rpm"
+sudo rpm -ivh "opensearch-dashboards-${OPENSEARCH_VERSION}-linux-x64.rpm"
+
+sudo cp config/opensearch_dashboards.yml /etc/opensearch-dashboards/opensearch_dashboards.yml
+sudo systemctl enable --now opensearch-dashboards
+```
+
+### Docker
+
+```bash
+docker run -d --name dashboards \
+  -p 5601:5601 \
+  -e "OPENSEARCH_HOSTS=http://host.docker.internal:9200" \
+  -e "DISABLE_SECURITY_DASHBOARDS_PLUGIN=true" \
+  opensearchproject/opensearch-dashboards:3.8.0
+```
+
+### Access & verify
+
+Open `http://localhost:5601`. Then confirm it connected to the backend:
+
+```bash
+# Dashboards server status API (reports "green"/"yellow" and the OpenSearch link)
+curl -s http://localhost:5601/api/status | grep -o '"state":"[a-z]*"' | head -1
+```
+
+With security disabled (local dev), no login prompt appears. With security enabled, log in with your admin credentials.
+
+> **Node.js:** the packages bundle Node.js 22 (OpenSearch Dashboards 3.5+). To use your own runtime instead, install Node.js `>=14.20.1 <23` and set `NODE_OSD_HOME` (or `NODE_HOME`) to its install path before running `bin/opensearch-dashboards`.
+
+> **Version match:** run the same major.minor as your OpenSearch node. A Dashboards version newer/older than the cluster can fail to connect or hide features.
 
 ---
 
