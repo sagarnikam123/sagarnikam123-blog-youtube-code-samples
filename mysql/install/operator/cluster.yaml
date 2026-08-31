@@ -1,0 +1,18 @@
+# MySQL InnoDBCluster — managed by the official MySQL Operator for Kubernetes.
+# Prereq: a secret named `mypwds` with rootUser/rootHost/rootPassword (see README).
+apiVersion: mysql.oracle.com/v2
+kind: InnoDBCluster
+metadata:
+  name: mycluster
+spec:
+  secretName: mypwds
+  tlsUseSelfSigned: true
+  instances: 3            # Group Replication members (odd number for quorum)
+  router:
+    instances: 1          # MySQL Router front-end replicas
+  datadirVolumeClaimTemplate:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 8Gi

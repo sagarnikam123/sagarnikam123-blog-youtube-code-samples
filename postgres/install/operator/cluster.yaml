@@ -1,0 +1,21 @@
+# PostgreSQL HA cluster — managed by the CloudNativePG operator.
+# Creates a 3-instance streaming-replication cluster with automatic failover.
+# The operator auto-generates secret `pg-cluster-app` with the app credentials.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-cluster
+spec:
+  instances: 3               # 1 primary + 2 replicas (odd count for quorum)
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+
+  storage:
+    size: 8Gi
+
+  monitoring:
+    enablePodMonitor: true   # expose Prometheus metrics for Grafana

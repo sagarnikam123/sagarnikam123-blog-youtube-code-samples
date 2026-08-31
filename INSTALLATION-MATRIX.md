@@ -51,8 +51,12 @@ The repository already contains reusable installation patterns for individual co
 | VictoriaLogs | Binary, Docker, Helm single, Helm cluster, Operator |
 | Grafana | Binary (tarball/APT/RPM/Homebrew/Windows), Docker, Helm, Kubernetes manifests, Operator |
 | Apache SkyWalking | Binary standalone, Docker standalone/cluster, Helm, SWCK |
+| MySQL | Binary tarball, DEB/APT, RPM, Docker, Docker Compose (+ Adminer + exporter), Helm (Bitnami), Operator (Oracle MySQL Operator) |
+| PostgreSQL | Binary (pgenv), DEB/APT (PGDG), RPM (PGDG), Docker, Docker Compose (+ Adminer + exporter), Helm (Bitnami), Operator (CloudNativePG) |
 
 These component installations will be reused rather than duplicated inside every composite platform.
+
+MySQL and PostgreSQL are documented as standalone SQL data stores and Grafana SQL datasources — used by application backends and analytics pipelines that visualize relational data in Grafana.
 
 ## Folder Convention
 
