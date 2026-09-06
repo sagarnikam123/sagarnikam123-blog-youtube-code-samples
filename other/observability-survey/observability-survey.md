@@ -35,7 +35,7 @@
    - 4: Advanced (Build custom dashboards, alerts, and instrument applications)
    - 5: Expert (Design distributed observability architectures and data pipelines)
 
-5. **When you joined, how easy was it to get access and documentation for our observability stack?** *(Single choice)*
+5. **When you joined, how easy was it to get access and documentation for our observability stack?** *(Single choice — Form Tip: Use Multiple Choice rather than Linear Scale to accommodate the N/A option)*
    - 1 - Very difficult (unclear access process, missing docs)
    - 2 - Difficult (took significant time/tickets)
    - 3 - Neutral / Figured it out with peer help
@@ -52,6 +52,7 @@
    - [ ] Infrastructure & Application Metrics (CPU, memory, custom business metrics)
    - [ ] Distributed Traces (APM, end-to-end request tracing)
    - [ ] Continuous Profiling (CPU/memory flame graphs, thread dumps)
+   - [ ] Database & Middleware Observability (RDS, DynamoDB, Kafka, Redis metrics & slow queries)
    - [ ] Frontend / Real User Monitoring (RUM, Web Vitals, browser errors)
    - [ ] Synthetic / Uptime Monitoring (Health checks, API pingers)
    - [ ] CI/CD & Build Pipeline Observability (Test metrics, deploy tracking)
@@ -71,7 +72,7 @@
    - Only during incidents / outages
    - Rarely / Never
 
-9. **Which tool(s) do you currently use for LOGS?** *(Select all that apply — mark your primary tool if possible)*
+9. **Which tool(s) do you currently use for LOGS?** *(Select all that apply — Form Tip: optionally add a follow-up single-choice for primary tool)*
    - [ ] Amazon Managed Grafana (AMG) / Loki
    - [ ] Self-hosted / OpenSource Grafana + Loki
    - [ ] AWS CloudWatch Logs
@@ -82,7 +83,7 @@
    - [ ] I do not query/view logs
    - [ ] Other: ___
 
-10. **Which tool(s) do you currently use for METRICS & DASHBOARDS?** *(Select all that apply — mark your primary tool if possible)*
+10. **Which tool(s) do you currently use for METRICS & DASHBOARDS?** *(Select all that apply — Form Tip: optionally add a follow-up single-choice for primary tool)*
     - [ ] Amazon Managed Grafana (AMG) + Prometheus
     - [ ] Self-hosted / OpenSource Grafana + Prometheus
     - [ ] Grafana + VictoriaMetrics
@@ -92,7 +93,7 @@
     - [ ] I do not query/view metrics
     - [ ] Other: ___
 
-11. **Which tool(s) do you currently use for TRACES & APM (Distributed Tracing)?** *(Select all that apply — mark your primary tool if possible)*
+11. **Which tool(s) do you currently use for TRACES & APM (Distributed Tracing)?** *(Select all that apply — Form Tip: optionally add a follow-up single-choice for primary tool)*
     - [ ] Apache SkyWalking
     - [ ] Grafana Tempo (AMG or Self-hosted)
     - [ ] Jaeger
@@ -115,6 +116,8 @@
 
 13. **Which tool(s) do you currently use for FRONTEND / REAL USER MONITORING (RUM) & ERROR TRACKING?** *(Select all that apply)*
     - [ ] Sentry
+    - [ ] AWS CloudWatch (Synthetics / RUM)
+    - [ ] OneUptime
     - [ ] Datadog RUM / Browser Monitoring
     - [ ] LogRocket / Bugsnag
     - [ ] Firebase Crashlytics / Google Analytics
@@ -138,7 +141,7 @@
 
 ## Section 3: Pain Points & Debugging Bottlenecks
 
-15. **What are your biggest pain points with the current observability setup?** *(Select up to 4)*
+15. **What are your biggest pain points with the current observability setup?** *(Select up to 4 — Form Builder Tip: Enable response validation "Select at most 4")*
     - [ ] Tool sprawl & fragmented workflows (switching between too many tabs/tools)
     - [ ] Hard to correlate logs, metrics, and traces for a single request/incident
     - [ ] Slow query performance / timeouts on dashboards and log queries
@@ -160,7 +163,8 @@
     - 5 – 15 minutes
     - 15 – 30 minutes
     - 30 – 60 minutes
-    - > 1 hour
+    - 1 – 2 hours
+    - > 2 hours
     - Usually require escalation / cannot solve independently
 
 17. **How quickly do telemetry data (logs/metrics/traces) become queryable after generation?** *(Single choice)*
@@ -177,7 +181,7 @@
 
 ## Section 4: Future Requirements & Platform Preferences
 
-19. **What are your top priorities for improving our observability stack?** *(Select up to 3)*
+19. **What are your top priorities for improving our observability stack?** *(Select up to 3 — Form Builder Tip: Enable response validation "Select at most 3")*
     - [ ] Unified "Single Pane of Glass" (correlated logs, metrics, traces, and deploy events in one UI)
     - [ ] Sub-second search & fast query performance
     - [ ] Real-time log tailing and live stream debugging
@@ -201,32 +205,53 @@
     - **Guided Self-Service:** Platform team provides templates, Terraform modules, and SDK wrappers; I deploy and tweak.
     - **Managed Service:** Platform team builds and maintains all dashboards, alerts, and pipelines on request.
 
-22. **Do you currently have visibility into your team's observability costs / data ingestion volume?** *(Single choice)*
-    - Yes, we actively monitor and optimize our usage & cost
-    - Rough awareness, but no exact numbers
+22. **For each activity below, what is your appetite and current ability to do it yourself?** *(Matrix — Google Forms: Multiple-choice grid | MS Forms: Likert. One choice per row)*
+    | Activity | Want to & already do it myself | Want to, but lack access/skills today | Prefer the platform team does it | Not relevant to my role |
+    |---|---|---|---|---|
+    | **Create / edit dashboards** | ◻ | ◻ | ◻ | ◻ |
+    | **Create / edit alerts & alert rules** | ◻ | ◻ | ◻ | ◻ |
+    | **Add / change instrumentation (logs, metrics, traces) in my code** | ◻ | ◻ | ◻ | ◻ |
+    | **Configure telemetry pipeline (sampling, filtering, routing, masking)** | ◻ | ◻ | ◻ | ◻ |
+    | **Manage data retention / storage policy for my services** | ◻ | ◻ | ◻ | ◻ |
+
+    > *"Want to, but lack access/skills today" is the key gap — it tells us where to grant access or run enablement.*
+
+23. **Do you currently have visibility into your team's observability costs / data ingestion volume?** *(Single choice)*
+    - Yes, we actively monitor and optimize our usage & cost (with tags/dimensions)
+    - Rough awareness, but no exact numbers or per-service cost breakdown
     - No visibility, but would like to know
     - No visibility / not relevant to my role
+
+24. **How long do you need each telemetry signal retained (queryable) to do your job?** *(Matrix — Google Forms: Multiple-choice grid | MS Forms: Likert. One choice per row)*
+    | Signal | < 7 days | 7–30 days | 1–3 months | 3–6 months | 6–13 months | > 13 months (compliance/audit) |
+    |---|---|---|---|---|---|---|
+    | **Logs** | ◻ | ◻ | ◻ | ◻ | ◻ | ◻ |
+    | **Metrics** | ◻ | ◻ | ◻ | ◻ | ◻ | ◻ |
+    | **Traces** | ◻ | ◻ | ◻ | ◻ | ◻ | ◻ |
+
+    > *Tip: consider your longest realistic lookback — incident post-mortems, capacity trend analysis, and any compliance/audit mandate.*
 
 ---
 
 ## Section 5: Alerting & Incident Response *(Optional)*
 
-23. **How would you rate the overall quality and actionability of current alerts?** *(Linear scale 1–5)*
+25. **How would you rate the overall quality and actionability of current alerts?** *(Linear scale 1–5)*
     - 1: Very Poor (Constantly noisy, mostly false positives, ignored)
     - 2: Poor (High noise-to-signal ratio)
     - 3: Average (Useful for major outages, but requires filtering)
     - 4: Good (Mostly actionable with clear triage paths)
-    - 5: Excellent (Every alert is actionable, includes runbook link, zero noise)
+    - 5: Excellent (Every alert is actionable, tied to SLOs/error budgets with runbook links, zero noise)
 
-24. **When an alert fires or an incident begins, where do you start your investigation?** *(Select up to 2)*
+26. **When an alert fires or an incident begins, where do you start your investigation?** *(Select up to 2)*
     - [ ] Service dashboards / Grafana
     - [ ] Log search / aggregation
     - [ ] Distributed trace timeline / APM
+    - [ ] Service Level Objective (SLO) / Error budget burn rate alerts
     - [ ] Recent deployment / Git commit history
     - [ ] Ask in team Slack / Teams channels
     - [ ] Other: ___
 
-25. **Are runbooks / triage guides readily available and updated for your services?** *(Single choice)*
+27. **Are runbooks / triage guides readily available and updated for your services?** *(Single choice)*
     - Yes, linked directly inside alert notifications
     - Yes, maintained in wiki / repository docs
     - Outdated or incomplete
@@ -237,14 +262,14 @@
 
 ## Section 6: OpenTelemetry (OTel) & Instrumentation *(Optional - Engineering)*
 
-26. **What is your familiarity and adoption of OpenTelemetry (OTel)?** *(Single choice)*
+28. **What is your familiarity and adoption of OpenTelemetry (OTel)?** *(Single choice)*
     - Actively using OpenTelemetry SDKs / Collectors in production
     - Currently experimenting or migrating to OpenTelemetry
     - Familiar with the concept and standards, but not using it yet
     - Heard the name, unclear on how it works
     - Not familiar with OpenTelemetry
 
-27. **What primary programming languages/frameworks do your services run on?** *(Select all that apply)*
+29. **What primary programming languages/frameworks do your services run on?** *(Select all that apply)*
     - [ ] Java / Kotlin / JVM
     - [ ] Python
     - [ ] Go
@@ -254,7 +279,7 @@
     - [ ] Frontend (React / Angular / Vue / Mobile)
     - [ ] Other: ___
 
-28. **What would make instrumenting your services significantly easier?** *(Select all that apply)*
+30. **What would make instrumenting your services significantly easier?** *(Select all that apply)*
     - [ ] Zero-code Auto-Instrumentation (e.g., eBPF, Java agent, runtime hooks)
     - [ ] Standardized internal shared libraries / starter kits with pre-configured OTel
     - [ ] Sample repositories with reference implementations
@@ -268,7 +293,7 @@
 
 > Inspired by industry benchmarks (e.g., the annual CNCF and Grafana Labs Observability Surveys). Helps align our roadmap with where the wider industry is heading.
 
-29. **What are the most important criteria when selecting a new observability tool?** *(Select up to 3)*
+31. **What are the most important criteria when selecting a new observability tool?** *(Select up to 3 — Form Builder Tip: Enable response validation "Select at most 3")*
     - [ ] Cost / total cost of ownership
     - [ ] Ease of use / low learning curve
     - [ ] Interoperability & open standards (OpenTelemetry, Prometheus, OTLP)
@@ -280,33 +305,33 @@
     - [ ] Security & compliance (RBAC, audit, data residency)
     - [ ] Other: ___
 
-30. **How important are open source / open standards (OpenTelemetry, Prometheus, OTLP) to our observability strategy?** *(Single choice)*
+32. **How important are open source / open standards (OpenTelemetry, Prometheus, OTLP) to our observability strategy?** *(Single choice)*
     - Essential (a hard requirement for any tool we adopt)
     - Very important
     - Somewhat important
     - Not important
     - No opinion
 
-31. **What is our current investment stage for each standard?** *(Matrix — Google Forms: Multiple-choice grid | MS Forms: Likert)*
+33. **What is our current investment stage for each standard?** *(Matrix — Google Forms: Multiple-choice grid | MS Forms: Likert)*
     | Standard | Not on radar | Investigating | Building POC | In production (some) | In production (most/all) |
     |---|---|---|---|---|---|
     | **Prometheus** | ◻ | ◻ | ◻ | ◻ | ◻ |
     | **OpenTelemetry** | ◻ | ◻ | ◻ | ◻ | ◻ |
 
-32. **How is observability delivered/owned in our organization today?** *(Single choice)*
+34. **How is observability delivered/owned in our organization today?** *(Single choice)*
     - **Centralized platform team** runs the platform and provides best practices/support, but product teams own their own service observability
     - **Fully managed by a central ops team** separate from product teams (they own uptime/performance in prod)
     - **Siloed / per-team** — each team picks and runs its own tools, no central standard
     - **Embedded SREs** within product teams
     - I don't know
 
-33. **How is our observability infrastructure hosted?** *(Single choice — leads/platform team best placed to answer; pick "I don't know" if unsure)*
+35. **How is our observability infrastructure hosted?** *(Single choice — leads/platform team best placed to answer; pick "I don't know" if unsure)*
     - Fully self-managed (we run Grafana/Prometheus/etc. ourselves)
     - Fully SaaS / managed (e.g., Amazon Managed Grafana, Datadog, Grafana Cloud)
     - Hybrid (mix of self-managed and SaaS)
     - I don't know
 
-34. **How do you expect our observability spend to change next year?** *(Single choice)*
+36. **How do you expect our observability spend to change next year?** *(Single choice)*
     - Increase — broader adoption / more services onboarded
     - Increase — higher vendor/SaaS bills
     - Increase — investing for higher ROI (better tooling)
@@ -320,7 +345,7 @@
 
 > Gauges team appetite, trust, and practical blockers for AI-assisted observability workflows.
 
-35. **How valuable would AI be for each of these observability use cases?** *(Matrix — Google Forms: Multiple-choice grid | MS Forms: Likert)*
+37. **How valuable would AI be for each of these observability use cases?** *(Matrix — Google Forms: Multiple-choice grid | MS Forms: Likert)*
     | Use case | Not valuable | Somewhat valuable | Very valuable | Critical | Not sure |
     |---|---|---|---|---|---|
     | Surface anomalies/issues before they cause downtime | ◻ | ◻ | ◻ | ◻ | ◻ |
@@ -330,21 +355,21 @@
     | Help new users quickly understand the system | ◻ | ◻ | ◻ | ◻ | ◻ |
     | Take autonomous actions (auto-remediation, workflows) | ◻ | ◻ | ◻ | ◻ | ◻ |
 
-36. **How comfortable are you with AI taking autonomous actions (auto-remediation, triggering workflows) in production?** *(Single choice)*
+38. **How comfortable are you with AI taking autonomous actions (auto-remediation, triggering workflows) in production?** *(Single choice)*
     - Very comfortable — I'd let it act with minimal oversight
     - Comfortable with guardrails and approvals
     - Neutral / unsure
     - Uncomfortable — assistance only, humans decide
     - Strongly opposed — no autonomous action
 
-37. **How important is it that AI explains its reasoning (sources, query logic, confidence levels)?** *(Single choice)*
+39. **How important is it that AI explains its reasoning (sources, query logic, confidence levels)?** *(Single choice)*
     - Critical / essential
     - Very important
     - Somewhat important
     - Not important
     - Not sure
 
-38. **What would most likely prevent you from using AI for observability tasks?** *(Single choice)*
+40. **What would most likely prevent you from using AI for observability tasks?** *(Single choice)*
     - Too much manual input of required context
     - It breaks too often / doesn't adapt to our environment
     - Lack of customization for our stack
@@ -354,7 +379,7 @@
     - Nothing — I'd adopt it readily
     - Other: ___
 
-39. **Are you monitoring AI / LLM-based applications (agentic workflows, model latency/cost/quality)?** *(Single choice)*
+41. **Are you monitoring AI / LLM-based applications (agentic workflows, model latency/cost/quality)?** *(Single choice)*
     - Yes, in production
     - Building a POC / experimenting
     - Investigating
@@ -365,7 +390,7 @@
 
 ## Section 9: Benchmarking & Open Feedback *(Optional)*
 
-40. **What observability tools did you use in your PREVIOUS organization/company?** *(Select all that apply per signal)*
+42. **What observability tools did you use in your PREVIOUS organization/company?** *(Select all that apply per signal)*
     - **Logs:**
       - [ ] Splunk
       - [ ] ELK Stack / OpenSearch / Kibana
@@ -399,7 +424,7 @@
     - **Other tools / platforms used in past companies:** *(Free text)*
       - [ Free text ]
 
-41. **Compared to your previous company or ideal setup, how does our current observability maturity rate?** *(Single choice)*
+43. **Compared to your previous company or ideal setup, how does our current observability maturity rate?** *(Single choice)*
     - Much better here
     - Somewhat better here
     - Comparable
@@ -407,10 +432,10 @@
     - Much worse here
     - N/A (First company / no prior baseline)
 
-42. **What specific tool, workflow, or practice from past experience would you recommend we adopt?** *(Open text)*
+44. **What specific tool, workflow, or practice from past experience would you recommend we adopt?** *(Open text)*
     - [ Free text ]
 
-43. **Any additional comments, wishlist items, or feedback for the Observability / Platform team?** *(Open text)*
+45. **Any additional comments, wishlist items, or feedback for the Observability / Platform team?** *(Open text)*
     - [ Free text ]
 
 ---
@@ -437,18 +462,20 @@ For interactive analysis of the responses (inspired by how Grafana Labs analyzes
 |---|---|---|
 | **Tool Sprawl & Primary Adoption per Signal** | Q9 (Logs), Q10 (Metrics), Q11 (Traces), Q12 (Profiling), Q13 (Frontend) | Identifies the most heavily used tools per telemetry signal and quantifies fragmentation/overlap across teams. |
 | **Unified vs. Best-of-Breed** | Q20 | Determines whether to invest in unified suite (Grafana/Datadog) vs. multi-vendor pipeline. |
-| **MTTR & Investigation Blockers** | Q16, Q17, Q18, Q24 | Correlate root cause discovery time with ingestion delay and correlation gaps. |
+| **MTTR & Investigation Blockers** | Q16, Q17, Q18, Q25 | Correlate root cause discovery time with ingestion delay and correlation gaps. |
 | **Signal Gaps (RUM / Profiling / Traces)** | Q6, Q7, Q11, Q12, Q13 | Highlights missing signal layers (e.g., client-side errors, non-prod telemetry). |
 | **Log Maturity & Standardization** | Q9, Q14 | Quantifies structured vs. raw log split; guides log parser/schema standardization. |
-| **Alert Actionability & Fatigue** | Q15, Q23, Q25 | Alert Quality Index (1–5). Identifies need for alert cleanup, SLO routing, and runbook linkage. |
-| **OTel Migration Readiness** | Q26, Q27, Q28 | Identifies target language SDK priorities (e.g., Java vs. Python) and auto-instrumentation demand. |
-| **Self-Service vs. Platform Support** | Q21, Q28 | Shapes platform team engagement model (Terraform modules vs. office hours vs. managed setups). |
-| **Cost & Ingestion Awareness** | Q15, Q22 | Identifies necessity for chargeback/showback dashboards and automated data tiering/retention policies. |
+| **Self-Service Appetite vs. Ability (per activity)** | Q22 | Splits respondents into "already self-sufficient", "wants access/enablement" (the actionable gap — grant RBAC or run training), and "prefers managed" for dashboards, alerts, instrumentation, pipeline, and retention. |
+| **Retention Requirements per Signal** | Q24 | Compares desired logs/metrics/traces retention against current limits; drives tiering, downsampling, and compliance-retention policy per signal. |
+| **Alert Actionability & Fatigue** | Q15, Q25, Q27 | Alert Quality Index (1–5). Identifies need for alert cleanup, SLO routing, and runbook linkage. |
+| **OTel Migration Readiness** | Q28, Q29, Q30 | Identifies target language SDK priorities (e.g., Java vs. Python) and auto-instrumentation demand. |
+| **Self-Service vs. Platform Support** | Q21, Q22, Q30 | Shapes platform team engagement model (Terraform modules vs. office hours vs. managed setups). |
+| **Cost & Ingestion Awareness** | Q15, Q23 | Identifies necessity for chargeback/showback dashboards and automated data tiering/retention policies. |
 | **Onboarding & Access Friction** | Q5, Q15 | Correlate onboarding ease with tenure; identifies access/permission and documentation gaps that slow new-joiner productivity. |
-| **Tool Selection Criteria** | Q29 | Ranks what actually drives adoption (cost, ease, interop, AI) — the north star for tool evaluation/RFP scoring. |
-| **Open Standards Commitment** | Q30, Q31 | Prometheus vs. OTel investment stage; guides how hard to standardize on OpenTelemetry and avoid lock-in. |
-| **Ownership & Delivery Model** | Q32 | Centralized vs. siloed vs. embedded. Correlate with satisfaction (Q23, Q41) — centralized teams tend to report higher satisfaction. |
-| **Hosting Model & Spend Trajectory** | Q33, Q34 | SaaS vs. self-managed split and next-year spend direction/reason; informs build-vs-buy and budget planning. |
-| **AI Appetite & Trust Gap** | Q35, Q36, Q37 | Value-per-use-case vs. comfort with autonomy; transparency demand. Assistance is widely welcomed; autonomous action is the trust frontier. |
-| **AI Adoption Blockers** | Q38, Q39 | Top blocker (usually manual context input) and whether LLM/agentic apps are even in scope to observe. |
-| **Past Tool Experience & Industry Benchmark** | Q40, Q41, Q42, Q43 | Uncovers industry tools engineers are already proficient in (e.g., Splunk, New Relic, Datadog) to guide tool evaluation and minimize onboarding friction. |
+| **Tool Selection Criteria** | Q31 | Ranks what actually drives adoption (cost, ease, interop, AI) — the north star for tool evaluation/RFP scoring. |
+| **Open Standards Commitment** | Q32, Q33 | Prometheus vs. OTel investment stage; guides how hard to standardize on OpenTelemetry and avoid lock-in. |
+| **Ownership & Delivery Model** | Q34 | Centralized vs. siloed vs. embedded. Correlate with satisfaction (Q25, Q43) — centralized teams tend to report higher satisfaction. |
+| **Hosting Model & Spend Trajectory** | Q35, Q36 | SaaS vs. self-managed split and next-year spend direction/reason; informs build-vs-buy and budget planning. |
+| **AI Appetite & Trust Gap** | Q37, Q38, Q39 | Value-per-use-case vs. comfort with autonomy; transparency demand. Assistance is widely welcomed; autonomous action is the trust frontier. |
+| **AI Adoption Blockers** | Q40, Q41 | Top blocker (usually manual context input) and whether LLM/agentic apps are even in scope to observe. |
+| **Past Tool Experience & Industry Benchmark** | Q42, Q43, Q44, Q45 | Uncovers industry tools engineers are already proficient in (e.g., Splunk, New Relic, Datadog) to guide tool evaluation and minimize onboarding friction. |
