@@ -1,0 +1,48 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 20
+
+  # OpenTelemetry Transformation Language (OTTL) Processor
+  transform:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          # Add environment tag
+          - set(attributes["deployment.environment"], "production")
+          # Mask password parameters in full URL
+          - replace_pattern(attributes["url.full"], "password=[^&]+", "password=REDACTED")
+          # Delete sensitive internal token
+          - delete_key(attributes, "auth.bearer_token")
+          # Promote cloud region to resource level
+          - set(resource.attributes["cloud.region"], attributes["cloud.region"])
+
+  batch:
+    send_batch_size: 512
+    timeout: 200ms
+
+exporters:
+  debug:
+    verbosity: detailed
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform, batch]
+      exporters: [debug]

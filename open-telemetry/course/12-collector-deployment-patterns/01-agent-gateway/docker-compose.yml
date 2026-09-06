@@ -1,0 +1,35 @@
+services:
+  # ---------------------------------------------------------------------------
+  # Tier 1: Local Agent Collector (Accepts telemetry on localhost:4317/4318)
+  # ---------------------------------------------------------------------------
+  agent:
+    image: otel/opentelemetry-collector-contrib:0.160.0
+    container_name: otel-tier1-agent
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./agent-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - gateway
+    networks:
+      - pipeline-net
+
+  # ---------------------------------------------------------------------------
+  # Tier 2: Centralized Gateway Collector (Aggregates from all agents)
+  # ---------------------------------------------------------------------------
+  gateway:
+    image: otel/opentelemetry-collector-contrib:0.160.0
+    container_name: otel-tier2-gateway
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./gateway-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "13133:13133"   # Gateway health check
+    networks:
+      - pipeline-net
+
+networks:
+  pipeline-net:
+    driver: bridge

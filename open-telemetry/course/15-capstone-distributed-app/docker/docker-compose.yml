@@ -1,0 +1,29 @@
+services:
+  frontend:
+    build:
+      context: ../frontend-py
+    container_name: capstone-frontend
+    ports:
+      - "8000:8000"
+    environment:
+      - WORKER_URL=http://worker:8090/process-payment
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4317
+    depends_on:
+      - worker
+    networks:
+      - otel-course
+
+  worker:
+    build:
+      context: ../worker-java
+    container_name: capstone-worker
+    ports:
+      - "8090:8090"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4317
+    networks:
+      - otel-course
+
+networks:
+  otel-course:
+    external: true

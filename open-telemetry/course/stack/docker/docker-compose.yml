@@ -1,0 +1,115 @@
+services:
+  # ---------------------------------------------------------------------------
+  # OpenTelemetry Collector Contrib (Core Telemetry Processing Engine)
+  # ---------------------------------------------------------------------------
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.160.0
+    container_name: otel-course-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"     # OTLP gRPC receiver
+      - "4318:4318"     # OTLP HTTP receiver
+      - "8888:8888"     # Collector internal Prometheus metrics
+      - "8889:8889"     # Prometheus metrics exporter
+      - "13133:13133"   # Health check extension
+      - "55679:55679"   # zPages debug extension
+    depends_on:
+      - jaeger
+      - prometheus
+      - tempo
+      - loki
+    networks:
+      - otel-course
+
+  # ---------------------------------------------------------------------------
+  # Jaeger v2 (Traces Backend & UI — Collector-Based Engine)
+  # ---------------------------------------------------------------------------
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    container_name: otel-course-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"   # Jaeger Web UI
+    networks:
+      - otel-course
+
+  # ---------------------------------------------------------------------------
+  # Prometheus 3.x (Metrics Backend & PromQL Engine)
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: otel-course-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--enable-feature=otlp-write-receiver"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"     # Prometheus Web UI
+    networks:
+      - otel-course
+
+  # ---------------------------------------------------------------------------
+  # Grafana Tempo (High-Scale Distributed Traces Storage)
+  # ---------------------------------------------------------------------------
+  tempo:
+    image: grafana/tempo:3.0.3
+    container_name: otel-course-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"     # Tempo HTTP query endpoint
+    networks:
+      - otel-course
+
+  # ---------------------------------------------------------------------------
+  # Grafana Loki (Logs Storage & LogQL Engine)
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:3.7.7
+    container_name: otel-course-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml:ro
+    ports:
+      - "3100:3100"     # Loki HTTP endpoint
+    networks:
+      - otel-course
+
+  # ---------------------------------------------------------------------------
+  # Grafana 13 (Unified Visualization & Correlation Dashboard)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:13.2.1
+    container_name: otel-course-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"     # Grafana Web UI
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+      - jaeger
+    networks:
+      - otel-course
+
+networks:
+  otel-course:
+    driver: bridge

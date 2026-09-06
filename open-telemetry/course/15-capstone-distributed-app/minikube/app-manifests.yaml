@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capstone-worker
+  namespace: observability
+  labels:
+    app: capstone-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capstone-worker
+  template:
+    metadata:
+      labels:
+        app: capstone-worker
+    spec:
+      containers:
+        - name: worker
+          image: eclipse-temurin:17-jre-alpine
+          command: ["sh", "-c", "echo 'Java worker running on K8s' && sleep 3600"]
+          ports:
+            - containerPort: 8090
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4317"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: capstone-worker
+  namespace: observability
+spec:
+  type: ClusterIP
+  selector:
+    app: capstone-worker
+  ports:
+    - port: 8090
+      targetPort: 8090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capstone-frontend
+  namespace: observability
+  labels:
+    app: capstone-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capstone-frontend
+  template:
+    metadata:
+      labels:
+        app: capstone-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: python:3.11-slim
+          command: ["sh", "-c", "echo 'Python frontend running on K8s' && sleep 3600"]
+          ports:
+            - containerPort: 8000
+          env:
+            - name: WORKER_URL
+              value: "http://capstone-worker.observability.svc.cluster.local:8090/process-payment"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4317"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: capstone-frontend
+  namespace: observability
+spec:
+  type: ClusterIP
+  selector:
+    app: capstone-frontend
+  ports:
+    - port: 8000
+      targetPort: 8000

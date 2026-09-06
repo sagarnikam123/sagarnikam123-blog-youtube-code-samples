@@ -1,0 +1,61 @@
+apiVersion: 1
+
+datasources:
+  # Prometheus Metrics
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  # Grafana Tempo Traces
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    editable: true
+    jsonData:
+      httpMethod: GET
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1m'
+        spanEndTimeShift: '1m'
+        filterByTraceId: true
+        filterBySpanId: false
+        customQuery: true
+        query: '{$${__tags}} |= "$${__trace.id}"'
+      tracesToMetrics:
+        datasourceUid: Prometheus
+        tags: [{ key: 'service.name', value: 'service' }, { key: 'job' }]
+        queries:
+          - name: 'Request Rate'
+            query: 'sum(rate(traces_spanmetrics_calls_total{$$__tags}[$$__range_ms]))'
+
+  # Jaeger Traces
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    uid: jaeger
+    editable: true
+
+  # Grafana Loki Logs
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    editable: true
+    jsonData:
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '(?i)(?:trace_id|traceid|traceID)[=:]\s*"?([a-f0-9]+)"?'
+          name: TraceID
+          url: '$${__value.raw}'
