@@ -1,4 +1,14 @@
 # sagarnikam123-blog-youtube-code-samples
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Blog](https://img.shields.io/badge/Blog-sagarnikam123.github.io-0075ca.svg?logo=rss&logoColor=white)](https://sagarnikam123.github.io/)
+[![YouTube](https://img.shields.io/badge/YouTube-Sagar%20Nikam-FF0000.svg?logo=youtube&logoColor=white)](https://www.youtube.com/sagarnikam123)
+[![Domain: DevOps & Observability](https://img.shields.io/badge/domain-DevOps%20%26%20Observability-7057ff.svg)](#-projects)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![Installation Matrix](https://img.shields.io/badge/guide-Installation%20Matrix-0A9EDC.svg)](INSTALLATION-MATRIX.md)
+[![Status: Maintained](https://img.shields.io/badge/status-actively%20maintained-success.svg)](#)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/sagarnikam123/sagarnikam123-blog-youtube-code-samples/pulls)
+
 A curated collection of production-ready code samples, automation frameworks, and DevOps projects shared through my blog and YouTube tutorials.
 
 ## 🔗 Links
