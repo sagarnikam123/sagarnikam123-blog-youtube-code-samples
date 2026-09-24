@@ -38,6 +38,9 @@ This matrix separates the broader installation guide from the benchmark deployme
 | Highlight.io | N/A | N/A | existing hobby Compose | N/A | N/A | N/A | N/A | N/A | N/A | Phase 2 Compose only |
 | Elastic Observability | existing components | existing Docker images | existing | existing multi-node | existing ECK standalone | existing ECK cluster | existing eck-stack | existing eck-stack | existing ECK | Phase 2 Compose; Phase 2 Kubernetes |
 | OpenSearch Observability | existing components | existing Docker images | existing | existing multi-node | existing through Helm | existing Helm | existing | existing | existing operator | Phase 2 Compose; Phase 2 Kubernetes |
+| Uptime Kuma | N/A (Node.js + PM2 from source) | existing | existing | N/A | community (via Helm) | N/A | community (HelmForge) | N/A | N/A | Uptime monitoring guide |
+| Gatus | N/A (`go install` / source) | existing | existing | N/A | existing (raw manifests) | use Helm | existing (official chart) | use Helm | N/A | Uptime monitoring guide |
+| OpenStatus | N/A | N/A | existing official Compose | N/A | N/A | N/A | N/A | N/A | N/A | Uptime monitoring guide |
 
 ## Existing Repository Coverage
 
@@ -101,3 +104,7 @@ Existing paths remain valid until their mode is migrated and validated. Benchmar
 - [Elastic self-managed](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html)
 - [OpenSearch installation](https://opensearch.org/docs/latest/install-and-configure/)
 - [OpenSearch Kubernetes Operator](https://opensearch-project.github.io/opensearch-k8s-operator/)
+- [Uptime Kuma installation](https://github.com/louislam/uptime-kuma/wiki/%F0%9F%94%A7-How-to-Install)
+- [Gatus configuration & deployment](https://github.com/TwiN/gatus)
+- [Gatus Helm chart](https://github.com/TwiN/helm-charts/tree/master/charts/gatus)
+- [OpenStatus self-hosting](https://www.openstatus.dev/docs/guides/self-hosting-openstatus)
