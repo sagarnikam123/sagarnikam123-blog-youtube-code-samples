@@ -1,0 +1,95 @@
+# =============================================================================
+# Gatus - Kubernetes standalone (raw manifests)
+# Apply into a namespace, e.g.:  kubectl -n gatus apply -f manifests.yaml
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gatus-config
+  labels:
+    app: gatus
+data:
+  config.yaml: |
+    web:
+      port: 8080
+    metrics: true
+    endpoints:
+      - name: example-http
+        group: core
+        url: "https://example.org/"
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[RESPONSE_TIME] < 300"
+          - "[CERTIFICATE_EXPIRATION] > 48h"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gatus
+  labels:
+    app: gatus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gatus
+  template:
+    metadata:
+      labels:
+        app: gatus
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+        - name: gatus
+          image: twinproduction/gatus:v5.37.0
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: GATUS_CONFIG_PATH
+              value: /config/config.yaml
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: config
+          configMap:
+            name: gatus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gatus
+  labels:
+    app: gatus
+spec:
+  type: ClusterIP
+  selector:
+    app: gatus
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -1,0 +1,66 @@
+# =============================================================================
+# Gatus - Docker Compose standalone
+# =============================================================================
+# Config-as-code uptime monitor (single Go binary). The whole configuration is
+# ../../../configs/config.yaml, bind-mounted at /config/config.yaml.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Persistent history (PostgreSQL) is optional. To enable it:
+#   1. In ../../../configs/config.yaml set:
+#        storage:
+#          type: postgres
+#          path: "postgres://gatus:gatus@postgres:5432/gatus?sslmode=disable"
+#   2. Start with the postgres profile:
+#        docker compose --profile postgres up -d
+#
+# Access:
+#   - Gatus dashboard: http://localhost:${GATUS_PORT:-8080}
+# =============================================================================
+
+services:
+  gatus:
+    image: twinproduction/gatus:${GATUS_VERSION:-v5.37.0}
+    container_name: gatus
+    restart: unless-stopped
+    ports:
+      - "${GATUS_PORT:-8080}:8080"
+    volumes:
+      - ../../../configs/config.yaml:/config/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - gatus
+
+  # Optional persistent history backend. Enable with: --profile postgres
+  postgres:
+    image: postgres:16-alpine
+    container_name: gatus-postgres
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gatus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gatus}
+      POSTGRES_DB: ${POSTGRES_DB:-gatus}
+    volumes:
+      - gatus-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gatus}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gatus
+
+networks:
+  gatus:
+    driver: bridge
+
+volumes:
+  gatus-postgres-data:

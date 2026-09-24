@@ -1,0 +1,39 @@
+# =============================================================================
+# Uptime Kuma - Docker Compose standalone
+# =============================================================================
+# UI-first self-hosted uptime monitor (Node.js + Vue). SQLite metadata lives in
+# the mounted /app/data volume. Config is created through the UI, not files.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Access:
+#   - Uptime Kuma UI: http://localhost:${UPTIME_KUMA_PORT:-3001}
+# =============================================================================
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:${UPTIME_KUMA_VERSION:-2}
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "${UPTIME_KUMA_PORT:-3001}:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+    healthcheck:
+      # Uptime Kuma ships extra/healthcheck for container health probing
+      test: ["CMD-SHELL", "extra/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - uptime-kuma
+
+networks:
+  uptime-kuma:
+    driver: bridge
+
+volumes:
+  uptime-kuma-data:

@@ -1,0 +1,57 @@
+# Gatus sample configuration
+# Reference: https://github.com/TwiN/gatus#configuration
+#
+# Monitors live here as code. Keep this file in Git and review changes.
+# Mounted into the container at /config/config.yaml.
+
+# Web UI / API listener (default :8080).
+web:
+  port: 8080
+
+# Expose Prometheus metrics at /metrics.
+metrics: true
+
+# Persistent history (optional). Default is in-memory (lost on restart).
+# Uncomment to use SQLite:
+# storage:
+#   type: sqlite
+#   path: /data/data.db
+# Or PostgreSQL (see docker-compose/standalone for a ready stack):
+# storage:
+#   type: postgres
+#   path: "postgres://gatus:gatus@postgres:5432/gatus?sslmode=disable"
+
+endpoints:
+  - name: example-http
+    group: core
+    url: "https://example.org/"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 300"
+      - "[CERTIFICATE_EXPIRATION] > 48h"
+
+  - name: example-tcp
+    group: core
+    url: "tcp://example.org:443"
+    interval: 60s
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: example-dns
+    group: internal
+    url: "8.8.8.8"
+    interval: 60s
+    dns:
+      query-name: "example.com"
+      query-type: "A"
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+      - "[BODY] == pat(*.*.*.*)"
+
+  - name: example-icmp
+    group: internal
+    url: "icmp://example.org"
+    interval: 60s
+    conditions:
+      - "[CONNECTED] == true"

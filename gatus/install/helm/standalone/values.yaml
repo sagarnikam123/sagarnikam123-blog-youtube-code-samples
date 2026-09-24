@@ -1,0 +1,29 @@
+# Gatus Helm values (standalone)
+# Chart: twin/gatus  (helm repo add twin https://twin.sh/helm-charts)
+# Only overrides are shown; see the chart's values.yaml for the full set.
+
+image:
+  repository: twinproduction/gatus
+  # Empty tag tracks the chart appVersion. Pin for reproducibility, e.g. "v5.37.0".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# The entire Gatus configuration is delivered inline through the chart.
+config:
+  web:
+    port: 8080
+  metrics: true
+  endpoints:
+    - name: example-http
+      group: core
+      url: "https://example.org/"
+      interval: 60s
+      conditions:
+        - "[STATUS] == 200"
+        - "[RESPONSE_TIME] < 300"
+        - "[CERTIFICATE_EXPIRATION] > 48h"
