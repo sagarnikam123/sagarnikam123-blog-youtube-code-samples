@@ -15,6 +15,18 @@ Installation modes are organized under [`install/`](install/).
 
 See the [installation mode index](install/README.md) for the full matrix.
 
+## Concepts in short
+
+| Term | What it is | Why it matters |
+|:-----|:-----------|:---------------|
+| **Monitor** | One thing you watch — a URL, host:port, DNS name, or ping target — with a type, interval, and thresholds. | The core unit. Uptime Kuma checks each monitor on its own schedule and records up/down. |
+| **Heartbeat** | A single check result (up/down + response time) stored per monitor. | The bar chart on each monitor is its heartbeat history; retention is configurable. |
+| **Notification** | A channel (Telegram, Discord, Slack, email, Gotify, webhook…) attached to monitors. | Uptime Kuma's strength — 90+ channels. Fires when a monitor changes state. |
+| **Status page** | A public (or password-protected) page grouping selected monitors. | What you share with users/customers to communicate uptime. |
+| **Everything is UI + SQLite** | No config files: monitors, notifications, and pages are created in the UI and stored in `/app/data`. | Fast to set up; back up `/app/data` for portability (there is no config-as-code). |
+
+Mental model: **one container does it all — probe + UI + status page + SQLite in `/app/data`.**
+
 ## Quick Start
 
 ```bash
@@ -27,6 +39,38 @@ docker run -d --restart=unless-stopped \
 ```
 
 Open <http://localhost:3001> and create the admin account on first run.
+
+## Hello-world example: your first monitor
+
+From nothing to a working check against `https://example.com`.
+
+```bash
+# 1. Start Uptime Kuma
+docker run -d --restart=unless-stopped \
+  -p 3001:3001 -v uptime-kuma:/app/data \
+  --name uptime-kuma louislam/uptime-kuma:2
+```
+
+```text
+2. Open http://localhost:3001 and create the admin account (first run only).
+3. Click "Add New Monitor":
+     Monitor Type : HTTP(s)
+     Friendly Name: Hello World
+     URL          : https://example.com
+     Heartbeat    : 60 seconds
+   Save.
+4. The monitor turns green within ~60s and its heartbeat bar starts filling.
+```
+
+Optional — get notified and publish a status page:
+
+```text
+5. Settings → Notifications → add a channel (e.g. Telegram/Discord/webhook),
+   then attach it to the monitor.
+6. Status Pages → New Status Page → add the "Hello World" monitor → publish.
+```
+
+Everything above is stored in `/app/data` (the mounted volume). Back that up to keep your setup.
 
 ## Access
 
