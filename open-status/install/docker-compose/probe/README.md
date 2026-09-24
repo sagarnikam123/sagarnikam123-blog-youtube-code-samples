@@ -1,6 +1,20 @@
 # OpenStatus — private-location probe
 
-Self-hosted OpenStatus performs no checks on its own. A **probe** (private location) runs wherever you want to monitor from — a VPS, a Raspberry Pi, inside your VPC — and ships results to the ingest server on port `8081`.
+## What is a probe? Why use it?
+
+A **probe** (OpenStatus calls it a *private location*) is a small container that actually performs the checks: it hits your URLs/ports on a schedule, measures the result, and ships it to the ingest server. The dashboard and API only store config and display results — nothing is checked until a probe runs.
+
+Why it's a separate component when self-hosting:
+
+- The managed OpenStatus cloud has a global fleet of edge checkers; **self-hosted instances have none**, so you run your own probe.
+- It checks from where *you* want — inside your VPC, behind a firewall, or from multiple regions (one probe per region).
+- It can reach internal services that aren't exposed to the public internet.
+
+Mental model: **dashboard = configure · probe = check · ingest = collect.**
+
+## Deploy
+
+Self-hosted OpenStatus performs no checks on its own. A probe runs wherever you want to monitor from — a VPS, a Raspberry Pi, inside your VPC — and ships results to the ingest server on port `8081`.
 
 > Naming is confusing on purpose-of-warning: the **probe** is `ghcr.io/openstatushq/private-location` (unprefixed); the **ingest server** inside the stack is `ghcr.io/openstatushq/openstatus-private-location` (prefixed). The probe's `OPENSTATUS_INGEST_URL` points at the ingest server.
 
