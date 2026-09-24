@@ -34,3 +34,12 @@ A curated collection of production-ready code samples, automation frameworks, an
 - **[benchmark/](benchmark/)** - Controlled benchmark deployments and OTLP validation.
 - **[signoz/](signoz/)**, **[open-observe/](open-observe/)**, **[click-stack/](click-stack/)**, **[grafana-lgtm/](grafana-lgtm/)**, **[victoria-metrics/](victoria-metrics/)**, **[uptrace/](uptrace/)**, **[parseable/](parseable/)** - Phase 1 benchmark platforms.
 - **[coroot/](coroot/)**, **[elastic-observability/](elastic-observability/)**, **[opensearch-observability/](opensearch-observability/)**, **[one-uptime/](one-uptime/)**, **[highlight-io/](highlight-io/)** - Phase 2 and extended platform deployments.
+
+### ⏱️ Uptime Monitoring
+
+Self-hosted uptime / status-page tools compared in the [open-source uptime monitoring guide](https://sagarnikam123.github.io/):
+
+- **[uptime-kuma/](uptime-kuma/)** - UI-first monitor (Docker, Compose, Node.js binary, community Helm).
+- **[gatus/](gatus/)** - Config-as-code probe engine (binary, Docker, Compose, K8s, official Helm).
+- **[open-status/](open-status/)** - Monitoring-as-code + status pages (official Docker Compose full stack, status-page-only, private-location probe).
+- **[one-uptime/](one-uptime/)** - Full reliability platform (uptime + incidents + on-call + OTel).
