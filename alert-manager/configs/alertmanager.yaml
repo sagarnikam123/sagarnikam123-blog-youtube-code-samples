@@ -23,14 +23,21 @@ route:
 receivers:
   - name: default
     webhook_configs:
-      # ponytail: for eval only — replace with real webhook/email/slack in production
+      # ponytail: for eval only — replace with real webhook/email/slack in production.
+      # Local receiver (Docker): prints alerts to `webhook-receiver` container logs.
       - url: http://webhook-receiver:5001/alerts
         send_resolved: true
+      # Public inspector: uncomment to also POST alerts to your webhook.site URL
+      # (handy when running in k8s where the local receiver isn't wired up).
+      # - url: https://webhook.site/<your-uuid>
+      #   send_resolved: true
 
   - name: critical
     webhook_configs:
       - url: http://webhook-receiver:5001/alerts
         send_resolved: true
+      # - url: https://webhook.site/<your-uuid>
+      #   send_resolved: true
 
 # Inhibition: suppress warning if critical already firing for same job
 inhibit_rules:
