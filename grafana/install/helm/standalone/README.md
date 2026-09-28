@@ -1,7 +1,7 @@
-# Grafana - Helm - v12.x
+# Grafana - Helm - v13.x
 
 ## Versions
-- **App version**: 13.2.0
+- **Image**: `grafana/grafana:13.2.2` (note: `grafana/grafana-oss` has no 13.2.x tag; use `grafana/grafana`)
 - **Chart version**: latest (check with `helm search repo grafana/grafana --versions`)
 - **Docs**: https://grafana.com/docs/grafana/latest/
 
