@@ -1,0 +1,110 @@
+# Alertmanager - 3-node HA cluster (Docker Compose)
+#
+# HA model (per https://prometheus.io/docs/alerting/latest/high_availability/):
+#   - Instances form a gossip cluster over port 9094 (Hashicorp memberlist).
+#   - State replicated: silences + notification log -> dedup across the cluster.
+#   - "Fail open": on partition, prefer duplicate notifications over missed ones.
+#   - Staggered sends by peer position (0s, 15s, 30s) so a single survivor still fires.
+#
+# Usage:
+#   docker compose -f docker-compose-ha.yaml up -d
+#   docker compose -f docker-compose-ha.yaml logs -f alertmanager-0
+#
+# Access (each node has its own UI; silences/alerts are shared):
+#   AM-0: http://localhost:9093   AM-1: http://localhost:9193   AM-2: http://localhost:9293
+#
+# IMPORTANT — senders (Loki ruler / Prometheus) must point at ALL THREE, not a LB:
+#   ruler.alertmanager_url: http://alertmanager-0:9093,http://alertmanager-1:9093,http://alertmanager-2:9093
+#   (Loki accepts a comma-separated list; a load balancer would be a single point of failure
+#    and breaks the independent-processing model.)
+
+x-am-common: &am-common
+  image: prom/alertmanager:v0.28.1
+  restart: unless-stopped
+  volumes:
+    - ../../configs/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+  healthcheck:
+    test: ["CMD-SHELL", "wget -q --spider http://localhost:9093/-/healthy || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+services:
+  alertmanager-0:
+    <<: *am-common
+    container_name: alertmanager-0
+    ports: ["9093:9093"]
+    volumes:
+      - ../../configs/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - am0-data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+      - --cluster.listen-address=0.0.0.0:9094
+      - --cluster.peer=alertmanager-1:9094
+      - --cluster.peer=alertmanager-2:9094
+      - --log.level=info
+
+  alertmanager-1:
+    <<: *am-common
+    container_name: alertmanager-1
+    ports: ["9193:9093"]
+    volumes:
+      - ../../configs/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - am1-data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+      - --cluster.listen-address=0.0.0.0:9094
+      - --cluster.peer=alertmanager-0:9094
+      - --cluster.peer=alertmanager-2:9094
+      - --log.level=info
+
+  alertmanager-2:
+    <<: *am-common
+    container_name: alertmanager-2
+    ports: ["9293:9093"]
+    volumes:
+      - ../../configs/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - am2-data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+      - --cluster.listen-address=0.0.0.0:9094
+      - --cluster.peer=alertmanager-0:9094
+      - --cluster.peer=alertmanager-1:9094
+      - --log.level=info
+
+  # Optional: same local webhook receiver as the single-node compose, to see alerts.
+  webhook-receiver:
+    image: python:3.12-alpine
+    container_name: webhook-receiver-ha
+    ports: ["5001:5001"]
+    command: >
+      python -c "
+      from http.server import HTTPServer, BaseHTTPRequestHandler
+      import json
+      from datetime import datetime
+      class H(BaseHTTPRequestHandler):
+          def do_POST(self):
+              n=int(self.headers.get('Content-Length',0)); b=self.rfile.read(n)
+              try:
+                  for a in json.loads(b):
+                      print(f\"[{datetime.now().isoformat()}] [{a.get('status','?').upper()}] \"
+                            f\"{a.get('labels',{}).get('alertname','?')}: \"
+                            f\"{a.get('annotations',{}).get('summary','')}\", flush=True)
+              except Exception as e: print('parse error:', e, flush=True)
+              self.send_response(200); self.end_headers()
+          def log_message(self,*a): pass
+      print('webhook receiver on :5001', flush=True)
+      HTTPServer(('0.0.0.0',5001),H).serve_forever()
+      "
+    restart: unless-stopped
+
+volumes:
+  am0-data:
+  am1-data:
+  am2-data:

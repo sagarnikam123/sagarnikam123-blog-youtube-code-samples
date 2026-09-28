@@ -1,0 +1,159 @@
+# =============================================================================
+# Alertmanager - 3-replica HA cluster (Kubernetes StatefulSet)
+# =============================================================================
+# HA model (https://prometheus.io/docs/alerting/latest/high_availability/):
+#   - Gossip cluster over port 9094 (memberlist); replicates silences + nflog.
+#   - Fail-open, at-least-once, peer-position-staggered notifications.
+#   - Any N instances tolerate N-1 failures (no quorum/voting).
+#
+# Why StatefulSet + headless Service:
+#   - Stable pod DNS (alertmanager-0.alertmanager-headless...) for --cluster.peer.
+#   - Per-pod PVC so silences + notification log survive restarts.
+#
+# Critical flags:
+#   --cluster.advertise-address = POD IP (routable). MUST be an IP, not a hostname —
+#     a hostname leaves the advertise address unset and breaks clustering. Injected
+#     via the downward API (status.podIP).
+#
+# Deploy:
+#   kubectl create namespace alerting --dry-run=client -o yaml | kubectl apply -f -
+#   # EDIT the webhook URL in the ConfigMap below first.
+#   kubectl -n alerting apply -f alertmanager-ha.yaml
+#   kubectl -n alerting rollout status statefulset/alertmanager
+#
+# Point the Loki ruler at ALL replicas (not the Service VIP / not a LB):
+#   ruler:
+#     alertmanager_url: >-
+#       http://alertmanager-0.alertmanager-headless.alerting.svc.cluster.local:9093,
+#       http://alertmanager-1.alertmanager-headless.alerting.svc.cluster.local:9093,
+#       http://alertmanager-2.alertmanager-headless.alerting.svc.cluster.local:9093
+#     enable_alertmanager_v2: true
+#     external_url: http://<grafana-or-loki-host>   # MUST include scheme (else 422)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  labels: { app: alertmanager }
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'job', 'severity']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 1h
+      receiver: default
+      routes:
+        - match:
+            severity: critical
+          receiver: default
+          group_wait: 10s
+          continue: true
+    receivers:
+      - name: default
+        webhook_configs:
+          # EDIT: replace with your webhook.site URL or real receiver.
+          - url: https://webhook.site/00000000-0000-0000-0000-000000000000
+            send_resolved: true
+    inhibit_rules:
+      - source_match:
+          severity: critical
+        target_match:
+          severity: warning
+        equal: ['alertname', 'job']
+---
+# Headless service: stable per-pod DNS for gossip peers.
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-headless
+  labels: { app: alertmanager }
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true    # peers resolvable during startup/gossip settle
+  selector: { app: alertmanager }
+  ports:
+    - { name: http, port: 9093, targetPort: 9093 }
+    - { name: cluster-tcp, port: 9094, targetPort: 9094, protocol: TCP }
+    - { name: cluster-udp, port: 9094, targetPort: 9094, protocol: UDP }
+---
+# Regular service for the UI / API (any member; state is shared). Senders must
+# NOT use this VIP to deliver alerts — point them at the per-pod headless DNS.
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  labels: { app: alertmanager }
+spec:
+  selector: { app: alertmanager }
+  ports:
+    - { name: http, port: 9093, targetPort: 9093 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: alertmanager
+  labels: { app: alertmanager }
+spec:
+  serviceName: alertmanager-headless
+  replicas: 3
+  podManagementPolicy: Parallel     # bring peers up together so gossip settles faster
+  selector:
+    matchLabels: { app: alertmanager }
+  template:
+    metadata:
+      labels: { app: alertmanager }
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.28.1
+          env:
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
+            - --web.listen-address=0.0.0.0:9093
+            - --cluster.listen-address=0.0.0.0:9094
+            - --cluster.advertise-address=$(POD_IP):9094
+            # Peer discovery via the headless service DNS. Each pod lists all three;
+            # naming itself is harmless (memberlist ignores self).
+            - --cluster.peer=alertmanager-0.alertmanager-headless.alerting.svc.cluster.local:9094
+            - --cluster.peer=alertmanager-1.alertmanager-headless.alerting.svc.cluster.local:9094
+            - --cluster.peer=alertmanager-2.alertmanager-headless.alerting.svc.cluster.local:9094
+            - --log.level=info
+          ports:
+            - { name: http, containerPort: 9093 }
+            - { name: cluster-tcp, containerPort: 9094, protocol: TCP }
+            - { name: cluster-udp, containerPort: 9094, protocol: UDP }
+          readinessProbe:
+            httpGet: { path: /-/ready, port: 9093 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /-/healthy, port: 9093 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - { name: config, mountPath: /etc/alertmanager }
+            - { name: data, mountPath: /alertmanager }
+      volumes:
+        - name: config
+          configMap: { name: alertmanager-config }
+  volumeClaimTemplates:
+    # Persists only the `silences` + `nflog` snapshot files (alerts are NOT stored;
+    # they're re-sent by Prometheus/Loki). Real usage is a few MB even with 1000s of
+    # silences/groups, and nflog self-prunes past --data.retention (default 120h).
+    # 128Mi is ~50x headroom; could even be emptyDir (peers re-gossip silences).
+    - metadata:
+        name: data      # per-pod PVC persists silences + notification log
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 128Mi
