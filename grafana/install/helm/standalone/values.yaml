@@ -1,7 +1,10 @@
 # -- Image
+# NOTE: grafana/grafana-oss has no 13.2.x tag (its latest is 13.0.2), so
+# grafana/grafana-oss:13.2.0 fails to pull (404). Use grafana/grafana, which
+# publishes 13.2.x and is the standard OSS image.
 image:
-  repository: grafana/grafana-oss
-  tag: "13.2.0"
+  repository: grafana/grafana
+  tag: "13.2.2"
   pullPolicy: IfNotPresent
 
 # -- Admin credentials
