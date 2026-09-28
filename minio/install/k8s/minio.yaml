@@ -1,0 +1,127 @@
+# =============================================================================
+# MinIO - Kubernetes manifest (S3 object store for Loki)
+# =============================================================================
+# Deploy:
+#   kubectl create namespace minio --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl -n minio apply -f minio.yaml
+#   kubectl -n minio rollout status deploy/minio
+#
+# Access:
+#   kubectl -n minio port-forward svc/minio 9000:9000          # S3 API
+#   kubectl -n minio port-forward svc/minio-console 9001:9001  # Console UI
+#   login: minioadmin / minioadmin
+#
+# WHY cgr.dev/chainguard/minio (not minio/minio): the official MinIO images on
+# quay.io AND Docker Hub (minio/minio, minio/mc) reject anonymous pulls (401),
+# so the minio/minio Helm chart and image cannot deploy on a stock cluster.
+# Chainguard publishes a free, public, multi-arch MinIO image that DOES pull.
+#
+# BUCKET CREATION WITHOUT `mc`: a MinIO bucket is just a top-level directory in
+# the data dir. A root initContainer pre-creates the buckets and chowns the
+# volume to MinIO's nonroot uid (65532) — necessary because some k8s storage
+# provisioners (e.g. minikube hostpath) ignore fsGroup and leave the PVC
+# root-owned, which makes the nonroot MinIO process fail with "file access denied".
+#
+# Buckets match the Loki configs in loki/configs/v3.x/v3.7.x/:
+#   loki-data (minio-*.yaml), loki-chunks (minio-thanos-*.yaml), loki-ruler, loki-admin
+# ponytail: single replica, filesystem backend — fine for dev/eval; upgrade path
+# = MinIO Operator / distributed mode for HA.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio
+type: Opaque
+stringData:
+  root-user: minioadmin
+  root-password: minioadmin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels: { app: minio }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }   # single RWO volume; never two pods at once
+  selector:
+    matchLabels: { app: minio }
+  template:
+    metadata:
+      labels: { app: minio }
+    spec:
+      initContainers:
+        - name: init-perms
+          image: cgr.dev/chainguard/busybox:latest
+          securityContext:
+            runAsUser: 0            # root only to fix volume ownership + make buckets
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data/loki-data /data/loki-chunks /data/loki-ruler /data/loki-admin
+              chown -R 65532:65532 /data
+              echo "buckets:"; ls -1 /data
+          volumeMounts:
+            - { name: data, mountPath: /data }
+      containers:
+        - name: minio
+          image: cgr.dev/chainguard/minio:latest
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: minio, key: root-user } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: minio, key: root-password } }
+          ports:
+            - { name: s3, containerPort: 9000 }
+            - { name: console, containerPort: 9001 }
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: 9000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /minio/health/live, port: 9000 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: minio }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio               # S3 API
+  labels: { app: minio }
+spec:
+  selector: { app: minio }
+  ports:
+    - { name: s3, port: 9000, targetPort: 9000 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-console       # web UI
+  labels: { app: minio }
+spec:
+  selector: { app: minio }
+  ports:
+    - { name: console, port: 9001, targetPort: 9001 }
