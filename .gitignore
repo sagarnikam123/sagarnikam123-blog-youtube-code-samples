@@ -89,3 +89,11 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 graphify-out/
+
+# Java
+*.class
+# Maven build output
+target/
+*.jar
+*.war
+*.ear
