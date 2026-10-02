@@ -70,7 +70,7 @@ indexGateway:
   maxUnavailable: 1
 ruler:
   enabled: true
-  replicas: 0
+  replicas: 1          # must be >= 1, or an enabled ruler never schedules a pod
 
 # Disable bloom components (optional feature)
 bloomPlanner:
